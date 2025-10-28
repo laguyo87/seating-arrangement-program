@@ -1,132 +1,121 @@
-# 교실 자리 배치 프로그램
+# 교실 좌석 배치 프로그램 (Classroom Seating Arrangement Program)
 
-## 개요
-
-이 프로그램은 교사들이 교실 환경에 맞춰 학생들의 좌석을 효율적이고 공정하게 배치하도록 돕는 웹 애플리케이션입니다.
+교실에서 학생들의 좌석을 체계적으로 배치할 수 있는 웹 애플리케이션입니다.
 
 ## 주요 기능
 
-### 1단계: 학생 정보 입력
-- **학생 인원수 설정**: 총 학생 수를 입력하면 해당 인원수만큼 좌석이 자동 생성됩니다.
-- **명렬표 입력**: 학생 이름과 성별(남학생/여학생)을 입력합니다.
+### 1. 학생 정보 관리
+- 남학생/여학생 수 입력
+- 학생 이름과 성별 입력 테이블 생성
+- CSV 파일을 통한 학생 정보 일괄 업로드
+- 양식 다운로드 기능
 
-### 2단계: 좌석 배치 옵션 선택
-- **좌석 열 구성**: 
-  - 1열 좌석 배치 (개별 책상)
-  - 2열 좌석 배치 (짝꿍 책상)
-- **기본 배치 유형**:
-  - 1열 균등 배치
-  - 2열 균등 배치
-  - 모둠 배치
-  - ㄷ자 배치
-- **성별 조건** (2열 선택시):
-  - 남녀 짝꿍 배치 (성비에 맞춘 최적화된 짝꿍 배치)
+### 2. 좌석 배치 옵션
+- **1명씩 한 줄로 배치**: 남녀가 교대로 배치
+- **2명씩 짝꿍 배치**: 
+  - 남녀 짝꿍 하기
+  - 같은 성끼리 짝꿍하기
+- 분단 수 설정 (1~10분단)
 
-### 3단계: 고급 및 맞춤 구성
-- **고정 좌석 지정**: 특정 학생을 특정 좌석에 고정 배치
-- **나머지 랜덤 배치**: 고정 좌석 외 나머지 학생을 랜덤 배치
-- **사용자 임의 구성**: 캔버스에서 좌석 블록을 자유롭게 이동하고 배치
+### 3. 맞춤 구성
+- 랜덤 배치
+- 고정 좌석 지정 후 랜덤 배치
 
-## 기술 스택
-
-- **언어**: TypeScript (ES2020)
-- **모듈 시스템**: ES Modules
-- **타입 시스템**: Strict TypeScript
-- **아키텍처**: 모듈화된 컴포넌트 기반
-
-## 프로젝트 구조
-
-```
-seating-arrangement-pgm/
-├── index.html              # HTML 메인 파일
-├── style.css              # 스타일시트
-├── src/
-│   ├── main.ts           # 메인 엔트리 포인트
-│   ├── models/           # 데이터 모델
-│   │   ├── Student.ts    # 학생 모델
-│   │   └── Seat.ts       # 좌석 모델
-│   ├── services/         # 비즈니스 로직 서비스
-│   │   ├── InputService.ts       # 입력 검증 서비스
-│   │   ├── LayoutService.ts      # 배치 알고리즘 서비스
-│   │   └── RandomService.ts      # 랜덤 배치 서비스
-│   ├── modules/          # UI 모듈
-│   │   ├── InputModule.ts        # 입력 모듈
-│   │   ├── LayoutSelectorModule.ts  # 배치 선택 모듈
-│   │   ├── SeatCanvasModule.ts      # 캔버스 모듈
-│   │   └── OutputModule.ts          # 출력 모듈
-│   └── controllers/      # 컨트롤러
-│       └── MainController.ts    # 메인 컨트롤러
-├── package.json          # 프로젝트 설정
-├── tsconfig.json         # TypeScript 설정
-└── README.md             # 이 파일
-```
-
-## 설치 및 실행
-
-### 1. 의존성 설치
-
-```bash
-npm install
-```
-
-### 2. TypeScript 컴파일
-
-```bash
-npm run build
-```
-
-또는 watch 모드로 자동 컴파일:
-
-```bash
-npm run watch
-```
-
-### 3. 웹 서버 실행
-
-로컬 웹 서버를 사용하여 프로젝트를 실행합니다. 예:
-
-```bash
-# Python을 사용하는 경우
-python -m http.server 8000
-
-# Node.js http-server를 사용하는 경우
-npx http-server
-```
-
-그 다음 브라우저에서 `http://localhost:8000` 접속
+### 4. 시각적 배치
+- 실시간 미리보기
+- 칠판, 교탁, 학생 좌석 카드 표시
+- 성별별 색상 구분 (남학생: 파란색, 여학생: 분홍색)
+- 분단별 레이블 표시
 
 ## 사용 방법
 
 1. **학생 정보 입력**
-   - "학생 총 인원수"를 입력하고 "인원수 설정" 버튼을 클릭
-   - 명렬표 입력 필드에 학생 이름과 성별을 입력
+   - 남학생 수와 여학생 수 입력
+   - 각각의 ↵ 버튼을 클릭하여 미리보기 확인
 
-2. **배치 옵션 선택**
-   - 1열 또는 2열 좌석 배치 선택
-   - 기본 배치 유형 선택 (균등 배치, 모둠 배치, ㄷ자 배치)
-   - 2열 선택시 남녀 짝꿍 배치 옵션 선택 가능
+2. **분단 개수 설정**
+   - 원하는 분단 수 입력 (예: 3분단, 4분단)
 
-3. **자리 배치 생성**
-   - "자리 배치 생성" 버튼 클릭
-   - 캔버스에 좌석 배치 결과가 표시됩니다
+3. **좌석 배치 형태 선택**
+   - 1명씩 한 줄로 배치 또는 2명씩 짝꿍 배치 선택
+   - 짝꿍 배치 시 남녀 짝꿍 또는 같은 성끼리 짝꿍 선택
 
-4. **고급 옵션**
-   - 좌석을 더블클릭하여 고정/해제
-   - "나머지 랜덤 배치"로 추가 배치
-   - "자유 배치 모드"로 좌석을 드래그하여 이동
+4. **맞춤 구성**
+   - 랜덤 배치 또는 고정 좌석 지정 후 랜덤 배치 선택
 
-5. **결과 내보내기**
-   - "결과 내보내기" 버튼으로 텍스트 파일로 저장
+5. **학생 정보 입력 테이블 생성**
+   - 학생 이름과 성별을 입력할 테이블 생성
 
-## 코드 특징
+6. **좌석 배치하기**
+   - 테이블에 입력된 이름을 실제 좌석에 무작위 배치
 
-- **타입 안정성**: TypeScript를 사용하여 컴파일 타임 타입 체크
-- **모듈화**: 기능별로 모듈 분리 (UI, 서비스, 컨트롤러)
-- **ES6+ 문법**: 최신 JavaScript/TypeScript 문법 사용
-- **상세한 주석**: 모든 클래스, 메서드, 복잡한 로직에 주석 제공
-- **에러 처리**: 적절한 에러 처리 및 사용자 피드백
+## 기술 스택
+
+- **Frontend**: HTML5, CSS3, TypeScript
+- **Build Tool**: TypeScript Compiler
+- **Package Manager**: npm
+
+## 프로젝트 구조
+
+```
+├── index.html              # 메인 HTML 파일
+├── style.css              # 스타일시트
+├── src/
+│   ├── main.ts            # 애플리케이션 진입점
+│   ├── controllers/
+│   │   └── MainController.ts  # 메인 컨트롤러
+│   ├── models/
+│   │   ├── Student.ts     # 학생 모델
+│   │   └── Seat.ts        # 좌석 모델
+│   ├── modules/
+│   │   ├── InputModule.ts      # 입력 모듈
+│   │   ├── LayoutSelectorModule.ts  # 레이아웃 선택 모듈
+│   │   ├── OutputModule.ts     # 출력 모듈
+│   │   ├── SeatCanvasModule.ts # 좌석 캔버스 모듈
+│   │   └── CustomLayoutModule.ts # 커스텀 레이아웃 모듈
+│   └── services/
+│       ├── InputService.ts     # 입력 서비스
+│       ├── LayoutService.ts    # 레이아웃 서비스
+│       └── RandomService.ts    # 랜덤 서비스
+├── dist/                  # 컴파일된 JavaScript 파일들
+├── package.json           # 프로젝트 설정
+└── tsconfig.json         # TypeScript 설정
+```
+
+## 설치 및 실행
+
+1. 저장소 클론
+```bash
+git clone https://github.com/laguyo87/classroom-seating-arrangement.git
+cd classroom-seating-arrangement
+```
+
+2. 의존성 설치
+```bash
+npm install
+```
+
+3. TypeScript 컴파일
+```bash
+npm run build
+```
+
+4. 웹 서버에서 실행
+   - `index.html` 파일을 웹 브라우저에서 열거나
+   - 로컬 웹 서버를 사용하여 실행
 
 ## 라이선스
 
-MIT
+이 프로젝트는 MIT 라이선스 하에 배포됩니다.
 
+## 기여하기
+
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 연락처
+
+프로젝트 링크: [https://github.com/laguyo87/classroom-seating-arrangement](https://github.com/laguyo87/classroom-seating-arrangement)
