@@ -1082,7 +1082,7 @@ export class MainController {
         actionButtons.innerHTML = `
             <button id="add-student-row-btn">행 추가</button>
             <button id="save-student-data">명렬표 저장</button>
-            <button id="arrange-seats" class="arrange-seats-btn">좌석 배치하기</button>
+            <button id="arrange-seats" class="arrange-seats-btn">자리 배치하기</button>
         `;
         studentTableContainer.appendChild(actionButtons);
         
@@ -1656,7 +1656,7 @@ export class MainController {
         actionButtons.innerHTML = `
             <button id="add-student-row-btn">행 추가</button>
             <button id="save-student-data">명렬표 저장</button>
-            <button id="arrange-seats" class="arrange-seats-btn">좌석 배치하기</button>
+            <button id="arrange-seats" class="arrange-seats-btn">자리 배치하기</button>
         `;
         studentTableContainer.appendChild(actionButtons);
         
