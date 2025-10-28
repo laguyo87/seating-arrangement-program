@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>교실 자리 배치 프로그램</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- 상단 헤더 -->
+    <header class="top-header">
+        <div class="header-content">
+            <h1>교실 자리 배치 프로그램</h1>
+            <p class="version">Version 1.0.0</p>
+        </div>
+    </header>
+
+    <!-- 메인 컨테이너 -->
+    <div class="main-container">
+        <!-- 좌측 사이드바 (설정) -->
+        <aside class="sidebar">
+            <div class="sidebar-content">
+            <!-- 1단계: 학생 정보 입력 -->
+            <section id="input-section" class="step-section">
+                <h2>1단계: 학생 정보 입력</h2>
+                
+                <div class="form-group">
+                    <label for="male-students">남학생 수:</label>
+                    <div class="count-input-container">
+                        <input type="number" id="male-students" min="0" placeholder="남학생 수" value="12" />
+                        <button id="increase-male-count" class="enter-btn">↵</button>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="female-students">여학생 수:</label>
+                    <div class="count-input-container">
+                        <input type="number" id="female-students" min="0" placeholder="여학생 수" value="12" />
+                        <button id="increase-female-count" class="enter-btn">↵</button>
+                    </div>
+                </div>
+                
+                <p class="help-text" style="margin-top: 8px; color: #666; font-size: 0.9em;">
+                    남학생 수와 여학생 수를 입력하고 각각의 ↵ 버튼을 누르면 우측에 미리보기가 표시됩니다.
+                </p>
+            </section>
+
+            <!-- 2단계: 분단 개수 -->
+            <section id="partition-section" class="step-section">
+                <h2>2단계: 분단 개수</h2>
+                
+                <div class="form-group">
+                    <label for="number-of-partitions">분단 수:</label>
+                    <div class="count-input-container">
+                        <input type="number" id="number-of-partitions" min="1" max="10" placeholder="분단 수" value="6" />
+                    </div>
+                    <p class="help-text" style="margin-top: 8px; color: #666; font-size: 0.9em;">
+                        교실의 분단 수를 입력하세요 (예: 2분단, 3분단 등)
+                    </p>
+                </div>
+            </section>
+
+            <!-- 3단계: 좌석 배치 형태 -->
+            <section id="layout-section" class="step-section">
+                <h2>3단계: 좌석 배치 형태</h2>
+                
+                <div class="form-group">
+                    <div class="radio-group">
+                        <label class="radio-option">
+                            <input type="radio" name="layout-type" value="single-uniform" data-seat-type="single" checked>
+                            <span>1명씩 한 줄로 배치</span>
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="layout-type" value="pair-uniform" data-seat-type="pair">
+                            <span>2명씩 짝꿍 배치</span>
+                        </label>
+                        
+                        <!-- 2명씩 짝꿍 배치 서브 옵션 (기본 숨김) -->
+                        <div id="pair-submenu" style="display: none; margin-left: 30px; margin-top: 5px; margin-bottom: 5px;">
+                            <label class="radio-option" style="border: none; padding: 8px 15px;">
+                                <input type="radio" name="pair-mode" value="gender-pair" checked>
+                                <span>남녀 짝꿍 하기</span>
+                            </label>
+                            <label class="radio-option" style="border: none; padding: 8px 15px;">
+                                <input type="radio" name="pair-mode" value="same-gender-pair">
+                                <span>같은 성끼리 짝꿍하기</span>
+                            </label>
+                        </div>
+                        
+                        <label class="radio-option">
+                            <input type="radio" name="layout-type" value="group" data-seat-type="single" id="radio-group">
+                            <span>모둠 배치 (준비중)</span>
+                        </label>
+                        
+                        <!-- 모둠 배치 서브 옵션 (기본 숨김) -->
+                        <div id="group-submenu" style="display: none; margin-left: 30px; margin-top: 5px; margin-bottom: 5px;">
+                            <label class="radio-option" style="border: none; padding: 8px 15px;">
+                                <input type="radio" name="group-size" value="group-4" data-seat-type="single">
+                                <span>4명 모둠 배치</span>
+                            </label>
+                            <label class="radio-option" style="border: none; padding: 8px 15px;">
+                                <input type="radio" name="group-size" value="group-6" data-seat-type="single">
+                                <span>6명 모둠 배치</span>
+                            </label>
+                        </div>
+                        
+                        <label class="radio-option">
+                            <input type="radio" name="layout-type" value="ushape" data-seat-type="single">
+                            <span>ㄷ자 2명 짝꿍 배치 (준비중)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group" id="gender-pairing-option" style="display: none;">
+                    <h3>성별 조건 (2열 좌석만 해당)</h3>
+                    <label><input type="checkbox" id="gender-pairing" /> 남녀 짝꿍 배치 (남여 성비에 맞춘 짝꿍 배치)</label>
+                </div>
+            </section>
+
+            <!-- 4단계: 맞춤 구성 -->
+            <section id="custom2-section" class="step-section">
+                <h2>4단계: 맞춤 구성</h2>
+                
+                <div class="form-group">
+                    <div class="radio-group">
+                        <label class="radio-option">
+                            <input type="radio" name="custom-mode-2" value="random" id="mode-random" checked>
+                            <span>랜덤 배치</span>
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="custom-mode-2" value="fixed-random" id="mode-fixed-random">
+                            <span>고정 좌석 지정 후 랜덤 배치</span>
+                        </label>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 5단계: 좌석 배치하기 -->
+            <section id="main-action-section" class="step-section">
+                <h2>5단계: 좌석 배치하기</h2>
+                
+                <div class="form-group">
+                    <button id="create-student-table" class="primary-btn">학생 정보 입력 테이블 생성</button>
+                    <p class="help-text" style="margin-top: 8px; color: #666; font-size: 0.9em;">
+                        학생 정보를 입력할 테이블을 생성합니다.
+                    </p>
+                </div>
+            </section>
+
+            </div>
+        </aside>
+
+        <!-- 우측 메인창 (미리보기) -->
+        <main class="main-content">
+            <div class="main-header">
+                <h2>자리 배치도</h2>
+            </div>
+            
+            <div id="output-section" class="result-container">
+                <!-- 카드 배치 영역 -->
+                <div id="card-layout-container" style="padding: 20px; background: white; border-radius: 8px; margin: 20px 0;">
+                    <div id="classroom-layout" style="min-height: 600px; background: #f8f9fa; border: 2px dashed #ddd; border-radius: 10px; padding: 20px; position: relative;">
+                        <!-- 칠판 영역 -->
+                        <div class="classroom-item" id="blackboard-area" style="position: absolute; top: 20px; left: 50%; transform: translateX(-50%); width: 300px; height: 80px; background: #2c3e50; border: 3px solid #1a252f; border-radius: 5px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 18px;">
+                            📝 칠판
+                        </div>
+                        <!-- 교탁 영역 -->
+                        <div class="classroom-item" id="teacher-desk-area" style="position: absolute; top: 120px; left: 50%; transform: translateX(-50%); width: 120px; height: 40px; background: #95a5a6; border: 2px solid #7f8c8d; border-radius: 5px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">
+                            🖥️ 교탁
+                        </div>
+                        <!-- 좌석 배치 영역 -->
+                        <div id="seats-area" style="margin-top: 200px; display: grid; gap: 10px; justify-content: center;">
+                            <!-- 좌석 카드들이 여기에 동적으로 추가됨 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script type="module" src="dist/main.js"></script>
+</body>
+</html>
+

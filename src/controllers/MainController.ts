@@ -1,0 +1,2041 @@
+/**
+ * 메인 컨트롤러
+ * 전체 프로그램 흐름 제어 및 모듈 통합
+ */
+import { InputModule } from '../modules/InputModule.js';
+import { LayoutSelectorModule } from '../modules/LayoutSelectorModule.js';
+import { SeatCanvasModule } from '../modules/SeatCanvasModule.js';
+import { OutputModule } from '../modules/OutputModule.js';
+import { CustomLayoutModule } from '../modules/CustomLayoutModule.js';
+import { StudentModel } from '../models/Student.js';
+import { LayoutService } from '../services/LayoutService.js';
+import { RandomService } from '../services/RandomService.js';
+import { SeatType } from '../models/Seat.js';
+import { Student } from '../models/Student.js';
+import { Seat } from '../models/Seat.js';
+
+/**
+ * 메인 컨트롤러 클래스
+ * 전체 프로그램의 흐름을 제어하고 모듈들을 조율합니다.
+ */
+export class MainController {
+    private inputModule!: InputModule;
+    private layoutSelectorModule!: LayoutSelectorModule;
+    private canvasModule!: SeatCanvasModule;
+    private outputModule!: OutputModule;
+    private customLayoutModule!: CustomLayoutModule;
+    
+    private students: Student[] = [];
+    private seats: Seat[] = [];
+    private isInitialized: boolean = false;
+
+    constructor() {
+        try {
+            // 모듈 초기화
+            this.inputModule = new InputModule('input-section');
+            this.layoutSelectorModule = new LayoutSelectorModule('layout-section');
+            
+            // Canvas 관련 모듈은 선택적으로 초기화 (카드 기반 배치 사용 시)
+            const canvas = document.getElementById('seat-canvas');
+            if (canvas) {
+                this.canvasModule = new SeatCanvasModule('seat-canvas');
+                this.customLayoutModule = new CustomLayoutModule('seat-canvas');
+            }
+            
+            this.outputModule = new OutputModule('output-section');
+            
+            // 이벤트 리스너 설정
+            this.initializeEventListeners();
+            
+            // 초기 상태에서도 4단계 비활성화 체크
+            const checkedLayoutType = document.querySelector('input[name="layout-type"]:checked') as HTMLInputElement;
+            if (checkedLayoutType && checkedLayoutType.value === 'single-uniform') {
+                this.toggleCustomMode1(true);
+            }
+            
+            this.isInitialized = true;
+            
+            // 저장된 데이터 불러오기
+            this.loadSavedLayoutResult();
+            
+            console.log('초기화 - seats.length:', this.seats.length, 'students.length:', this.students.length);
+            
+            if (this.seats.length > 0 && this.students.length > 0) {
+                console.log('저장된 배치 결과를 로드합니다.');
+                this.outputModule.showInfo('저장된 배치 결과가 로드되었습니다.');
+                // 저장된 배치 결과 렌더링
+                this.renderFinalLayout();
+            } else {
+                console.log('초기 예시 레이아웃을 표시합니다.');
+                // 초기 예시 레이아웃 표시 (24명, 6분단)
+                this.renderInitialExampleLayout();
+                
+                // 초기값으로 미리보기 자동 실행
+                setTimeout(() => {
+                    this.updatePreviewForGenderCounts();
+                }, 100);
+            }
+        } catch (error) {
+            console.error('초기화 실패:', error);
+            alert('프로그램 초기화 중 오류가 발생했습니다.');
+        }
+    }
+
+    /**
+     * 초기 캔버스에 칠판과 교탁 그리기
+     */
+    private drawInitialCanvas(): void {
+        const canvas = document.getElementById('seat-canvas') as HTMLCanvasElement;
+        if (!canvas) return;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        // 캔버스 클리어
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // 배경 설정
+        ctx.fillStyle = '#f8f9fa';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // 교탁과 칠판 그리기
+        this.drawTeacherDeskAndBoard(ctx, canvas);
+        
+        // 안내 메시지
+        ctx.fillStyle = '#666';
+        ctx.font = 'bold 20px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('교실 자리 배치 프로그램', canvas.width / 2, canvas.height / 2 - 30);
+        ctx.font = '14px sans-serif';
+        ctx.fillStyle = '#999';
+        ctx.fillText('칠판과 교탁이 상단에 자동으로 배치됩니다.', canvas.width / 2, canvas.height / 2);
+    }
+
+    /**
+     * 이벤트 리스너 초기화
+     */
+    private initializeEventListeners(): void {
+        // 라디오 버튼 변경 이벤트 직접 리스닝
+        const layoutInputs = document.querySelectorAll('input[name="layout-type"]');
+        layoutInputs.forEach(input => {
+            input.addEventListener('change', (e) => {
+                const target = e.target as HTMLInputElement;
+                const layoutType = target.value;
+                
+                // '1명 한 줄로 배치' 선택 시 4단계 비활성화
+                this.toggleCustomMode1(layoutType === 'single-uniform');
+                
+                // '2명씩 짝꿍 배치' 선택 시 서브 메뉴 표시
+                this.togglePairSubmenu(layoutType === 'pair-uniform');
+                
+                
+                // 배치 형태 변경 시 미리보기 업데이트
+                this.updatePreviewForGenderCounts();
+            });
+        });
+
+        // 모둠 크기 라디오 버튼 변경 이벤트
+        const groupSizeInputs = document.querySelectorAll('input[name="group-size"]');
+        groupSizeInputs.forEach(input => {
+            input.addEventListener('change', (e) => {
+                // 미리보기 기능 삭제됨
+            });
+        });
+        
+        // 짝꿍 모드 라디오 버튼 변경 이벤트
+        const pairModeInputs = document.querySelectorAll('input[name="pair-mode"]');
+        pairModeInputs.forEach(input => {
+            input.addEventListener('change', (e) => {
+                console.log('짝꿍 모드 변경:', (e.target as HTMLInputElement).value);
+                // 현재 학생 수 가져오기
+                this.updatePreviewForGenderCounts();
+            });
+        });
+
+        // 인원수 설정 이벤트
+        document.addEventListener('studentCountSet', (e: Event) => {
+            const customEvent = e as CustomEvent;
+            const count = customEvent.detail.count;
+            this.handleCreateStudentTable(count);
+            // 미리보기 업데이트
+            this.updatePreviewForStudentCount(count);
+        });
+
+        // 남학생 수 입력 필드 이벤트
+        const maleCountInput = document.getElementById('male-students') as HTMLInputElement;
+        if (maleCountInput) {
+            maleCountInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    this.updatePreviewForGenderCounts();
+                }
+            });
+
+            maleCountInput.addEventListener('change', () => {
+                this.updatePreviewForGenderCounts();
+            });
+
+            // 남학생 수 엔터 버튼
+            const maleIncreaseBtn = document.getElementById('increase-male-count');
+            if (maleIncreaseBtn) {
+                maleIncreaseBtn.addEventListener('click', () => {
+                    this.updatePreviewForGenderCounts();
+                });
+            }
+        }
+
+        // 여학생 수 입력 필드 이벤트
+        const femaleCountInput = document.getElementById('female-students') as HTMLInputElement;
+        if (femaleCountInput) {
+            femaleCountInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    this.updatePreviewForGenderCounts();
+                }
+            });
+
+            femaleCountInput.addEventListener('change', () => {
+                this.updatePreviewForGenderCounts();
+            });
+
+            // 여학생 수 엔터 버튼
+            const femaleIncreaseBtn = document.getElementById('increase-female-count');
+            if (femaleIncreaseBtn) {
+                femaleIncreaseBtn.addEventListener('click', () => {
+                    this.updatePreviewForGenderCounts();
+                });
+            }
+        }
+
+        // 학생 정보 입력 테이블 생성 버튼
+        const createTableBtn = document.getElementById('create-student-table');
+        if (createTableBtn) {
+            createTableBtn.addEventListener('click', () => {
+                this.handleCreateStudentTable();
+            });
+        }
+        
+        // 분단 수 입력 필드에 엔터 키 이벤트 추가
+        const partitionInput = document.getElementById('number-of-partitions') as HTMLInputElement;
+        if (partitionInput) {
+            partitionInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    // 분단 수가 입력되면 자동으로 저장되도록 (현재는 change 이벤트만 사용)
+                    partitionInput.blur(); // 포커스 제거
+                }
+            });
+            
+            // 분단 수 변경 시 미리보기 업데이트
+            partitionInput.addEventListener('change', () => {
+                console.log('분단 수 변경됨');
+                // 현재 학생 수 가져오기
+                this.updatePreviewForGenderCounts();
+            });
+        }
+
+
+
+        // 결과 내보내기 버튼
+        const exportBtn = document.getElementById('export-result');
+        if (exportBtn) {
+            exportBtn.addEventListener('click', () => this.handleExport());
+        }
+
+        // 고정 좌석 모드 버튼
+        const fixedModeBtn = document.getElementById('enable-fixed-seats');
+        if (fixedModeBtn) {
+            fixedModeBtn.addEventListener('click', () => {
+                this.outputModule.showInfo('고정 좌석 모드: 캔버스의 좌석을 더블 클릭하여 고정/해제할 수 있습니다.');
+            });
+        }
+
+        // 나머지 랜덤 배치 버튼
+        const randomizeBtn = document.getElementById('randomize-remaining');
+        if (randomizeBtn) {
+            randomizeBtn.addEventListener('click', () => this.handleRandomizeRemaining());
+        }
+
+
+        // 양식 파일 다운로드 버튼
+        const downloadTemplateBtn = document.getElementById('download-template');
+        if (downloadTemplateBtn) {
+            downloadTemplateBtn.addEventListener('click', () => this.downloadTemplateFile());
+        }
+
+        // 엑셀 파일 업로드 버튼 (눌러서 파일 선택 트리거)
+        const uploadFileBtn = document.getElementById('upload-file');
+        if (uploadFileBtn) {
+            uploadFileBtn.addEventListener('click', () => {
+                const fileInput = document.getElementById('upload-file-input') as HTMLInputElement;
+                if (fileInput) {
+                    fileInput.click();
+                }
+            });
+        }
+
+        // 엑셀 파일 업로드 입력 필드
+        const uploadFileInput = document.getElementById('upload-file-input');
+        if (uploadFileInput) {
+            uploadFileInput.addEventListener('change', (e) => this.handleFileUpload(e));
+        }
+
+        // 라디오 버튼 이벤트 리스너
+        this.initializeRadioListeners();
+    }
+
+    /**
+     * 라디오 버튼 이벤트 리스너 초기화
+     */
+    private initializeRadioListeners(): void {
+        // 배치 유형 라디오 버튼
+        const layoutRadios = document.querySelectorAll('input[name="layout-type"]');
+        layoutRadios.forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                const target = e.target as HTMLInputElement;
+                if (target.id === 'radio-group') {
+                    // 모둠 배치가 선택되면 서브 메뉴 표시
+                    const groupSubmenu = document.getElementById('group-submenu');
+                    if (groupSubmenu) {
+                        groupSubmenu.style.display = 'block';
+                    }
+                } else {
+                    // 다른 옵션 선택 시 서브 메뉴 숨김
+                    const groupSubmenu = document.getElementById('group-submenu');
+                    if (groupSubmenu) {
+                        groupSubmenu.style.display = 'none';
+                    }
+                }
+            });
+        });
+    }
+
+
+    /**
+     * 최종 자리 배치도 렌더링
+     */
+    private renderFinalLayout(): void {
+        console.log('renderFinalLayout 시작');
+        console.log('Students:', this.students);
+        console.log('Seats:', this.seats);
+        
+        // 카드 컨테이너 표시
+        const cardContainer = document.getElementById('card-layout-container');
+        console.log('Card container:', cardContainer);
+        
+        if (!cardContainer) {
+            console.error('카드 컨테이너를 찾을 수 없습니다.');
+            return;
+        }
+        
+        cardContainer.style.display = 'block';
+        
+        // 헤더 제목 변경
+        const mainHeader = document.querySelector('.main-header h2');
+        if (mainHeader) {
+            mainHeader.textContent = '자리 배치도';
+        }
+
+        // 실제 학생 데이터로 카드 렌더링
+        this.renderStudentCards(this.seats);
+    }
+
+    /**
+     * 초기 예시 레이아웃 렌더링
+     */
+    private renderInitialExampleLayout(): void {
+        console.log('초기 예시 레이아웃 렌더링 시작');
+        
+        // 카드 컨테이너 표시
+        const cardContainer = document.getElementById('card-layout-container');
+        if (!cardContainer) {
+            console.error('카드 컨테이너를 찾을 수 없습니다.');
+            return;
+        }
+        
+        cardContainer.style.display = 'block';
+        
+        // 학생 및 좌석 배열 초기화
+        this.students = [];
+        this.seats = [];
+        
+        // 예시 좌석 생성 (24개)
+        const exampleSeats: Seat[] = [];
+        for (let i = 0; i < 24; i++) {
+            const student = StudentModel.create(
+                `학생${i + 1}`,
+                (i % 2 === 0) ? 'M' : 'F'
+            );
+            this.students.push(student);
+            
+            // 좌석 생성 (더미)
+            const seat = {
+                id: i + 1,
+                position: { x: 0, y: 0 },
+                isActive: true,
+                isFixed: false,
+                studentId: student.id,
+                studentName: student.name
+            } as Seat;
+            exampleSeats.push(seat);
+        }
+        
+        this.seats = exampleSeats;
+        
+        // 예시 카드 렌더링
+        this.renderExampleCards();
+    }
+
+    /**
+     * 예시 카드 렌더링
+     */
+    private renderExampleCards(): void {
+        const seatsArea = document.getElementById('seats-area');
+        if (!seatsArea) return;
+
+        // 기존 카드 제거
+        seatsArea.innerHTML = '';
+
+        // 선택된 배치 형태 확인
+        const layoutTypeInput = document.querySelector('input[name="layout-type"]:checked') as HTMLInputElement;
+        const layoutType = layoutTypeInput?.value;
+        
+        // 분단 수 가져오기
+        const partitionInput = document.getElementById('number-of-partitions') as HTMLInputElement;
+        const partitionCount = partitionInput ? parseInt(partitionInput.value || '1', 10) : 1;
+        
+        // 2명씩 짝꿍 배치인 경우
+        if (layoutType === 'pair-uniform') {
+            // 분단 레이블 추가
+            const labelsRow = document.createElement('div');
+            labelsRow.style.gridColumn = `1 / -1`;
+            labelsRow.style.display = 'grid';
+            labelsRow.style.gridTemplateColumns = `repeat(${partitionCount}, 1fr)`;
+            labelsRow.style.gap = '40px';
+            labelsRow.style.marginBottom = '5px';
+            
+            for (let i = 1; i <= partitionCount; i++) {
+                const label = document.createElement('div');
+                label.textContent = `${i}분단`;
+                label.style.textAlign = 'center';
+                label.style.fontWeight = 'bold';
+                label.style.color = '#667eea';
+                label.style.fontSize = '0.9em';
+                labelsRow.appendChild(label);
+            }
+            
+            seatsArea.appendChild(labelsRow);
+            
+            seatsArea.style.gridTemplateColumns = `repeat(${partitionCount}, 1fr)`;
+            seatsArea.style.gap = '10px 40px';
+            
+            // 선택된 짝꿍 모드 확인
+            const pairModeInput = document.querySelector('input[name="pair-mode"]:checked') as HTMLInputElement;
+            const pairMode = pairModeInput?.value || 'gender-pair'; // 기본값: 남녀 짝꿍
+            console.log('짝꿍 모드:', pairMode);
+            
+            if (pairMode === 'same-gender-pair') {
+                // 같은 성끼리 짝꿍하기: 각 행에서 분단을 넘나들며 같은 성별끼리 짝꿍
+                // 성별별로 학생 분류
+                const maleStudents = this.students.filter(s => s.gender === 'M');
+                const femaleStudents = this.students.filter(s => s.gender === 'F');
+                
+                const studentsPerPartition = Math.ceil(this.students.length / partitionCount);
+                const rowsPerPartition = Math.ceil(studentsPerPartition / 2);
+                
+                let maleIndex = 0;
+                let femaleIndex = 0;
+                
+                // 가로로 배치 (각 행을 분단별로 채움)
+                for (let row = 0; row < rowsPerPartition; row++) {
+                    for (let partition = 0; partition < partitionCount; partition++) {
+                        const pairContainer = document.createElement('div');
+                        pairContainer.style.display = 'flex';
+                        pairContainer.style.gap = '0px';
+                        
+                        // 각 행마다 올바른 패턴으로 배치
+                        // 첫 번째 행: 남남 -> 여여 -> 남남
+                        // 두 번째 행: 여여 -> 남남 -> 여여  
+                        // 세 번째 행: 남남 -> 여여 -> 남남
+                        // 네 번째 행: 여여 -> 남남 -> 여여
+                        const shouldBeMale = (row + partition) % 2 === 0;
+                        
+                        if (shouldBeMale) {
+                            // 남학생 짝꿍
+                            if (maleIndex < maleStudents.length) {
+                                const card1 = this.createStudentCard(maleStudents[maleIndex], this.students.indexOf(maleStudents[maleIndex]));
+                                pairContainer.appendChild(card1);
+                                maleIndex++;
+                                
+                                if (maleIndex < maleStudents.length) {
+                                    const card2 = this.createStudentCard(maleStudents[maleIndex], this.students.indexOf(maleStudents[maleIndex]));
+                                    pairContainer.appendChild(card2);
+                                    maleIndex++;
+                                }
+                            }
+                        } else {
+                            // 여학생 짝꿍
+                            if (femaleIndex < femaleStudents.length) {
+                                const card1 = this.createStudentCard(femaleStudents[femaleIndex], this.students.indexOf(femaleStudents[femaleIndex]));
+                                pairContainer.appendChild(card1);
+                                femaleIndex++;
+                                
+                                if (femaleIndex < femaleStudents.length) {
+                                    const card2 = this.createStudentCard(femaleStudents[femaleIndex], this.students.indexOf(femaleStudents[femaleIndex]));
+                                    pairContainer.appendChild(card2);
+                                    femaleIndex++;
+                                }
+                            }
+                        }
+                        
+                        seatsArea.appendChild(pairContainer);
+                    }
+                }
+            } else {
+                // 남녀 짝꿍 하기인 경우 - 명확하게 남녀 교대로 짝꿍
+                const maleStudents = this.students.filter(s => s.gender === 'M');
+                const femaleStudents = this.students.filter(s => s.gender === 'F');
+                
+                const totalPairs = Math.min(maleStudents.length, femaleStudents.length);
+                const rowsPerPartition = Math.ceil(totalPairs / partitionCount);
+                
+                let maleIndex = 0;
+                let femaleIndex = 0;
+                
+                // 가로로 배치 (각 행을 분단별로 채움)
+                for (let row = 0; row < rowsPerPartition; row++) {
+                    for (let partition = 0; partition < partitionCount; partition++) {
+                        if (maleIndex >= maleStudents.length || femaleIndex >= femaleStudents.length) break;
+                        
+                        const pairContainer = document.createElement('div');
+                        pairContainer.style.display = 'flex';
+                        pairContainer.style.gap = '0px';
+                        
+                        // 남학생 카드
+                        const card1 = this.createStudentCard(maleStudents[maleIndex], this.students.indexOf(maleStudents[maleIndex]));
+                        pairContainer.appendChild(card1);
+                        maleIndex++;
+                        
+                        // 여학생 카드
+                        if (femaleIndex < femaleStudents.length) {
+                            const card2 = this.createStudentCard(femaleStudents[femaleIndex], this.students.indexOf(femaleStudents[femaleIndex]));
+                            pairContainer.appendChild(card2);
+                            femaleIndex++;
+                        }
+                        
+                        seatsArea.appendChild(pairContainer);
+                    }
+                }
+            }
+        } else {
+            // '1명씩 한 줄로 배치' - 각 행에서 남녀 교대로 한 줄로 배치
+            // 총 컬럼 수 = 분단 수 (사용자 입력값 그대로 사용)
+            seatsArea.style.gridTemplateColumns = `repeat(${partitionCount}, 1fr)`;
+            seatsArea.style.gap = '10px 40px'; // 분단 간 넓은 간격
+            
+            // 남학생과 여학생 분리
+            const maleStudents = this.students.filter(s => s.gender === 'M');
+            const femaleStudents = this.students.filter(s => s.gender === 'F');
+            
+            // 각 분단별 행 수 계산
+            const rowsPerPartition = Math.ceil(maleStudents.length / partitionCount);
+            
+            // 각 행별로 배치
+            for (let row = 0; row < rowsPerPartition; row++) {
+                // 각 분단의 남학생과 여학생을 교대로 배치
+                for (let partition = 0; partition < partitionCount; partition++) {
+                    const maleIndex = row * partitionCount + partition;
+                    const femaleIndex = row * partitionCount + partition;
+                    
+                    // 남학생 카드 배치
+                    if (maleIndex < maleStudents.length) {
+                        const card = this.createStudentCard(maleStudents[maleIndex], this.students.indexOf(maleStudents[maleIndex]));
+                        seatsArea.appendChild(card);
+                    }
+                    
+                    // 여학생 카드 배치
+                    if (femaleIndex < femaleStudents.length) {
+                        const card = this.createStudentCard(femaleStudents[femaleIndex], this.students.indexOf(femaleStudents[femaleIndex]));
+                        seatsArea.appendChild(card);
+                    }
+                }
+            }
+        }
+    }
+    
+    /**
+     * 학생 카드 생성 헬퍼 메서드
+     */
+    private createStudentCard(student: Student, index: number): HTMLDivElement {
+        const card = document.createElement('div');
+        card.className = 'student-seat-card';
+        
+        const nameDiv = document.createElement('div');
+        nameDiv.className = 'student-name';
+        nameDiv.textContent = student.name;
+        
+        const numberDiv = document.createElement('div');
+        numberDiv.className = 'student-number';
+        numberDiv.textContent = `${index + 1}번`;
+        
+        const genderDiv = document.createElement('div');
+        genderDiv.className = 'student-gender';
+        genderDiv.textContent = student.gender === 'M' ? '남' : '여';
+        
+        // 성별에 따라 클래스 추가
+        if (student.gender === 'M') {
+            card.classList.add('gender-m');
+        } else {
+            card.classList.add('gender-f');
+        }
+        
+        card.appendChild(nameDiv);
+        card.appendChild(numberDiv);
+        card.appendChild(genderDiv);
+        
+        return card;
+    }
+
+    /**
+     * 성별별 학생 수에 따라 미리보기 업데이트
+     */
+    private updatePreviewForGenderCounts(): void {
+        const maleCountInput = document.getElementById('male-students') as HTMLInputElement;
+        const femaleCountInput = document.getElementById('female-students') as HTMLInputElement;
+        
+        const maleCount = maleCountInput ? parseInt(maleCountInput.value || '0', 10) : 0;
+        const femaleCount = femaleCountInput ? parseInt(femaleCountInput.value || '0', 10) : 0;
+        
+        console.log('성별별 미리보기 업데이트:', { maleCount, femaleCount });
+        
+        // 학생 및 좌석 배열 초기화
+        this.students = [];
+        this.seats = [];
+        
+        let studentIndex = 0;
+        
+        // 남학생 생성
+        for (let i = 0; i < maleCount && i < 100; i++) {
+            const student = StudentModel.create(
+                `남학생${i + 1}`,
+                'M'
+            );
+            this.students.push(student);
+            
+            // 좌석 생성 (더미)
+            const seat = {
+                id: studentIndex + 1,
+                position: { x: 0, y: 0 },
+                isActive: true,
+                isFixed: false,
+                studentId: student.id,
+                studentName: student.name
+            } as Seat;
+            this.seats.push(seat);
+            studentIndex++;
+        }
+        
+        // 여학생 생성
+        for (let i = 0; i < femaleCount && i < 100; i++) {
+            const student = StudentModel.create(
+                `여학생${i + 1}`,
+                'F'
+            );
+            this.students.push(student);
+            
+            // 좌석 생성 (더미)
+            const seat = {
+                id: studentIndex + 1,
+                position: { x: 0, y: 0 },
+                isActive: true,
+                isFixed: false,
+                studentId: student.id,
+                studentName: student.name
+            } as Seat;
+            this.seats.push(seat);
+            studentIndex++;
+        }
+        
+        // 미리보기 렌더링
+        this.renderExampleCards();
+    }
+
+    /**
+     * 학생 수에 따라 미리보기 업데이트
+     */
+    private updatePreviewForStudentCount(count: number): void {
+        console.log('미리보기 업데이트:', count);
+        
+        // 학생 및 좌석 배열 초기화
+        this.students = [];
+        this.seats = [];
+        
+        // 지정된 수만큼 학생과 좌석 생성
+        for (let i = 0; i < count && i < 100; i++) {
+            const student = StudentModel.create(
+                `학생${i + 1}`,
+                (i % 2 === 0) ? 'M' : 'F'
+            );
+            this.students.push(student);
+            
+            // 좌석 생성 (더미)
+            const seat = {
+                id: i + 1,
+                position: { x: 0, y: 0 },
+                isActive: true,
+                isFixed: false,
+                studentId: student.id,
+                studentName: student.name
+            } as Seat;
+            this.seats.push(seat);
+        }
+        
+        // 카드 렌더링 (초기 6열 배치 유지)
+        this.renderExampleCards();
+    }
+
+    /**
+     * 학생 데이터로 카드 렌더링
+     */
+    private renderStudentCards(seats: Seat[]): void {
+        const seatsArea = document.getElementById('seats-area');
+        if (!seatsArea) return;
+
+        // 기존 카드 제거
+        seatsArea.innerHTML = '';
+
+        // 학생 수에 따라 그리드 열 수 결정
+        const columnCount = this.students.length <= 20 ? 4 : 6;
+        seatsArea.style.gridTemplateColumns = `repeat(${columnCount}, 1fr)`;
+        seatsArea.style.gap = '10px';
+
+        seats.forEach((seat, index) => {
+            if (index >= this.students.length) return;
+            
+            const student = this.students[index];
+            const card = document.createElement('div');
+            card.className = 'student-seat-card';
+            
+            const nameDiv = document.createElement('div');
+            nameDiv.className = 'student-name';
+            nameDiv.textContent = student.name || `학생${index + 1}`;
+            
+            const numberDiv = document.createElement('div');
+            numberDiv.className = 'student-number';
+            numberDiv.textContent = `${index + 1}번`;
+            
+            // 성별에 따라 클래스 추가
+            if (student.gender === 'M') {
+                card.classList.add('gender-m');
+            } else {
+                card.classList.add('gender-f');
+            }
+            
+            card.appendChild(nameDiv);
+            card.appendChild(numberDiv);
+            
+            seatsArea.appendChild(card);
+        });
+    }
+
+    /**
+     * 좌석 배치 결과를 localStorage에 저장
+     */
+    private saveLayoutResult(): void {
+        try {
+            const layoutData = {
+                seats: this.seats,
+                students: this.students,
+                timestamp: new Date().toISOString()
+            };
+            
+            localStorage.setItem('layoutResult', JSON.stringify(layoutData));
+            console.log('좌석 배치 결과가 브라우저에 저장되었습니다.');
+        } catch (error) {
+            console.error('배치 결과 저장 중 오류:', error);
+        }
+    }
+
+    /**
+     * 저장된 좌석 배치 결과 불러오기
+     */
+    private loadSavedLayoutResult(): void {
+        try {
+            const layoutDataStr = localStorage.getItem('layoutResult');
+            if (!layoutDataStr) {
+                return;
+            }
+
+            const layoutData = JSON.parse(layoutDataStr);
+            
+            if (layoutData.seats && layoutData.students) {
+                this.seats = layoutData.seats;
+                this.students = layoutData.students;
+                if (this.canvasModule) {
+                    this.canvasModule.setData(this.seats, this.students);
+                }
+                console.log('저장된 배치 결과를 불러왔습니다.');
+            }
+        } catch (error) {
+            console.error('배치 결과 불러오기 중 오류:', error);
+        }
+    }
+
+    /**
+     * 나머지 랜덤 배치 처리
+     */
+    private handleRandomizeRemaining(): void {
+        if (this.seats.length === 0) {
+            this.outputModule.showError('먼저 자리 배치를 생성해주세요.');
+            return;
+        }
+
+        try {
+            const unassignedStudents = this.students.filter(s => !s.fixedSeatId);
+            
+            if (unassignedStudents.length === 0) {
+                this.outputModule.showInfo('배치할 학생이 없습니다.');
+                return;
+            }
+
+            this.seats = RandomService.assignRandomly(unassignedStudents, this.seats);
+            if (this.canvasModule) {
+                this.canvasModule.setData(this.seats, this.students);
+            }
+
+            this.outputModule.showSuccess(`나머지 ${unassignedStudents.length}명의 학생이 랜덤으로 배치되었습니다.`);
+        } catch (error) {
+            console.error('랜덤 배치 중 오류:', error);
+            this.outputModule.showError('랜덤 배치 중 오류가 발생했습니다.');
+        }
+    }
+
+
+    /**
+     * 결과 내보내기 처리
+     */
+    private handleExport(): void {
+        if (this.seats.length === 0) {
+            this.outputModule.showError('내보낼 배치 결과가 없습니다.');
+            return;
+        }
+
+        try {
+            // 텍스트로 내보내기
+            const textContent = this.outputModule.exportAsText(this.seats);
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+            this.outputModule.downloadFile(textContent, `seating-arrangement-${timestamp}.txt`);
+
+            this.outputModule.showSuccess('결과가 다운로드되었습니다.');
+        } catch (error) {
+            console.error('내보내기 중 오류:', error);
+            this.outputModule.showError('내보내기 중 오류가 발생했습니다.');
+        }
+    }
+
+
+    /**
+     * 배치 미리보기 처리
+     * @param layoutType 배치 유형
+     * @param groupSize 모둠 크기 (선택적)
+     */
+    private handleLayoutPreview(layoutType: string, groupSize?: number): void {
+        // 미리보기 기능 비활성화됨
+        // 사용자가 '자리 배치 생성' 버튼을 클릭할 때만 배치가 표시됩니다.
+        return;
+    }
+
+    /**
+     * 카드 형태로 미리보기 렌더링
+     * @param seats 좌석 배열
+     */
+    private renderPreviewCards(seats: Seat[]): void {
+        const seatsArea = document.getElementById('seats-area');
+        if (!seatsArea) return;
+
+        // 기존 카드 제거
+        seatsArea.innerHTML = '';
+
+        // 그리드 레이아웃 설정 (6열 x 4행)
+        seatsArea.style.gridTemplateColumns = 'repeat(6, 1fr)';
+        seatsArea.style.gap = '10px';
+
+        seats.forEach((seat, index) => {
+            const card = document.createElement('div');
+            card.className = 'student-seat-card';
+            
+            const nameDiv = document.createElement('div');
+            nameDiv.className = 'student-name';
+            nameDiv.textContent = `학생${index + 1}`;
+            
+            const genderDiv = document.createElement('div');
+            genderDiv.className = 'student-gender';
+            genderDiv.textContent = (index % 2 === 0) ? '남' : '여';
+            
+            const numberDiv = document.createElement('div');
+            numberDiv.className = 'student-number';
+            numberDiv.textContent = `${index + 1}번`;
+            
+            // 성별에 따라 클래스 추가
+            if (index % 2 === 0) {
+                card.classList.add('gender-m');
+            } else {
+                card.classList.add('gender-f');
+            }
+            
+            card.appendChild(nameDiv);
+            card.appendChild(genderDiv);
+            card.appendChild(numberDiv);
+            
+            seatsArea.appendChild(card);
+        });
+    }
+
+    /**
+     * 학생 명렬표 테이블 생성
+     * @param count 학생 수 (선택적)
+     */
+    private handleCreateStudentTable(count?: number): void {
+        const outputSection = document.getElementById('output-section');
+        if (!outputSection) return;
+
+        // count가 제공되지 않으면 남학생/여학생 수를 합산
+        if (count === undefined) {
+            const maleCountInput = document.getElementById('male-students') as HTMLInputElement;
+            const femaleCountInput = document.getElementById('female-students') as HTMLInputElement;
+            
+            const maleCount = maleCountInput ? parseInt(maleCountInput.value || '0', 10) : 0;
+            const femaleCount = femaleCountInput ? parseInt(femaleCountInput.value || '0', 10) : 0;
+            
+            count = maleCount + femaleCount;
+        }
+
+        if (count <= 0) {
+            alert('학생 수를 입력해주세요.');
+            return;
+        }
+
+        // 기존 캔버스 숨기기
+        const canvasContainer = outputSection.querySelector('#canvas-container');
+        if (canvasContainer) {
+            (canvasContainer as HTMLElement).style.display = 'none';
+        }
+
+        // 테이블 생성
+        let studentTableContainer = outputSection.querySelector('.student-table-container');
+        
+        // 기존 테이블이 있으면 제거
+        if (studentTableContainer) {
+            studentTableContainer.remove();
+        }
+
+        // 새 테이블 컨테이너 생성
+        studentTableContainer = document.createElement('div');
+        studentTableContainer.className = 'student-table-container';
+
+        // 버튼 컨테이너 생성
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.display = 'flex';
+        buttonContainer.style.gap = '10px';
+        buttonContainer.style.marginBottom = '15px';
+        
+        // 양식 다운로드 버튼
+        const downloadBtn = document.createElement('button');
+        downloadBtn.id = 'download-template';
+        downloadBtn.className = 'secondary-btn';
+        downloadBtn.textContent = '양식 다운로드';
+        downloadBtn.style.flex = '1';
+        downloadBtn.addEventListener('click', () => this.downloadTemplateFile());
+        buttonContainer.appendChild(downloadBtn);
+        
+        // 파일 업로드 버튼
+        const uploadBtn = document.createElement('button');
+        uploadBtn.id = 'upload-file';
+        uploadBtn.className = 'secondary-btn';
+        uploadBtn.textContent = '엑셀 파일에서 가져오기';
+        uploadBtn.style.flex = '1';
+        
+        // 숨겨진 파일 입력
+        const fileInput = document.createElement('input');
+        fileInput.id = 'upload-file-input';
+        fileInput.type = 'file';
+        fileInput.accept = '.csv,.xlsx,.xls';
+        fileInput.style.display = 'none';
+        fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
+        
+        uploadBtn.addEventListener('click', () => {
+            fileInput.click();
+        });
+        
+        buttonContainer.appendChild(uploadBtn);
+        buttonContainer.appendChild(fileInput);
+        
+        studentTableContainer.appendChild(buttonContainer);
+
+        // 테이블 생성
+        const table = document.createElement('table');
+        table.className = 'student-input-table';
+        
+        // 헤더 생성
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        headerRow.innerHTML = `
+            <th>번호</th>
+            <th>이름</th>
+            <th>성별</th>
+            <th>작업</th>
+        `;
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        // 본문 생성
+        const tbody = document.createElement('tbody');
+        for (let i = 1; i <= count; i++) {
+            const row = document.createElement('tr');
+            row.dataset.studentIndex = (i - 1).toString();
+            
+            // 번호 열
+            const numCell = document.createElement('td');
+            numCell.textContent = i.toString();
+            numCell.style.textAlign = 'center';
+            numCell.style.padding = '10px';
+            numCell.style.background = '#f8f9fa';
+            
+            // 이름 입력 열
+            const nameCell = document.createElement('td');
+            const nameInput = document.createElement('input');
+            nameInput.type = 'text';
+            nameInput.placeholder = '학생 이름';
+            nameInput.className = 'student-name-input';
+            nameInput.id = `student-name-${i}`;
+            nameInput.tabIndex = i;
+            nameCell.appendChild(nameInput);
+            
+            // 성별 선택 열
+            const genderCell = document.createElement('td');
+            const genderSelect = document.createElement('select');
+            genderSelect.className = 'student-gender-select';
+            genderSelect.id = `student-gender-${i}`;
+            genderSelect.innerHTML = `
+                <option value="">선택</option>
+                <option value="M">남</option>
+                <option value="F">여</option>
+            `;
+            genderSelect.tabIndex = count + i;
+            genderCell.appendChild(genderSelect);
+            
+            // 작업 열 (삭제 버튼)
+            const actionCell = document.createElement('td');
+            actionCell.style.textAlign = 'center';
+            actionCell.style.padding = '8px';
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = '삭제';
+            deleteBtn.type = 'button';
+            deleteBtn.className = 'delete-row-btn';
+            deleteBtn.onclick = () => this.handleDeleteStudentRow(row);
+            actionCell.appendChild(deleteBtn);
+
+            // 키보드 이벤트 추가 (이름 입력 필드)
+            nameInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    // 다음 셀(성별)로 이동
+                    genderSelect.focus();
+                } else if (e.key === 'ArrowDown') {
+                    // 다음 행의 같은 열로 이동
+                    this.moveToCell(tbody, i, 'name', 'down');
+                } else if (e.key === 'ArrowUp') {
+                    // 이전 행의 같은 열로 이동
+                    this.moveToCell(tbody, i, 'name', 'up');
+                }
+            });
+
+            // 키보드 이벤트 추가 (성별 선택 필드)
+            genderSelect.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === 'Tab') {
+                    // 다음 행의 이름 필드로 이동
+                    const nextRow = tbody.querySelector(`tr:nth-child(${Math.min(i + 1, count)})`);
+                    const nextNameInput = nextRow?.querySelector('.student-name-input') as HTMLInputElement;
+                    if (nextNameInput) {
+                        nextNameInput.focus();
+                        nextNameInput.select();
+                    }
+                } else if (e.key === 'ArrowDown') {
+                    // 다음 행의 같은 열로 이동
+                    this.moveToCell(tbody, i, 'gender', 'down');
+                } else if (e.key === 'ArrowUp') {
+                    // 이전 행의 같은 열로 이동
+                    this.moveToCell(tbody, i, 'gender', 'up');
+                }
+            });
+            
+            row.appendChild(numCell);
+            row.appendChild(nameCell);
+            row.appendChild(genderCell);
+            row.appendChild(actionCell);
+            
+            tbody.appendChild(row);
+        }
+        
+        table.appendChild(tbody);
+        studentTableContainer.appendChild(table);
+        
+        // 작업 버튼 추가
+        const actionButtons = document.createElement('div');
+        actionButtons.className = 'table-action-buttons';
+        actionButtons.innerHTML = `
+            <button id="add-student-row-btn">행 추가</button>
+            <button id="save-student-data">명렬표 저장</button>
+            <button id="arrange-seats" class="arrange-seats-btn">좌석 배치하기</button>
+        `;
+        studentTableContainer.appendChild(actionButtons);
+        
+        outputSection.appendChild(studentTableContainer);
+
+        // 행 추가 버튼 이벤트
+        const addRowBtn = document.getElementById('add-student-row-btn');
+        if (addRowBtn) {
+            addRowBtn.addEventListener('click', () => this.handleAddStudentRow());
+        }
+
+        // 저장 버튼 이벤트
+        const saveBtn = document.getElementById('save-student-data');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', () => this.handleSaveStudentData());
+        }
+
+        // 좌석 배치하기 버튼 이벤트
+        const arrangeBtn = document.getElementById('arrange-seats');
+        if (arrangeBtn) {
+            arrangeBtn.addEventListener('click', () => this.handleArrangeSeats());
+        }
+
+        this.outputModule.showInfo(`${count}명의 학생 명렬표가 생성되었습니다.`);
+    }
+
+    /**
+     * 학생 행 삭제 처리
+     * @param row 삭제할 행
+     */
+    private handleDeleteStudentRow(row: HTMLTableRowElement): void {
+        if (confirm('이 학생을 삭제하시겠습니까?')) {
+            row.remove();
+            this.updateRowNumbers();
+        }
+    }
+
+    /**
+     * 학생 행 추가 처리
+     */
+    private handleAddStudentRow(): void {
+        const outputSection = document.getElementById('output-section');
+        const table = outputSection?.querySelector('.student-input-table tbody');
+        if (!table) return;
+
+        const newRowIndex = table.children.length;
+        const row = document.createElement('tr');
+        row.dataset.studentIndex = newRowIndex.toString();
+        
+        const numCell = document.createElement('td');
+        numCell.textContent = (newRowIndex + 1).toString();
+        
+        const nameCell = document.createElement('td');
+        const nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.placeholder = '학생 이름';
+        nameInput.className = 'student-name-input';
+        nameCell.appendChild(nameInput);
+        
+        const genderCell = document.createElement('td');
+        const genderSelect = document.createElement('select');
+        genderSelect.className = 'student-gender-select';
+        genderSelect.innerHTML = `
+            <option value="">선택</option>
+            <option value="M">남</option>
+            <option value="F">여</option>
+        `;
+        genderCell.appendChild(genderSelect);
+        
+        const actionCell = document.createElement('td');
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = '삭제';
+        deleteBtn.type = 'button';
+        deleteBtn.className = 'delete-row-btn';
+        deleteBtn.onclick = () => this.handleDeleteStudentRow(row);
+        actionCell.appendChild(deleteBtn);
+        
+        row.appendChild(numCell);
+        row.appendChild(nameCell);
+        row.appendChild(genderCell);
+        row.appendChild(actionCell);
+        
+        table.appendChild(row);
+    }
+
+    /**
+     * 행 번호 업데이트
+     */
+    private updateRowNumbers(): void {
+        const outputSection = document.getElementById('output-section');
+        const rows = outputSection?.querySelectorAll('.student-input-table tbody tr');
+        if (!rows) return;
+
+        rows.forEach((row) => {
+            const htmlRow = row as HTMLTableRowElement;
+            const numCell = htmlRow.querySelector('td:first-child');
+            if (numCell) {
+                const rowIndex = Array.from(rows).indexOf(htmlRow);
+                numCell.textContent = (rowIndex + 1).toString();
+                htmlRow.dataset.studentIndex = rowIndex.toString();
+            }
+        });
+    }
+
+    /**
+     * 학생 데이터 저장 처리
+     */
+    private handleSaveStudentData(): void {
+        const outputSection = document.getElementById('output-section');
+        const rows = outputSection?.querySelectorAll('.student-input-table tbody tr');
+        if (!rows || rows.length === 0) {
+            this.outputModule.showError('저장할 학생 데이터가 없습니다.');
+            return;
+        }
+
+        const students: Array<{name: string, gender: 'M' | 'F'}> = [];
+        
+        rows.forEach((row) => {
+            const nameInput = row.querySelector('.student-name-input') as HTMLInputElement;
+            const genderSelect = row.querySelector('.student-gender-select') as HTMLSelectElement;
+            
+            if (nameInput && genderSelect) {
+                const name = nameInput.value.trim();
+                const gender = genderSelect.value as 'M' | 'F';
+                
+                if (name && gender) {
+                    students.push({ name, gender });
+                }
+            }
+        });
+
+        if (students.length === 0) {
+            this.outputModule.showError('학생 정보를 모두 입력해주세요.');
+            return;
+        }
+
+        // 학생 데이터를 스토리지에 저장
+        localStorage.setItem('studentData', JSON.stringify(students));
+        
+        // 내부 students 배열에 저장 (자리 배치 생성 시 사용)
+        this.students = students.map((s, index) => ({
+            id: index + 1,
+            name: s.name,
+            gender: s.gender,
+            fixedSeatId: undefined
+        }));
+        
+        this.outputModule.showSuccess(`${students.length}명의 학생 정보가 저장되었습니다.`);
+    }
+
+    /**
+     * 배치 결과 섹션 생성
+     */
+    private createLayoutResultSection(outputSection: HTMLElement, students: Array<{name: string, gender: 'M' | 'F'}>): void {
+        // 기존 배치 결과 제거
+        let layoutResultSection = outputSection.querySelector('.layout-result-section');
+        if (layoutResultSection) {
+            layoutResultSection.remove();
+        }
+
+        // 새 배치 결과 섹션 생성
+        layoutResultSection = document.createElement('div');
+        layoutResultSection.className = 'layout-result-section';
+        
+        const title = document.createElement('h3');
+        title.textContent = '자리 배치도 생성';
+        title.style.marginTop = '30px';
+        title.style.marginBottom = '15px';
+        title.style.color = '#333';
+        layoutResultSection.appendChild(title);
+
+        // 캔버스 컨테이너 생성
+        const canvasContainer = document.createElement('div');
+        canvasContainer.id = 'dynamic-canvas-container';
+        canvasContainer.style.background = '#f8f9fa';
+        canvasContainer.style.border = '3px solid #667eea';
+        canvasContainer.style.borderRadius = '10px';
+        canvasContainer.style.padding = '20px';
+        canvasContainer.style.display = 'flex';
+        canvasContainer.style.justifyContent = 'center';
+        canvasContainer.style.alignItems = 'center';
+        canvasContainer.style.marginBottom = '20px';
+        canvasContainer.style.minHeight = '450px';
+
+        const canvas = document.createElement('canvas');
+        canvas.id = 'dynamic-seat-canvas';
+        canvas.width = 800;
+        canvas.height = 600;
+        canvas.style.background = 'white';
+        canvas.style.border = '2px solid #667eea';
+        canvas.style.borderRadius = '5px';
+        canvas.style.boxShadow = '0 4px 15px rgba(0, 0, 0, 0.1)';
+
+        canvasContainer.appendChild(canvas);
+        layoutResultSection.appendChild(canvasContainer);
+
+        outputSection.appendChild(layoutResultSection);
+
+        // 배치 미리보기 렌더링
+        this.renderStudentLayout(students);
+    }
+
+    /**
+     * 학생 배치 미리보기 렌더링
+     */
+    private renderStudentLayout(students: Array<{name: string, gender: 'M' | 'F'}>): void {
+        const layoutType = this.layoutSelectorModule.getCurrentLayoutType();
+        
+        if (!layoutType) {
+            return;
+        }
+
+        const canvas = document.getElementById('dynamic-seat-canvas') as HTMLCanvasElement;
+        if (!canvas) return;
+
+        // 분단 수 가져오기
+        const partitionInput = document.getElementById('number-of-partitions') as HTMLInputElement;
+        const partitionCount = partitionInput ? parseInt(partitionInput.value || '1', 10) : 1;
+        
+        // 레이아웃 생성
+        const layoutResult = LayoutService.createLayout(
+            layoutType,
+            students.length,
+            canvas.width,
+            canvas.height,
+            partitionCount
+        );
+
+        if (layoutResult.success && layoutResult.seats) {
+            this.seats = layoutResult.seats;
+            
+            // 캔버스에 그리기
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+                // 캔버스 클리어
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // 배경 설정
+                ctx.fillStyle = '#f8f9fa';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // 교탁과 칠판 그리기
+                this.drawTeacherDeskAndBoard(ctx, canvas);
+                
+                // 학생 이름과 함께 좌석 그리기
+                this.seats.forEach((seat, index) => {
+                    if (index < students.length) {
+                        this.drawSeatWithStudent(ctx, seat, students[index]);
+                    }
+                });
+            }
+        }
+    }
+
+    /**
+     * 학생 정보와 함께 좌석 그리기
+     */
+    private drawSeatWithStudent(ctx: CanvasRenderingContext2D, seat: any, student: {name: string, gender: 'M' | 'F'}): void {
+        const x = seat.position.x;
+        const y = seat.position.y + 100; // 교탁 공간 확보
+        const width = 50;
+        const height = 50;
+        
+        // 좌석 색상 (성별에 따라)
+        ctx.fillStyle = student.gender === 'M' ? '#e3f2fd' : '#fce4ec';
+        ctx.fillRect(x, y, width, height);
+        
+        // 좌석 테두리
+        ctx.strokeStyle = '#999';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x, y, width, height);
+        
+        // 학생 이름 표시
+        ctx.fillStyle = '#333';
+        ctx.font = '9px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(student.name, x + width / 2, y + height / 2);
+        
+        // 성별 표시
+        ctx.fillStyle = '#666';
+        ctx.font = '8px sans-serif';
+        ctx.fillText(student.gender === 'M' ? '♂' : '♀', x + width / 2, y + height - 5);
+    }
+
+
+    /**
+     * 셀 간 이동 처리
+     * @param tbody tbody 요소
+     * @param currentRow 현재 행 번호 (1부터 시작)
+     * @param columnName 열 이름 ('name' 또는 'gender')
+     * @param direction 이동 방향 ('up' 또는 'down')
+     */
+    private moveToCell(tbody: HTMLTableSectionElement, currentRow: number, columnName: string, direction: 'up' | 'down'): void {
+        const nextRowNum = direction === 'down' ? currentRow + 1 : currentRow - 1;
+        const nextRow = tbody.querySelector(`tr:nth-child(${nextRowNum})`);
+        
+        if (nextRow) {
+            const cellInput = columnName === 'name' 
+                ? nextRow.querySelector('.student-name-input') as HTMLInputElement
+                : nextRow.querySelector('.student-gender-select') as HTMLSelectElement;
+            
+            if (cellInput) {
+                cellInput.focus();
+                if (cellInput instanceof HTMLInputElement) {
+                    cellInput.select();
+                }
+            }
+        }
+    }
+
+    /**
+     * 양식 파일 다운로드
+     */
+    private downloadTemplateFile(): void {
+        // CSV 양식 파일 생성
+        const headers = ['번호', '이름', '성별'];
+        const exampleData = [
+            ['1', '홍길동', '남'],
+            ['2', '김영희', '여'],
+            ['3', '이철수', '남']
+        ];
+        
+        let csvContent = headers.join(',') + '\n';
+        exampleData.forEach(row => {
+            csvContent += row.join(',') + '\n';
+        });
+        
+        // BOM 추가 (엑셀에서 한글 깨짐 방지)
+        const BOM = '\uFEFF';
+        csvContent = BOM + csvContent;
+        
+        // 파일 다운로드
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = '학생_명렬표_양식.csv';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        this.outputModule.showSuccess('양식 파일이 다운로드되었습니다. 엑셀로 열어서 학생 정보를 입력하세요.');
+    }
+
+    /**
+     * 파일 업로드 처리
+     * @param event 파일 선택 이벤트
+     */
+    private handleFileUpload(event: Event): void {
+        const input = event.target as HTMLInputElement;
+        const file = input.files?.[0];
+        
+        if (!file) return;
+        
+        const fileName = file.name.toLowerCase();
+        
+        // 파일 확장자 확인
+        if (!fileName.endsWith('.csv') && !fileName.endsWith('.xlsx') && !fileName.endsWith('.xls')) {
+            this.outputModule.showError('CSV 또는 엑셀 파일(.csv, .xlsx, .xls)만 업로드 가능합니다.');
+            return;
+        }
+        
+        // CSV 파일 읽기
+        if (fileName.endsWith('.csv')) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const text = e.target?.result as string;
+                    this.parseCsvFile(text);
+                } catch (error) {
+                    console.error('파일 읽기 오류:', error);
+                    this.outputModule.showError('파일을 읽는 중 오류가 발생했습니다.');
+                }
+            };
+            reader.readAsText(file, 'UTF-8');
+        } else {
+            // 엑셀 파일인 경우 안내 메시지
+            this.outputModule.showError('엑셀 파일은 CSV로 저장한 후 업로드해주세요. 파일 > 다른 이름으로 저장 > CSV(쉼표로 구분)(*.csv)');
+        }
+    }
+
+    /**
+     * CSV 파일 파싱 및 테이블에 데이터 입력
+     * @param csvText CSV 파일 내용
+     */
+    private parseCsvFile(csvText: string): void {
+        // BOM 제거
+        csvText = csvText.replace(/^\uFEFF/, '');
+        
+        // 줄바꿈 정리
+        csvText = csvText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        
+        const lines = csvText.split('\n');
+        const students: Array<{name: string, gender: 'M' | 'F'}> = [];
+        
+        // 첫 번째 줄(헤더) 제외하고 파싱
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+            
+            // CSV 파싱 (쉼표로 구분)
+            const columns = line.split(',');
+            if (columns.length >= 3) {
+                const name = columns[1].trim();
+                const gender = columns[2].trim();
+                
+                if (name && (gender === '남' || gender === '여' || gender === 'M' || gender === 'F')) {
+                    const normalizedGender = (gender === '남' || gender === 'M') ? 'M' : 'F';
+                    students.push({ name, gender: normalizedGender });
+                }
+            }
+        }
+        
+        if (students.length === 0) {
+            this.outputModule.showError('파일에서 학생 정보를 읽을 수 없습니다. 양식을 확인해주세요.');
+            return;
+        }
+        
+        // 테이블 생성 및 데이터 입력
+        this.createTableWithStudents(students);
+        
+        this.outputModule.showSuccess(`${students.length}명의 학생 정보가 업로드되었습니다.`);
+        
+        // 인원수 입력 필드 업데이트 (남학생/여학생 수로 분리)
+        const maleCountInput = document.getElementById('male-students') as HTMLInputElement;
+        const femaleCountInput = document.getElementById('female-students') as HTMLInputElement;
+        
+        if (maleCountInput && femaleCountInput) {
+            const maleStudents = students.filter(s => s.gender === 'M').length;
+            const femaleStudents = students.filter(s => s.gender === 'F').length;
+            
+            maleCountInput.value = maleStudents.toString();
+            femaleCountInput.value = femaleStudents.toString();
+        }
+        
+        // 파일 input 초기화
+        const uploadInput = document.getElementById('upload-file') as HTMLInputElement;
+        if (uploadInput) {
+            uploadInput.value = '';
+        }
+    }
+
+    /**
+     * 학생 데이터로 테이블 생성
+     * @param students 학생 배열
+     */
+    private createTableWithStudents(students: Array<{name: string, gender: 'M' | 'F'}>): void {
+        const outputSection = document.getElementById('output-section');
+        if (!outputSection) return;
+
+        // 기존 캔버스 숨기기
+        const canvasContainer = outputSection.querySelector('#canvas-container');
+        if (canvasContainer) {
+            (canvasContainer as HTMLElement).style.display = 'none';
+        }
+
+        // 기존 테이블 제거
+        let studentTableContainer = outputSection.querySelector('.student-table-container');
+        if (studentTableContainer) {
+            studentTableContainer.remove();
+        }
+
+        // 새 테이블 컨테이너 생성
+        studentTableContainer = document.createElement('div');
+        studentTableContainer.className = 'student-table-container';
+
+        // 테이블 생성
+        const table = document.createElement('table');
+        table.className = 'student-input-table';
+        
+        // 헤더 생성
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        headerRow.innerHTML = `
+            <th>번호</th>
+            <th>이름</th>
+            <th>성별</th>
+            <th>작업</th>
+        `;
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        // 본문 생성
+        const tbody = document.createElement('tbody');
+        students.forEach((student, index) => {
+            const row = document.createElement('tr');
+            row.dataset.studentIndex = index.toString();
+            
+            // 번호 열
+            const numCell = document.createElement('td');
+            numCell.textContent = (index + 1).toString();
+            numCell.style.textAlign = 'center';
+            numCell.style.padding = '10px';
+            numCell.style.background = '#f8f9fa';
+            
+            // 이름 입력 열
+            const nameCell = document.createElement('td');
+            const nameInput = document.createElement('input');
+            nameInput.type = 'text';
+            nameInput.placeholder = '학생 이름';
+            nameInput.className = 'student-name-input';
+            nameInput.value = student.name;
+            nameInput.tabIndex = index + 1;
+            nameCell.appendChild(nameInput);
+            
+            // 성별 선택 열
+            const genderCell = document.createElement('td');
+            const genderSelect = document.createElement('select');
+            genderSelect.className = 'student-gender-select';
+            genderSelect.innerHTML = `
+                <option value="">선택</option>
+                <option value="M">남</option>
+                <option value="F">여</option>
+            `;
+            genderSelect.value = student.gender;
+            genderSelect.tabIndex = students.length + index + 1;
+            genderCell.appendChild(genderSelect);
+            
+            // 작업 열 (삭제 버튼)
+            const actionCell = document.createElement('td');
+            actionCell.style.textAlign = 'center';
+            actionCell.style.padding = '8px';
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = '삭제';
+            deleteBtn.type = 'button';
+            deleteBtn.className = 'delete-row-btn';
+            deleteBtn.onclick = () => this.handleDeleteStudentRow(row);
+            actionCell.appendChild(deleteBtn);
+
+            // 키보드 이벤트 추가
+            nameInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    genderSelect.focus();
+                } else if (e.key === 'ArrowDown') {
+                    this.moveToCell(tbody, index + 1, 'name', 'down');
+                } else if (e.key === 'ArrowUp') {
+                    this.moveToCell(tbody, index + 1, 'name', 'up');
+                }
+            });
+
+            genderSelect.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === 'Tab') {
+                    const nextRow = tbody.querySelector(`tr:nth-child(${Math.min(index + 2, students.length)})`);
+                    const nextNameInput = nextRow?.querySelector('.student-name-input') as HTMLInputElement;
+                    if (nextNameInput) {
+                        nextNameInput.focus();
+                        nextNameInput.select();
+                    }
+                } else if (e.key === 'ArrowDown') {
+                    this.moveToCell(tbody, index + 1, 'gender', 'down');
+                } else if (e.key === 'ArrowUp') {
+                    this.moveToCell(tbody, index + 1, 'gender', 'up');
+                }
+            });
+            
+            row.appendChild(numCell);
+            row.appendChild(nameCell);
+            row.appendChild(genderCell);
+            row.appendChild(actionCell);
+            
+            tbody.appendChild(row);
+        });
+        
+        table.appendChild(tbody);
+        studentTableContainer.appendChild(table);
+        
+        // 작업 버튼 추가
+        const actionButtons = document.createElement('div');
+        actionButtons.className = 'table-action-buttons';
+        actionButtons.innerHTML = `
+            <button id="add-student-row-btn">행 추가</button>
+            <button id="save-student-data">명렬표 저장</button>
+            <button id="arrange-seats" class="arrange-seats-btn">좌석 배치하기</button>
+        `;
+        studentTableContainer.appendChild(actionButtons);
+        
+        outputSection.appendChild(studentTableContainer);
+
+        // 버튼 이벤트
+        const addRowBtn = document.getElementById('add-student-row-btn');
+        if (addRowBtn) {
+            addRowBtn.addEventListener('click', () => this.handleAddStudentRow());
+        }
+
+        const saveBtn = document.getElementById('save-student-data');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', () => this.handleSaveStudentData());
+        }
+    }
+
+    /**
+     * 교탁과 칠판 그리기
+     */
+    private drawTeacherDeskAndBoard(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement): void {
+        const width = canvas.width;
+        
+        // 칠판 그리기
+        ctx.fillStyle = '#2c3e50';
+        const boardY = 10;
+        const boardHeight = 60;
+        ctx.fillRect(width * 0.2, boardY, width * 0.6, boardHeight);
+        
+        // 칠판 테두리
+        ctx.strokeStyle = '#1a252f';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(width * 0.2, boardY, width * 0.6, boardHeight);
+        
+        // 칠판 텍스트
+        ctx.fillStyle = '#ecf0f1';
+        ctx.font = 'bold 18px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('칠판', width * 0.5, boardY + 40);
+        
+        // 교탁 그리기
+        const deskY = boardY + boardHeight + 15;
+        const deskWidth = 80;
+        const deskHeight = 20;
+        ctx.fillStyle = '#95a5a6';
+        ctx.fillRect((width - deskWidth) / 2, deskY, deskWidth, deskHeight);
+        
+        // 교탁 테두리
+        ctx.strokeStyle = '#7f8c8d';
+        ctx.lineWidth = 2;
+        ctx.strokeRect((width - deskWidth) / 2, deskY, deskWidth, deskHeight);
+        
+        // 교탁 다리
+        const legWidth = 5;
+        const legHeight = 30;
+        ctx.fillStyle = '#7f8c8d';
+        // 왼쪽 다리
+        ctx.fillRect((width - deskWidth) / 2 + 10, deskY + deskHeight, legWidth, legHeight);
+        // 오른쪽 다리
+        ctx.fillRect((width - deskWidth) / 2 + deskWidth - 10 - legWidth, deskY + deskHeight, legWidth, legHeight);
+    }
+
+
+    /**
+     * 커스텀 모드 1 토글 (4단계 활성화/비활성화)
+     */
+    private toggleCustomMode1(disable: boolean): void {
+        const advancedSection = document.getElementById('advanced-section');
+        if (!advancedSection) return;
+
+        // 라디오 버튼들 가져오기
+        const radioOptions = advancedSection.querySelectorAll('input[name="custom-mode-1"]');
+        const labels = advancedSection.querySelectorAll('label.radio-option');
+        
+        radioOptions.forEach((radio, index) => {
+            const radioElement = radio as HTMLInputElement;
+            const label = labels[index] as HTMLElement;
+            
+            if (disable) {
+                // 비활성화
+                radioElement.disabled = true;
+                if (label) {
+                    label.style.opacity = '0.5';
+                    label.style.pointerEvents = 'none';
+                    label.style.cursor = 'not-allowed';
+                }
+                advancedSection.style.opacity = '0.5';
+                advancedSection.style.pointerEvents = 'none';
+            } else {
+                // 활성화
+                radioElement.disabled = false;
+                if (label) {
+                    label.style.opacity = '1';
+                    label.style.pointerEvents = 'auto';
+                    label.style.cursor = 'pointer';
+                }
+                advancedSection.style.opacity = '1';
+                advancedSection.style.pointerEvents = 'auto';
+            }
+        });
+    }
+
+    /**
+     * 2명씩 짝꿍 배치 서브 메뉴 토글
+     */
+    private togglePairSubmenu(show: boolean): void {
+        const pairSubmenu = document.getElementById('pair-submenu');
+        if (!pairSubmenu) return;
+        
+        if (show) {
+            pairSubmenu.style.display = 'block';
+        } else {
+            pairSubmenu.style.display = 'none';
+        }
+    }
+
+    /**
+     * 프로그램 실행
+     */
+    public run(): void {
+        if (!this.isInitialized) {
+            console.error('컨트롤러가 초기화되지 않았습니다.');
+            return;
+        }
+        
+        console.log('교실 자리 배치 프로그램이 시작되었습니다.');
+    }
+
+    /**
+     * 좌석 배치하기 처리
+     */
+    private handleArrangeSeats(): void {
+        try {
+            // 테이블에서 학생 데이터 가져오기
+            const studentData = this.inputModule.getStudentData();
+            
+            if (studentData.length === 0) {
+                alert('학생 정보를 먼저 입력해주세요.');
+                return;
+            }
+
+            // 학생 데이터를 Student 객체로 변환
+            this.students = StudentModel.createMultiple(studentData);
+            
+            // 남학생과 여학생 분리
+            const maleStudents = this.students.filter(s => s.gender === 'M');
+            const femaleStudents = this.students.filter(s => s.gender === 'F');
+            
+            // 기존 카드들 제거
+            const seatsArea = document.getElementById('seats-area');
+            if (!seatsArea) return;
+            
+            seatsArea.innerHTML = '';
+            
+            // 현재 선택된 배치 형태 확인
+            const layoutTypeInput = document.querySelector('input[name="layout-type"]:checked') as HTMLInputElement;
+            const layoutType = layoutTypeInput?.value;
+            
+            // 분단 수 가져오기
+            const partitionInput = document.getElementById('number-of-partitions') as HTMLInputElement;
+            const partitionCount = partitionInput ? parseInt(partitionInput.value || '1', 10) : 1;
+            
+            if (layoutType === 'pair-uniform') {
+                // 2명씩 짝꿍 배치
+                this.renderArrangedPairLayout(maleStudents, femaleStudents, partitionCount);
+            } else {
+                // 1명씩 한 줄로 배치
+                this.renderArrangedSingleLayout(maleStudents, femaleStudents, partitionCount);
+            }
+            
+            this.outputModule.showSuccess('좌석 배치가 완료되었습니다!');
+            
+        } catch (error) {
+            console.error('좌석 배치 중 오류:', error);
+            this.outputModule.showError('좌석 배치 중 오류가 발생했습니다.');
+        }
+    }
+
+    /**
+     * 2명씩 짝꿍 배치 렌더링 (실제 이름 사용)
+     */
+    private renderArrangedPairLayout(maleStudents: Student[], femaleStudents: Student[], partitionCount: number): void {
+        const seatsArea = document.getElementById('seats-area');
+        if (!seatsArea) return;
+
+        // 분단 레이블 추가
+        const labelsRow = document.createElement('div');
+        labelsRow.style.gridColumn = `1 / -1`;
+        labelsRow.style.display = 'grid';
+        labelsRow.style.gridTemplateColumns = `repeat(${partitionCount}, 1fr)`;
+        labelsRow.style.gap = '40px';
+        labelsRow.style.marginBottom = '5px';
+        
+        for (let i = 1; i <= partitionCount; i++) {
+            const label = document.createElement('div');
+            label.textContent = `${i}분단`;
+            label.style.textAlign = 'center';
+            label.style.fontWeight = 'bold';
+            label.style.color = '#667eea';
+            label.style.fontSize = '0.9em';
+            labelsRow.appendChild(label);
+        }
+        
+        seatsArea.appendChild(labelsRow);
+        seatsArea.style.gridTemplateColumns = `repeat(${partitionCount}, 1fr)`;
+        seatsArea.style.gap = '10px 40px';
+
+        // 짝꿍 모드 확인
+        const pairModeInput = document.querySelector('input[name="pair-mode"]:checked') as HTMLInputElement;
+        const pairMode = pairModeInput?.value || 'gender-pair';
+
+        if (pairMode === 'same-gender-pair') {
+            // 같은 성끼리 짝꿍하기
+            this.renderSameGenderPairs(maleStudents, femaleStudents, partitionCount);
+        } else {
+            // 남녀 짝꿍 하기
+            this.renderGenderPairs(maleStudents, femaleStudents, partitionCount);
+        }
+    }
+
+    /**
+     * 1명씩 한 줄로 배치 렌더링 (실제 이름 사용)
+     */
+    private renderArrangedSingleLayout(maleStudents: Student[], femaleStudents: Student[], partitionCount: number): void {
+        const seatsArea = document.getElementById('seats-area');
+        if (!seatsArea) return;
+
+        seatsArea.style.gridTemplateColumns = `repeat(${partitionCount}, 1fr)`;
+        seatsArea.style.gap = '10px 40px';
+
+        // 남학생과 여학생을 무작위로 섞기
+        const shuffledMales = [...maleStudents].sort(() => Math.random() - 0.5);
+        const shuffledFemales = [...femaleStudents].sort(() => Math.random() - 0.5);
+
+        const rowsPerPartition = Math.ceil(Math.max(maleStudents.length, femaleStudents.length) / partitionCount);
+
+        for (let row = 0; row < rowsPerPartition; row++) {
+            for (let partition = 0; partition < partitionCount; partition++) {
+                const maleIndex = row * partitionCount + partition;
+                const femaleIndex = row * partitionCount + partition;
+
+                // 남학생 카드 배치
+                if (maleIndex < shuffledMales.length) {
+                    const card = this.createStudentNameCard(shuffledMales[maleIndex]);
+                    seatsArea.appendChild(card);
+                }
+
+                // 여학생 카드 배치
+                if (femaleIndex < shuffledFemales.length) {
+                    const card = this.createStudentNameCard(shuffledFemales[femaleIndex]);
+                    seatsArea.appendChild(card);
+                }
+            }
+        }
+    }
+
+    /**
+     * 남녀 짝꿍 배치 렌더링
+     */
+    private renderGenderPairs(maleStudents: Student[], femaleStudents: Student[], partitionCount: number): void {
+        const seatsArea = document.getElementById('seats-area');
+        if (!seatsArea) return;
+
+        // 남학생과 여학생을 무작위로 섞기
+        const shuffledMales = [...maleStudents].sort(() => Math.random() - 0.5);
+        const shuffledFemales = [...femaleStudents].sort(() => Math.random() - 0.5);
+
+        const totalPairs = Math.min(shuffledMales.length, shuffledFemales.length);
+        const rowsPerPartition = Math.ceil(totalPairs / partitionCount);
+
+        let maleIndex = 0;
+        let femaleIndex = 0;
+
+        for (let row = 0; row < rowsPerPartition; row++) {
+            for (let partition = 0; partition < partitionCount; partition++) {
+                if (maleIndex >= shuffledMales.length || femaleIndex >= shuffledFemales.length) break;
+
+                const pairContainer = document.createElement('div');
+                pairContainer.style.display = 'flex';
+                pairContainer.style.gap = '0px';
+
+                // 남학생 카드
+                const maleCard = this.createStudentNameCard(shuffledMales[maleIndex]);
+                pairContainer.appendChild(maleCard);
+                maleIndex++;
+
+                // 여학생 카드
+                const femaleCard = this.createStudentNameCard(shuffledFemales[femaleIndex]);
+                pairContainer.appendChild(femaleCard);
+                femaleIndex++;
+
+                seatsArea.appendChild(pairContainer);
+            }
+        }
+    }
+
+    /**
+     * 같은 성끼리 짝꿍 배치 렌더링
+     */
+    private renderSameGenderPairs(maleStudents: Student[], femaleStudents: Student[], partitionCount: number): void {
+        const seatsArea = document.getElementById('seats-area');
+        if (!seatsArea) return;
+
+        // 남학생과 여학생을 무작위로 섞기
+        const shuffledMales = [...maleStudents].sort(() => Math.random() - 0.5);
+        const shuffledFemales = [...femaleStudents].sort(() => Math.random() - 0.5);
+
+        const allPairs: Array<{student1: Student, student2: Student | null}> = [];
+
+        // 남학생 짝꿍
+        for (let i = 0; i < shuffledMales.length; i += 2) {
+            allPairs.push({
+                student1: shuffledMales[i],
+                student2: (i + 1 < shuffledMales.length) ? shuffledMales[i + 1] : null
+            });
+        }
+
+        // 여학생 짝꿍
+        for (let i = 0; i < shuffledFemales.length; i += 2) {
+            allPairs.push({
+                student1: shuffledFemales[i],
+                student2: (i + 1 < shuffledFemales.length) ? shuffledFemales[i + 1] : null
+            });
+        }
+
+        const totalPairs = allPairs.length;
+        const rowsPerPartition = Math.ceil(totalPairs / partitionCount);
+
+        for (let row = 0; row < rowsPerPartition; row++) {
+            for (let partition = 0; partition < partitionCount; partition++) {
+                const pairIndex = row * partitionCount + partition;
+
+                if (pairIndex < allPairs.length) {
+                    const pair = allPairs[pairIndex];
+                    const pairContainer = document.createElement('div');
+                    pairContainer.style.display = 'flex';
+                    pairContainer.style.gap = '0px';
+
+                    // 첫 번째 카드
+                    const card1 = this.createStudentNameCard(pair.student1);
+                    pairContainer.appendChild(card1);
+
+                    // 두 번째 카드 (있으면)
+                    if (pair.student2) {
+                        const card2 = this.createStudentNameCard(pair.student2);
+                        pairContainer.appendChild(card2);
+                    }
+
+                    seatsArea.appendChild(pairContainer);
+                }
+            }
+        }
+    }
+
+    /**
+     * 학생 이름만 표시하는 카드 생성
+     */
+    private createStudentNameCard(student: Student): HTMLDivElement {
+        const card = document.createElement('div');
+        card.className = 'student-seat-card';
+        
+        // 성별에 따라 클래스 추가
+        if (student.gender === 'M') {
+            card.classList.add('gender-m');
+        } else {
+            card.classList.add('gender-f');
+        }
+        
+        // 이름만 표시 (가운데 정렬)
+        const nameDiv = document.createElement('div');
+        nameDiv.className = 'student-name';
+        nameDiv.textContent = student.name;
+        nameDiv.style.textAlign = 'center';
+        nameDiv.style.fontSize = '1.1em';
+        nameDiv.style.fontWeight = 'bold';
+        
+        card.appendChild(nameDiv);
+        
+        return card;
+    }
+}
+
