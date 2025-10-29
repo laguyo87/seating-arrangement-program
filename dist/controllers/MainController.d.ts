@@ -98,10 +98,6 @@ export declare class MainController {
      */
     private updateRowNumbers;
     /**
-     * 학생 데이터 저장 처리
-     */
-    private handleSaveStudentData;
-    /**
      * 배치 결과 섹션 생성
      */
     private createLayoutResultSection;
@@ -161,14 +157,6 @@ export declare class MainController {
      */
     private handleArrangeSeats;
     /**
-     * 2명씩 짝꿍 배치 렌더링 (실제 이름 사용)
-     */
-    private renderArrangedPairLayout;
-    /**
-     * 1명씩 한 줄로 배치 렌더링 (실제 이름 사용)
-     */
-    private renderArrangedSingleLayout;
-    /**
      * 남녀 짝꿍 배치 렌더링
      */
     private renderGenderPairs;
@@ -180,5 +168,25 @@ export declare class MainController {
      * 학생 이름만 표시하는 카드 생성
      */
     private createStudentNameCard;
+    /**
+     * 자리 배치도 인쇄 처리
+     */
+    private handlePrintLayout;
+    /**
+     * 자리 배치도 저장 처리
+     */
+    private handleSaveLayout;
+    /**
+     * 자리 배치도 공유하기
+     */
+    private handleShareLayout;
+    /**
+     * 간단한 공유 코드 생성
+     */
+    private generateShareCode;
+    /**
+     * 모달 창으로 자리 배치도 공유하기
+     */
+    private showShareModal;
 }
 //# sourceMappingURL=MainController.d.ts.map

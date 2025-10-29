@@ -230,6 +230,32 @@ export class MainController {
         }
         // 라디오 버튼 이벤트 리스너
         this.initializeRadioListeners();
+        // 이벤트 위임을 사용하여 동적으로 생성되는 버튼들 처리
+        document.addEventListener('click', (e) => {
+            const target = e.target;
+            // 자리 배치하기 버튼 클릭
+            if (target.id === 'arrange-seats') {
+                console.log('자리 배치하기 버튼 클릭됨');
+                this.handleArrangeSeats();
+            }
+            // 행 추가 버튼 클릭
+            if (target.id === 'add-student-row-btn') {
+                this.handleAddStudentRow();
+            }
+            // 공유하기 버튼 클릭
+            if (target.id === 'share-layout') {
+                console.log('공유하기 버튼 클릭됨');
+                this.handleShareLayout();
+            }
+            // 인쇄하기 버튼 클릭
+            if (target.id === 'print-layout') {
+                this.handlePrintLayout();
+            }
+            // 저장하기 버튼 클릭
+            if (target.id === 'save-layout') {
+                this.handleSaveLayout();
+            }
+        });
     }
     /**
      * 라디오 버튼 이벤트 리스너 초기화
@@ -476,12 +502,15 @@ export class MainController {
         const nameDiv = document.createElement('div');
         nameDiv.className = 'student-name';
         nameDiv.textContent = student.name;
-        const numberDiv = document.createElement('div');
-        numberDiv.className = 'student-number';
-        numberDiv.textContent = `${index + 1}번`;
-        const genderDiv = document.createElement('div');
-        genderDiv.className = 'student-gender';
-        genderDiv.textContent = student.gender === 'M' ? '남' : '여';
+        nameDiv.style.textAlign = 'center';
+        nameDiv.style.fontSize = '1.8em';
+        nameDiv.style.fontWeight = 'bold';
+        nameDiv.style.color = '#333';
+        nameDiv.style.display = 'flex';
+        nameDiv.style.alignItems = 'center';
+        nameDiv.style.justifyContent = 'center';
+        nameDiv.style.height = '100%';
+        nameDiv.style.width = '100%';
         // 성별에 따라 클래스 추가
         if (student.gender === 'M') {
             card.classList.add('gender-m');
@@ -490,8 +519,6 @@ export class MainController {
             card.classList.add('gender-f');
         }
         card.appendChild(nameDiv);
-        card.appendChild(numberDiv);
-        card.appendChild(genderDiv);
         return card;
     }
     /**
@@ -908,26 +935,10 @@ export class MainController {
         actionButtons.className = 'table-action-buttons';
         actionButtons.innerHTML = `
             <button id="add-student-row-btn">행 추가</button>
-            <button id="save-student-data">명렬표 저장</button>
             <button id="arrange-seats" class="arrange-seats-btn">자리 배치하기</button>
         `;
         studentTableContainer.appendChild(actionButtons);
         outputSection.appendChild(studentTableContainer);
-        // 행 추가 버튼 이벤트
-        const addRowBtn = document.getElementById('add-student-row-btn');
-        if (addRowBtn) {
-            addRowBtn.addEventListener('click', () => this.handleAddStudentRow());
-        }
-        // 저장 버튼 이벤트
-        const saveBtn = document.getElementById('save-student-data');
-        if (saveBtn) {
-            saveBtn.addEventListener('click', () => this.handleSaveStudentData());
-        }
-        // 좌석 배치하기 버튼 이벤트
-        const arrangeBtn = document.getElementById('arrange-seats');
-        if (arrangeBtn) {
-            arrangeBtn.addEventListener('click', () => this.handleArrangeSeats());
-        }
         this.outputModule.showInfo(`${count}명의 학생 명렬표가 생성되었습니다.`);
     }
     /**
@@ -998,43 +1009,6 @@ export class MainController {
                 htmlRow.dataset.studentIndex = rowIndex.toString();
             }
         });
-    }
-    /**
-     * 학생 데이터 저장 처리
-     */
-    handleSaveStudentData() {
-        const outputSection = document.getElementById('output-section');
-        const rows = outputSection?.querySelectorAll('.student-input-table tbody tr');
-        if (!rows || rows.length === 0) {
-            this.outputModule.showError('저장할 학생 데이터가 없습니다.');
-            return;
-        }
-        const students = [];
-        rows.forEach((row) => {
-            const nameInput = row.querySelector('.student-name-input');
-            const genderSelect = row.querySelector('.student-gender-select');
-            if (nameInput && genderSelect) {
-                const name = nameInput.value.trim();
-                const gender = genderSelect.value;
-                if (name && gender) {
-                    students.push({ name, gender });
-                }
-            }
-        });
-        if (students.length === 0) {
-            this.outputModule.showError('학생 정보를 모두 입력해주세요.');
-            return;
-        }
-        // 학생 데이터를 스토리지에 저장
-        localStorage.setItem('studentData', JSON.stringify(students));
-        // 내부 students 배열에 저장 (자리 배치 생성 시 사용)
-        this.students = students.map((s, index) => ({
-            id: index + 1,
-            name: s.name,
-            gender: s.gender,
-            fixedSeatId: undefined
-        }));
-        this.outputModule.showSuccess(`${students.length}명의 학생 정보가 저장되었습니다.`);
     }
     /**
      * 배치 결과 섹션 생성
@@ -1396,7 +1370,6 @@ export class MainController {
         actionButtons.className = 'table-action-buttons';
         actionButtons.innerHTML = `
             <button id="add-student-row-btn">행 추가</button>
-            <button id="save-student-data">명렬표 저장</button>
             <button id="arrange-seats" class="arrange-seats-btn">자리 배치하기</button>
         `;
         studentTableContainer.appendChild(actionButtons);
@@ -1405,10 +1378,6 @@ export class MainController {
         const addRowBtn = document.getElementById('add-student-row-btn');
         if (addRowBtn) {
             addRowBtn.addEventListener('click', () => this.handleAddStudentRow());
-        }
-        const saveBtn = document.getElementById('save-student-data');
-        if (saveBtn) {
-            saveBtn.addEventListener('click', () => this.handleSaveStudentData());
         }
     }
     /**
@@ -1521,103 +1490,69 @@ export class MainController {
                 alert('학생 정보를 먼저 입력해주세요.');
                 return;
             }
+            console.log('학생 데이터:', studentData);
             // 학생 데이터를 Student 객체로 변환
             this.students = StudentModel.createMultiple(studentData);
             // 남학생과 여학생 분리
             const maleStudents = this.students.filter(s => s.gender === 'M');
             const femaleStudents = this.students.filter(s => s.gender === 'F');
-            // 기존 카드들 제거
+            console.log('남학생 수:', maleStudents.length, '여학생 수:', femaleStudents.length);
+            // 기존 카드들에서 이름만 변경 (카드 위치는 고정)
             const seatsArea = document.getElementById('seats-area');
             if (!seatsArea)
                 return;
-            seatsArea.innerHTML = '';
-            // 현재 선택된 배치 형태 확인
-            const layoutTypeInput = document.querySelector('input[name="layout-type"]:checked');
-            const layoutType = layoutTypeInput?.value;
-            // 분단 수 가져오기
-            const partitionInput = document.getElementById('number-of-partitions');
-            const partitionCount = partitionInput ? parseInt(partitionInput.value || '1', 10) : 1;
-            if (layoutType === 'pair-uniform') {
-                // 2명씩 짝꿍 배치
-                this.renderArrangedPairLayout(maleStudents, femaleStudents, partitionCount);
+            // 기존 카드들 가져오기 (분단 레이블 제외)
+            const existingCards = seatsArea.querySelectorAll('.student-seat-card');
+            console.log('기존 카드 수:', existingCards.length);
+            if (existingCards.length === 0) {
+                alert('먼저 좌석 배치 형태를 설정해주세요.');
+                return;
             }
-            else {
-                // 1명씩 한 줄로 배치
-                this.renderArrangedSingleLayout(maleStudents, femaleStudents, partitionCount);
-            }
+            // 남학생과 여학생을 무작위로 섞기
+            const shuffledMales = [...maleStudents].sort(() => Math.random() - 0.5);
+            const shuffledFemales = [...femaleStudents].sort(() => Math.random() - 0.5);
+            console.log('섞인 남학생:', shuffledMales.map(s => s.name));
+            console.log('섞인 여학생:', shuffledFemales.map(s => s.name));
+            let maleIndex = 0;
+            let femaleIndex = 0;
+            // 각 카드에 이름 할당
+            existingCards.forEach((card, index) => {
+                const cardElement = card;
+                // 카드의 성별 확인
+                const isMaleCard = cardElement.classList.contains('gender-m');
+                const isFemaleCard = cardElement.classList.contains('gender-f');
+                console.log(`카드 ${index}: 남성카드=${isMaleCard}, 여성카드=${isFemaleCard}`);
+                if (isMaleCard && maleIndex < shuffledMales.length) {
+                    // 남학생 카드에 남학생 이름 할당
+                    const nameDiv = cardElement.querySelector('.student-name');
+                    console.log(`남학생 카드 ${index}의 이름 요소:`, nameDiv);
+                    if (nameDiv) {
+                        nameDiv.textContent = shuffledMales[maleIndex].name;
+                        console.log(`남학생 카드 ${index}에 이름 할당:`, shuffledMales[maleIndex].name);
+                    }
+                    maleIndex++;
+                }
+                else if (isFemaleCard && femaleIndex < shuffledFemales.length) {
+                    // 여학생 카드에 여학생 이름 할당
+                    const nameDiv = cardElement.querySelector('.student-name');
+                    console.log(`여학생 카드 ${index}의 이름 요소:`, nameDiv);
+                    if (nameDiv) {
+                        nameDiv.textContent = shuffledFemales[femaleIndex].name;
+                        console.log(`여학생 카드 ${index}에 이름 할당:`, shuffledFemales[femaleIndex].name);
+                    }
+                    femaleIndex++;
+                }
+            });
             this.outputModule.showSuccess('좌석 배치가 완료되었습니다!');
+            // 자리 배치도 액션 버튼들 표시
+            const actionButtons = document.getElementById('layout-action-buttons');
+            if (actionButtons) {
+                actionButtons.style.display = 'block';
+            }
         }
         catch (error) {
             console.error('좌석 배치 중 오류:', error);
             this.outputModule.showError('좌석 배치 중 오류가 발생했습니다.');
-        }
-    }
-    /**
-     * 2명씩 짝꿍 배치 렌더링 (실제 이름 사용)
-     */
-    renderArrangedPairLayout(maleStudents, femaleStudents, partitionCount) {
-        const seatsArea = document.getElementById('seats-area');
-        if (!seatsArea)
-            return;
-        // 분단 레이블 추가
-        const labelsRow = document.createElement('div');
-        labelsRow.style.gridColumn = `1 / -1`;
-        labelsRow.style.display = 'grid';
-        labelsRow.style.gridTemplateColumns = `repeat(${partitionCount}, 1fr)`;
-        labelsRow.style.gap = '40px';
-        labelsRow.style.marginBottom = '5px';
-        for (let i = 1; i <= partitionCount; i++) {
-            const label = document.createElement('div');
-            label.textContent = `${i}분단`;
-            label.style.textAlign = 'center';
-            label.style.fontWeight = 'bold';
-            label.style.color = '#667eea';
-            label.style.fontSize = '0.9em';
-            labelsRow.appendChild(label);
-        }
-        seatsArea.appendChild(labelsRow);
-        seatsArea.style.gridTemplateColumns = `repeat(${partitionCount}, 1fr)`;
-        seatsArea.style.gap = '10px 40px';
-        // 짝꿍 모드 확인
-        const pairModeInput = document.querySelector('input[name="pair-mode"]:checked');
-        const pairMode = pairModeInput?.value || 'gender-pair';
-        if (pairMode === 'same-gender-pair') {
-            // 같은 성끼리 짝꿍하기
-            this.renderSameGenderPairs(maleStudents, femaleStudents, partitionCount);
-        }
-        else {
-            // 남녀 짝꿍 하기
-            this.renderGenderPairs(maleStudents, femaleStudents, partitionCount);
-        }
-    }
-    /**
-     * 1명씩 한 줄로 배치 렌더링 (실제 이름 사용)
-     */
-    renderArrangedSingleLayout(maleStudents, femaleStudents, partitionCount) {
-        const seatsArea = document.getElementById('seats-area');
-        if (!seatsArea)
-            return;
-        seatsArea.style.gridTemplateColumns = `repeat(${partitionCount}, 1fr)`;
-        seatsArea.style.gap = '10px 40px';
-        // 남학생과 여학생을 무작위로 섞기
-        const shuffledMales = [...maleStudents].sort(() => Math.random() - 0.5);
-        const shuffledFemales = [...femaleStudents].sort(() => Math.random() - 0.5);
-        const rowsPerPartition = Math.ceil(Math.max(maleStudents.length, femaleStudents.length) / partitionCount);
-        for (let row = 0; row < rowsPerPartition; row++) {
-            for (let partition = 0; partition < partitionCount; partition++) {
-                const maleIndex = row * partitionCount + partition;
-                const femaleIndex = row * partitionCount + partition;
-                // 남학생 카드 배치
-                if (maleIndex < shuffledMales.length) {
-                    const card = this.createStudentNameCard(shuffledMales[maleIndex]);
-                    seatsArea.appendChild(card);
-                }
-                // 여학생 카드 배치
-                if (femaleIndex < shuffledFemales.length) {
-                    const card = this.createStudentNameCard(shuffledFemales[femaleIndex]);
-                    seatsArea.appendChild(card);
-                }
-            }
         }
     }
     /**
@@ -1723,6 +1658,585 @@ export class MainController {
         nameDiv.style.fontWeight = 'bold';
         card.appendChild(nameDiv);
         return card;
+    }
+    /**
+     * 자리 배치도 인쇄 처리
+     */
+    handlePrintLayout() {
+        try {
+            // 인쇄용 스타일이 포함된 새 창 열기
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) {
+                alert('팝업이 차단되었습니다. 팝업을 허용해주세요.');
+                return;
+            }
+            // 현재 자리 배치도 영역 가져오기
+            const seatsArea = document.getElementById('seats-area');
+            const classroomLayout = document.getElementById('classroom-layout');
+            if (!seatsArea || !classroomLayout) {
+                alert('인쇄할 자리 배치도를 찾을 수 없습니다.');
+                return;
+            }
+            // 현재 그리드 설정 가져오기
+            const currentGridTemplateColumns = seatsArea.style.gridTemplateColumns;
+            console.log('현재 그리드 설정:', currentGridTemplateColumns);
+            // 현재 화면의 실제 HTML 구조를 그대로 사용
+            const seatsAreaHtml = seatsArea.innerHTML;
+            // 현재 날짜와 시간
+            const now = new Date();
+            const dateString = now.toLocaleDateString('ko-KR', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            // 인쇄용 HTML 생성
+            const printContent = `
+                <!DOCTYPE html>
+                <html lang="ko">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>자리 배치도 - ${dateString}</title>
+                    <style>
+                        body {
+                            font-family: 'Malgun Gothic', sans-serif;
+                            margin: 0;
+                            padding: 10px;
+                            background: white;
+                            font-size: 12px;
+                        }
+                        .print-header {
+                            text-align: center;
+                            margin-bottom: 15px;
+                            border-bottom: 1px solid #333;
+                            padding-bottom: 8px;
+                        }
+                        .print-title {
+                            font-size: 18px;
+                            font-weight: bold;
+                            margin-bottom: 5px;
+                        }
+                        .print-date {
+                            font-size: 11px;
+                            color: #666;
+                        }
+                        .classroom-layout {
+                            background: #f8f9fa;
+                            border: 1px dashed #ddd;
+                            border-radius: 5px;
+                            padding: 10px;
+                            margin: 10px 0;
+                        }
+                        .blackboard-area {
+                            position: relative;
+                            top: 0;
+                            left: 50%;
+                            transform: translateX(-50%);
+                            width: 200px;
+                            height: 50px;
+                            background: #2c3e50;
+                            border: 2px solid #1a252f;
+                            border-radius: 3px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            color: white;
+                            font-weight: bold;
+                            font-size: 12px;
+                            margin-bottom: 10px;
+                        }
+                        .teacher-desk-area {
+                            position: relative;
+                            top: 0;
+                            left: 50%;
+                            transform: translateX(-50%);
+                            width: 80px;
+                            height: 25px;
+                            background: #95a5a6;
+                            border: 1px solid #7f8c8d;
+                            border-radius: 3px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            color: white;
+                            font-weight: bold;
+                            font-size: 10px;
+                            margin-bottom: 20px;
+                        }
+                        .seats-area {
+                            display: grid;
+                            gap: 5px 20px !important;
+                            justify-content: center !important;
+                            margin-top: 10px;
+                            grid-template-columns: ${currentGridTemplateColumns || 'repeat(6, 1fr)'};
+                        }
+                        .student-seat-card {
+                            min-width: 60px;
+                            height: 60px;
+                            background: white;
+                            border: 1px solid #ddd;
+                            border-radius: 4px;
+                            padding: 5px;
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            justify-content: center;
+                            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+                        }
+                        .student-seat-card.gender-m {
+                            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+                        }
+                        .student-seat-card.gender-f {
+                            background: linear-gradient(135deg, #fce4ec 0%, #f8bbd9 100%);
+                        }
+                        .student-name {
+                            text-align: center;
+                            font-size: 10px;
+                            font-weight: bold;
+                            color: #333;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            height: 100%;
+                            width: 100%;
+                        }
+                        .partition-label {
+                            text-align: center;
+                            font-weight: bold;
+                            color: #667eea;
+                            font-size: 8px;
+                            margin-bottom: 3px;
+                        }
+                        /* 분단 레이블과 카드들의 정렬을 위한 추가 스타일 */
+                        .labels-row {
+                            display: grid;
+                            gap: 5px 20px !important;
+                            justify-content: center !important;
+                            grid-template-columns: ${currentGridTemplateColumns || 'repeat(6, 1fr)'};
+                            margin-bottom: 5px;
+                        }
+                        .labels-row > div {
+                            text-align: center;
+                            font-weight: bold;
+                            color: #667eea;
+                            font-size: 8px;
+                            margin-bottom: 3px;
+                        }
+                        @media print {
+                            body { 
+                                margin: 0; 
+                                padding: 5px;
+                                font-size: 10px;
+                            }
+                            .print-header { 
+                                page-break-after: avoid; 
+                                margin-bottom: 10px;
+                            }
+                            .classroom-layout { 
+                                page-break-inside: avoid; 
+                                margin: 5px 0;
+                                padding: 5px;
+                            }
+                            .seats-area {
+                                gap: 3px 15px !important;
+                            }
+                            .student-seat-card {
+                                min-width: 50px;
+                                height: 50px;
+                                padding: 3px;
+                            }
+                            .student-name {
+                                font-size: 9px;
+                            }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="print-header">
+                        <div class="print-title">교실 자리 배치도</div>
+                        <div class="print-date">생성일시: ${dateString}</div>
+                    </div>
+                    
+                    <div class="classroom-layout">
+                        <div class="blackboard-area">📝 칠판</div>
+                        <div class="teacher-desk-area">🖥️ 교탁</div>
+                        <div class="seats-area">
+                            ${seatsAreaHtml}
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `;
+            printWindow.document.write(printContent);
+            printWindow.document.close();
+            // 인쇄 대화상자 열기
+            setTimeout(() => {
+                printWindow.print();
+            }, 500);
+        }
+        catch (error) {
+            console.error('인쇄 중 오류:', error);
+            this.outputModule.showError('인쇄 중 오류가 발생했습니다.');
+        }
+    }
+    /**
+     * 자리 배치도 저장 처리
+     */
+    handleSaveLayout() {
+        try {
+            // 현재 자리 배치도 영역 가져오기
+            const seatsArea = document.getElementById('seats-area');
+            const classroomLayout = document.getElementById('classroom-layout');
+            if (!seatsArea || !classroomLayout) {
+                alert('저장할 자리 배치도를 찾을 수 없습니다.');
+                return;
+            }
+            // 현재 그리드 설정 가져오기
+            const currentGridTemplateColumns = seatsArea.style.gridTemplateColumns;
+            console.log('저장용 현재 그리드 설정:', currentGridTemplateColumns);
+            // 현재 화면의 실제 HTML 구조를 그대로 사용
+            const seatsAreaHtml = seatsArea.innerHTML;
+            // 현재 날짜와 시간
+            const now = new Date();
+            const dateString = now.toLocaleDateString('ko-KR', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            }).replace(/\./g, '-').replace(/\s/g, '_');
+            // HTML 내용 생성
+            const htmlContent = `
+                <!DOCTYPE html>
+                <html lang="ko">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>자리 배치도 - ${dateString}</title>
+                    <style>
+                        body {
+                            font-family: 'Malgun Gothic', sans-serif;
+                            margin: 0;
+                            padding: 20px;
+                            background: white;
+                        }
+                        .print-header {
+                            text-align: center;
+                            margin-bottom: 30px;
+                            border-bottom: 2px solid #333;
+                            padding-bottom: 15px;
+                        }
+                        .print-title {
+                            font-size: 24px;
+                            font-weight: bold;
+                            margin-bottom: 10px;
+                        }
+                        .print-date {
+                            font-size: 14px;
+                            color: #666;
+                        }
+                        .classroom-layout {
+                            background: #f8f9fa;
+                            border: 2px dashed #ddd;
+                            border-radius: 10px;
+                            padding: 20px;
+                            margin: 20px 0;
+                        }
+                        .blackboard-area {
+                            position: relative;
+                            top: 0;
+                            left: 50%;
+                            transform: translateX(-50%);
+                            width: 300px;
+                            height: 80px;
+                            background: #2c3e50;
+                            border: 3px solid #1a252f;
+                            border-radius: 5px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            color: white;
+                            font-weight: bold;
+                            font-size: 18px;
+                            margin-bottom: 20px;
+                        }
+                        .teacher-desk-area {
+                            position: relative;
+                            top: 0;
+                            left: 50%;
+                            transform: translateX(-50%);
+                            width: 120px;
+                            height: 40px;
+                            background: #95a5a6;
+                            border: 2px solid #7f8c8d;
+                            border-radius: 5px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            color: white;
+                            font-weight: bold;
+                            margin-bottom: 40px;
+                        }
+                        .seats-area {
+                            display: grid;
+                            gap: 10px 40px !important;
+                            justify-content: center !important;
+                            margin-top: 20px;
+                            grid-template-columns: ${currentGridTemplateColumns || 'repeat(6, 1fr)'};
+                        }
+                        .student-seat-card {
+                            min-width: 120px;
+                            height: 120px;
+                            background: white;
+                            border: 2px solid #ddd;
+                            border-radius: 8px;
+                            padding: 15px;
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            justify-content: center;
+                            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+                        }
+                        .student-seat-card.gender-m {
+                            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+                        }
+                        .student-seat-card.gender-f {
+                            background: linear-gradient(135deg, #fce4ec 0%, #f8bbd9 100%);
+                        }
+                        .student-name {
+                            text-align: center;
+                            font-size: 1.8em;
+                            font-weight: bold;
+                            color: #333;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            height: 100%;
+                            width: 100%;
+                        }
+                        .partition-label {
+                            text-align: center;
+                            font-weight: bold;
+                            color: #667eea;
+                            font-size: 0.9em;
+                            margin-bottom: 5px;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="print-header">
+                        <div class="print-title">교실 자리 배치도</div>
+                        <div class="print-date">생성일시: ${dateString}</div>
+                    </div>
+                    
+                    <div class="classroom-layout">
+                        <div class="blackboard-area">📝 칠판</div>
+                        <div class="teacher-desk-area">🖥️ 교탁</div>
+                        <div class="seats-area">
+                            ${seatsAreaHtml}
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `;
+            // 파일명 생성
+            const fileName = `자리배치도_${dateString}.html`;
+            // Blob 생성 및 다운로드
+            const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            this.outputModule.showSuccess(`자리 배치도가 "${fileName}"으로 저장되었습니다.`);
+        }
+        catch (error) {
+            console.error('저장 중 오류:', error);
+            this.outputModule.showError('저장 중 오류가 발생했습니다.');
+        }
+    }
+    /**
+     * 자리 배치도 공유하기
+     */
+    handleShareLayout() {
+        console.log('handleShareLayout 메서드 시작');
+        try {
+            const seatsArea = document.getElementById('seats-area');
+            const classroomLayout = document.getElementById('classroom-layout');
+            console.log('seatsArea:', seatsArea);
+            console.log('classroomLayout:', classroomLayout);
+            if (!seatsArea || !classroomLayout) {
+                console.log('자리 배치도 요소를 찾을 수 없음');
+                alert('공유할 자리 배치도를 찾을 수 없습니다.');
+                return;
+            }
+            const currentGridTemplateColumns = seatsArea.style.gridTemplateColumns;
+            const seatsAreaHtml = seatsArea.innerHTML;
+            const now = new Date();
+            const dateString = now.toLocaleDateString('ko-KR', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            // 간단한 공유 코드 생성
+            const shareCode = this.generateShareCode(seatsAreaHtml, currentGridTemplateColumns, dateString);
+            // 모달 창으로 공유하기 (방법 2)
+            console.log('모달 창으로 공유하기 실행');
+            this.showShareModal(shareCode);
+        }
+        catch (error) {
+            console.error('공유 중 오류:', error);
+            this.outputModule.showError('공유 중 오류가 발생했습니다.');
+        }
+    }
+    /**
+     * 간단한 공유 코드 생성
+     */
+    generateShareCode(seatsHtml, gridColumns, dateString) {
+        // 학생 정보 추출
+        const studentNames = [];
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = seatsHtml;
+        const nameElements = tempDiv.querySelectorAll('.student-name');
+        nameElements.forEach(element => {
+            const name = element.textContent?.trim();
+            if (name && name !== '') {
+                studentNames.push(name);
+            }
+        });
+        // 간단한 공유 코드 생성
+        const shareData = {
+            type: 'seating-arrangement',
+            date: dateString,
+            students: studentNames,
+            layout: gridColumns,
+            version: '1.0'
+        };
+        // Base64로 인코딩하여 짧게 만들기
+        const jsonString = JSON.stringify(shareData);
+        const encodedData = btoa(unescape(encodeURIComponent(jsonString)));
+        // 공유 링크 생성 (실제로는 로컬 데이터이지만 사용자에게는 링크처럼 보이게)
+        const shareCode = `자리배치도:${encodedData}`;
+        return shareCode;
+    }
+    /**
+     * 모달 창으로 자리 배치도 공유하기
+     */
+    showShareModal(content) {
+        // 모달 창으로 텍스트 영역 표시
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        `;
+        const modalContent = document.createElement('div');
+        modalContent.style.cssText = `
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            max-width: 80%;
+            max-height: 80%;
+            overflow: auto;
+        `;
+        const title = document.createElement('h3');
+        title.textContent = '📤 자리 배치도 공유';
+        title.style.marginTop = '0';
+        title.style.color = '#333';
+        const instruction = document.createElement('div');
+        instruction.innerHTML = `
+            <p style="margin-bottom: 10px; color: #666;">
+                <strong>사용 방법:</strong><br>
+                1. 아래 공유 코드를 복사하세요 (Ctrl+A → Ctrl+C)<br>
+                2. 이메일, 메신저, 문서 등에 붙여넣기하세요<br>
+                3. 받는 사람이 이 코드를 자리 배치 프로그램에 입력하면 동일한 배치를 볼 수 있습니다
+            </p>
+        `;
+        const textarea = document.createElement('textarea');
+        textarea.value = content;
+        textarea.style.cssText = `
+            width: 100%;
+            height: 120px;
+            font-family: monospace;
+            font-size: 14px;
+            border: 2px solid #007bff;
+            border-radius: 8px;
+            padding: 15px;
+            resize: none;
+            background: #f8f9fa;
+            font-weight: bold;
+        `;
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.cssText = `
+            margin-top: 15px;
+            text-align: right;
+        `;
+        const copyButton = document.createElement('button');
+        copyButton.textContent = '📋 전체 선택';
+        copyButton.className = 'primary-btn';
+        copyButton.style.marginRight = '10px';
+        copyButton.onclick = () => {
+            textarea.select();
+            textarea.setSelectionRange(0, 99999);
+            // 복사 완료 메시지
+            setTimeout(() => {
+                const originalText = copyButton.textContent;
+                copyButton.textContent = '✅ 복사됨!';
+                copyButton.style.background = '#28a745';
+                setTimeout(() => {
+                    copyButton.textContent = originalText;
+                    copyButton.style.background = '';
+                }, 2000);
+            }, 100);
+        };
+        const closeButton = document.createElement('button');
+        closeButton.textContent = '❌ 닫기';
+        closeButton.className = 'secondary-btn';
+        closeButton.onclick = () => {
+            document.body.removeChild(modal);
+        };
+        buttonContainer.appendChild(copyButton);
+        buttonContainer.appendChild(closeButton);
+        modalContent.appendChild(title);
+        modalContent.appendChild(instruction);
+        modalContent.appendChild(textarea);
+        modalContent.appendChild(buttonContainer);
+        modal.appendChild(modalContent);
+        document.body.appendChild(modal);
+        // ESC 키로 모달 닫기
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                document.body.removeChild(modal);
+                document.removeEventListener('keydown', handleKeyDown);
+            }
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        // 모달 배경 클릭으로 닫기
+        modal.onclick = (e) => {
+            if (e.target === modal) {
+                document.body.removeChild(modal);
+                document.removeEventListener('keydown', handleKeyDown);
+            }
+        };
+        // 텍스트 영역에 포커스하고 전체 선택
+        setTimeout(() => {
+            textarea.focus();
+            textarea.select();
+        }, 100);
     }
 }
 //# sourceMappingURL=MainController.js.map

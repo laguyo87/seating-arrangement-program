@@ -155,6 +155,14 @@
         <main class="main-content">
             <div class="main-header">
                 <h2>자리 배치도</h2>
+               <!-- 자리 배치도 액션 버튼들 (초기에는 숨김) -->
+               <div id="layout-action-buttons" style="display: none;">
+                   <div style="display: flex; gap: 10px;">
+                       <button id="share-layout" class="secondary-btn">📤 공유하기</button>
+                       <button id="print-layout" class="secondary-btn">🖨️ 인쇄하기</button>
+                       <button id="save-layout" class="secondary-btn">💾 저장하기</button>
+                   </div>
+               </div>
             </div>
             
             <div id="output-section" class="result-container">

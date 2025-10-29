@@ -326,12 +326,15 @@ button:disabled {
     padding: 20px 30px;
     background: #f8f9fa;
     border-bottom: 2px solid #dee2e6;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .main-header h2 {
     color: #333;
     font-size: 1.5em;
-    margin-bottom: 5px;
+    margin: 0;
 }
 
 .status-info {
@@ -681,16 +684,16 @@ button:disabled {
 
 /* 학생 좌석 카드 스타일 */
 .student-seat-card {
-    min-width: 80px;
-    height: 100px;
+    min-width: 120px;
+    height: 120px;
     background: white;
     border: 2px solid #ddd;
     border-radius: 8px;
-    padding: 10px;
+    padding: 15px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
     cursor: pointer;
     transition: all 0.3s ease;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
