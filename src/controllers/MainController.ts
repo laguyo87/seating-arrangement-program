@@ -28,6 +28,8 @@ export class MainController {
     private students: Student[] = [];
     private seats: Seat[] = [];
     private isInitialized: boolean = false;
+    private fixedSeatIds: Set<number> = new Set(); // 고정 좌석 ID 목록
+    private nextSeatId: number = 1; // 좌석 카드 고유 ID 생성기
 
     constructor() {
         try {
@@ -51,6 +53,12 @@ export class MainController {
             const checkedLayoutType = document.querySelector('input[name="layout-type"]:checked') as HTMLInputElement;
             if (checkedLayoutType && checkedLayoutType.value === 'single-uniform') {
                 this.toggleCustomMode1(true);
+            }
+            
+            // 초기 상태에서 고정 좌석 모드 확인
+            const checkedFixedRandomMode = document.querySelector('input[name="custom-mode-2"][value="fixed-random"]:checked') as HTMLInputElement;
+            if (checkedFixedRandomMode) {
+                this.enableFixedSeatMode();
             }
             
             this.isInitialized = true;
@@ -337,8 +345,103 @@ export class MainController {
                 }
             });
         });
+
+        // 고정 좌석 모드 라디오 버튼
+        const customModeRadios = document.querySelectorAll('input[name="custom-mode-2"]');
+        customModeRadios.forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                const target = e.target as HTMLInputElement;
+                if (target.value === 'fixed-random') {
+                    // 고정 좌석 지정 후 랜덤 배치 모드 활성화
+                    this.enableFixedSeatMode();
+                } else {
+                    // 일반 랜덤 배치 모드
+                    this.disableFixedSeatMode();
+                }
+            });
+        });
     }
 
+    /**
+     * 고정 좌석 모드 활성화
+     */
+    private enableFixedSeatMode(): void {
+        console.log('고정 좌석 모드 활성화');
+        // 좌석 카드에 클릭 이벤트 추가 (이벤트 위임)
+        const seatsArea = document.getElementById('seats-area');
+        if (seatsArea) {
+            seatsArea.style.cursor = 'pointer';
+            seatsArea.addEventListener('click', this.handleSeatCardClick);
+        }
+    }
+
+    /**
+     * 고정 좌석 모드 비활성화
+     */
+    private disableFixedSeatMode(): void {
+        console.log('고정 좌석 모드 비활성화');
+        // 고정 좌석 초기화
+        this.fixedSeatIds.clear();
+        
+        // 모든 좌석 카드에서 고정 표시 제거
+        const fixedSeats = document.querySelectorAll('.student-seat-card.fixed-seat');
+        fixedSeats.forEach(seat => {
+            seat.classList.remove('fixed-seat');
+            const lockIcon = seat.querySelector('.fixed-seat-lock');
+            if (lockIcon) {
+                lockIcon.remove();
+            }
+        });
+
+        const seatsArea = document.getElementById('seats-area');
+        if (seatsArea) {
+            seatsArea.style.cursor = 'default';
+            seatsArea.removeEventListener('click', this.handleSeatCardClick);
+        }
+    }
+
+    /**
+     * 좌석 카드 클릭 이벤트 핸들러
+     */
+    private handleSeatCardClick = (e: MouseEvent): void => {
+        const target = e.target as HTMLElement;
+        const card = target.closest('.student-seat-card') as HTMLElement;
+        
+        if (!card) return;
+
+        const seatIdStr = card.getAttribute('data-seat-id');
+        if (!seatIdStr) return;
+
+        const seatId = parseInt(seatIdStr, 10);
+        
+        // 고정 좌석 토글
+        if (this.fixedSeatIds.has(seatId)) {
+            // 고정 해제
+            this.fixedSeatIds.delete(seatId);
+            card.classList.remove('fixed-seat');
+            const lockIcon = card.querySelector('.fixed-seat-lock');
+            if (lockIcon) {
+                lockIcon.remove();
+            }
+            console.log(`좌석 ${seatId} 고정 해제`);
+        } else {
+            // 고정 설정
+            this.fixedSeatIds.add(seatId);
+            card.classList.add('fixed-seat');
+            
+            // 🔒 아이콘 추가
+            const lockIcon = document.createElement('div');
+            lockIcon.className = 'fixed-seat-lock';
+            lockIcon.textContent = '🔒';
+            lockIcon.style.cssText = 'position: absolute; top: 5px; right: 5px; font-size: 1.2em; z-index: 10;';
+            card.appendChild(lockIcon);
+            
+            console.log(`좌석 ${seatId} 고정 설정`);
+        }
+
+        // 테이블의 고정 좌석 드롭다운 업데이트
+        this.updateFixedSeatDropdowns();
+    }
 
     /**
      * 최종 자리 배치도 렌더링
@@ -558,6 +661,26 @@ export class MainController {
             }
         } else {
             // '1명씩 한 줄로 배치' - 각 행에서 남녀 교대로 한 줄로 배치
+            // 분단 레이블 추가
+            const labelsRow = document.createElement('div');
+            labelsRow.style.gridColumn = `1 / -1`;
+            labelsRow.style.display = 'grid';
+            labelsRow.style.gridTemplateColumns = `repeat(${partitionCount}, 1fr)`;
+            labelsRow.style.gap = '40px';
+            labelsRow.style.marginBottom = '5px';
+            
+            for (let i = 1; i <= partitionCount; i++) {
+                const label = document.createElement('div');
+                label.textContent = `${i}분단`;
+                label.style.textAlign = 'center';
+                label.style.fontWeight = 'bold';
+                label.style.color = '#667eea';
+                label.style.fontSize = '0.9em';
+                labelsRow.appendChild(label);
+            }
+            
+            seatsArea.appendChild(labelsRow);
+            
             // 총 컬럼 수 = 분단 수 (사용자 입력값 그대로 사용)
             seatsArea.style.gridTemplateColumns = `repeat(${partitionCount}, 1fr)`;
             seatsArea.style.gap = '10px 40px'; // 분단 간 넓은 간격
@@ -599,6 +722,28 @@ export class MainController {
         const card = document.createElement('div');
         card.className = 'student-seat-card';
         
+        // 좌석 고유 ID 부여
+        const seatId = this.nextSeatId++;
+        card.setAttribute('data-seat-id', seatId.toString());
+        
+        // 좌석 번호 표시 (좌측 상단)
+        const seatNumberDiv = document.createElement('div');
+        seatNumberDiv.className = 'seat-number-label';
+        seatNumberDiv.textContent = `#${seatId}`;
+        seatNumberDiv.style.cssText = `
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            font-size: 0.8em;
+            font-weight: bold;
+            color: #667eea;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 2px 6px;
+            border-radius: 4px;
+            z-index: 5;
+        `;
+        card.appendChild(seatNumberDiv);
+        
         const nameDiv = document.createElement('div');
         nameDiv.className = 'student-name';
         nameDiv.textContent = student.name;
@@ -621,7 +766,89 @@ export class MainController {
         
         card.appendChild(nameDiv);
         
+        // 고정 좌석 모드일 때 클릭 이벤트 추가
+        this.setupFixedSeatClickHandler(card, seatId);
+        
         return card;
+    }
+
+    /**
+     * 고정 좌석 클릭 핸들러 설정
+     */
+    private setupFixedSeatClickHandler(card: HTMLDivElement, seatId: number): void {
+        // '고정 좌석 지정 후 랜덤 배치' 모드인지 확인
+        const fixedRandomMode = document.querySelector('input[name="custom-mode-2"][value="fixed-random"]:checked') as HTMLInputElement;
+        
+        if (fixedRandomMode) {
+            card.style.cursor = 'pointer';
+            card.title = '클릭하여 고정 좌석 지정/해제';
+            
+            card.addEventListener('click', () => {
+                this.toggleFixedSeat(seatId, card);
+            });
+        }
+        
+        // 이미 고정된 좌석인지 확인
+        if (this.fixedSeatIds.has(seatId)) {
+            card.classList.add('fixed-seat');
+        }
+    }
+    
+    /**
+     * 고정 좌석 토글
+     */
+    private toggleFixedSeat(seatId: number, card: HTMLDivElement): void {
+        if (this.fixedSeatIds.has(seatId)) {
+            // 고정 해제
+            this.fixedSeatIds.delete(seatId);
+            card.classList.remove('fixed-seat');
+            card.title = '클릭하여 고정 좌석 지정';
+        } else {
+            // 고정 설정
+            this.fixedSeatIds.add(seatId);
+            card.classList.add('fixed-seat');
+            card.title = '고정 좌석 (클릭하여 해제)';
+        }
+        
+        // 테이블의 드롭다운 업데이트
+        this.updateFixedSeatDropdowns();
+        
+        console.log(`고정 좌석 ${seatId} ${this.fixedSeatIds.has(seatId) ? '설정' : '해제'}`);
+    }
+    
+    /**
+     * 테이블의 고정 좌석 드롭다운 업데이트
+     */
+    private updateFixedSeatDropdowns(): void {
+        const fixedSeatSelects = document.querySelectorAll('.fixed-seat-select') as NodeListOf<HTMLSelectElement>;
+        
+        fixedSeatSelects.forEach(select => {
+            const currentValue = select.value;
+            const currentOption = select.querySelector(`option[value="${currentValue}"]`);
+            
+            // 기존 옵션 제거 (기본 옵션 제외)
+            while (select.children.length > 1) {
+                select.removeChild(select.lastChild!);
+            }
+            
+            // 고정 좌석 옵션 추가
+            if (this.fixedSeatIds.size > 0) {
+                this.fixedSeatIds.forEach(seatId => {
+                    const option = document.createElement('option');
+                    option.value = seatId.toString();
+                    option.textContent = `좌석 #${seatId}`;
+                    select.appendChild(option);
+                });
+            }
+            
+            // 이전 값이 유효하면 다시 설정
+            if (currentValue && select.querySelector(`option[value="${currentValue}"]`)) {
+                select.value = currentValue;
+            } else if (currentOption && !currentValue) {
+                // "없음" 옵션이면 유지
+                select.value = '';
+            }
+        });
     }
 
     /**
@@ -1007,12 +1234,26 @@ export class MainController {
         // 헤더 생성
         const thead = document.createElement('thead');
         const headerRow = document.createElement('tr');
-        headerRow.innerHTML = `
-            <th>번호</th>
-            <th>이름</th>
-            <th>성별</th>
-            <th>작업</th>
-        `;
+        
+        // '고정 좌석 지정 후 랜덤 배치' 모드인지 확인
+        const fixedRandomMode = document.querySelector('input[name="custom-mode-2"][value="fixed-random"]:checked') as HTMLInputElement;
+        
+        if (fixedRandomMode) {
+            headerRow.innerHTML = `
+                <th>번호</th>
+                <th>이름</th>
+                <th>성별</th>
+                <th title="미리보기 화면의 좌석 카드에 표시된 번호(#1, #2...)를 선택하세요. 고정 좌석을 지정하지 않으려면 '없음'을 선택하세요.">고정 좌석 <span style="font-size: 0.8em; color: #999;">(미리보기 좌석 번호)</span></th>
+                <th>작업</th>
+            `;
+        } else {
+            headerRow.innerHTML = `
+                <th>번호</th>
+                <th>이름</th>
+                <th>성별</th>
+                <th>작업</th>
+            `;
+        }
         thead.appendChild(headerRow);
         table.appendChild(thead);
 
@@ -1051,6 +1292,46 @@ export class MainController {
             `;
             genderSelect.tabIndex = count + i;
             genderCell.appendChild(genderSelect);
+            
+            // 고정 좌석 선택 열 (고정 좌석 모드일 때만)
+            let fixedSeatCell: HTMLTableCellElement | null = null;
+            if (fixedRandomMode) {
+                fixedSeatCell = document.createElement('td');
+                const fixedSeatSelect = document.createElement('select');
+                fixedSeatSelect.className = 'fixed-seat-select';
+                fixedSeatSelect.id = `fixed-seat-${i}`;
+                fixedSeatSelect.innerHTML = '<option value="">없음</option>';
+                fixedSeatSelect.tabIndex = count * 2 + i;
+                
+                // 고정된 좌석이 있으면 옵션 추가
+                if (this.fixedSeatIds.size > 0) {
+                    this.fixedSeatIds.forEach(seatId => {
+                        const option = document.createElement('option');
+                        option.value = seatId.toString();
+                        option.textContent = `좌석 #${seatId}`;
+                        fixedSeatSelect.appendChild(option);
+                    });
+                }
+                
+                // 고정 좌석 선택 변경 이벤트
+                fixedSeatSelect.addEventListener('change', () => {
+                    const selectedSeatId = fixedSeatSelect.value;
+                    const studentIndex = parseInt(row.dataset.studentIndex || '0', 10);
+                    
+                    // 학생 데이터에 고정 좌석 ID 저장
+                    if (this.students[studentIndex]) {
+                        if (selectedSeatId) {
+                            this.students[studentIndex].fixedSeatId = parseInt(selectedSeatId, 10);
+                        } else {
+                            delete this.students[studentIndex].fixedSeatId;
+                        }
+                    }
+                    
+                    console.log(`학생 ${studentIndex}의 고정 좌석: ${selectedSeatId || '없음'}`);
+                });
+                
+                fixedSeatCell.appendChild(fixedSeatSelect);
+            }
             
             // 작업 열 (삭제 버튼)
             const actionCell = document.createElement('td');
@@ -1099,6 +1380,9 @@ export class MainController {
             row.appendChild(numCell);
             row.appendChild(nameCell);
             row.appendChild(genderCell);
+            if (fixedSeatCell) {
+                row.appendChild(fixedSeatCell);
+            }
             row.appendChild(actionCell);
             
             tbody.appendChild(row);
@@ -1164,6 +1448,43 @@ export class MainController {
         `;
         genderCell.appendChild(genderSelect);
         
+        // 고정 좌석 선택 열 (고정 좌석 모드일 때만)
+        let fixedSeatCell: HTMLTableCellElement | null = null;
+        const fixedRandomMode = document.querySelector('input[name="custom-mode-2"][value="fixed-random"]:checked') as HTMLInputElement;
+        if (fixedRandomMode) {
+            fixedSeatCell = document.createElement('td');
+            const fixedSeatSelect = document.createElement('select');
+            fixedSeatSelect.className = 'fixed-seat-select';
+            fixedSeatSelect.innerHTML = '<option value="">없음</option>';
+            
+            // 고정된 좌석이 있으면 옵션 추가
+            if (this.fixedSeatIds.size > 0) {
+                this.fixedSeatIds.forEach(seatId => {
+                    const option = document.createElement('option');
+                    option.value = seatId.toString();
+                    option.textContent = `좌석 #${seatId}`;
+                    fixedSeatSelect.appendChild(option);
+                });
+            }
+            
+            // 고정 좌석 선택 변경 이벤트
+            fixedSeatSelect.addEventListener('change', () => {
+                const selectedSeatId = fixedSeatSelect.value;
+                const studentIndex = parseInt(row.dataset.studentIndex || '0', 10);
+                
+                // 학생 데이터에 고정 좌석 ID 저장
+                if (this.students[studentIndex]) {
+                    if (selectedSeatId) {
+                        this.students[studentIndex].fixedSeatId = parseInt(selectedSeatId, 10);
+                    } else {
+                        delete this.students[studentIndex].fixedSeatId;
+                    }
+                }
+            });
+            
+            fixedSeatCell.appendChild(fixedSeatSelect);
+        }
+        
         const actionCell = document.createElement('td');
         const deleteBtn = document.createElement('button');
         deleteBtn.textContent = '삭제';
@@ -1175,6 +1496,9 @@ export class MainController {
         row.appendChild(numCell);
         row.appendChild(nameCell);
         row.appendChild(genderCell);
+        if (fixedSeatCell) {
+            row.appendChild(fixedSeatCell);
+        }
         row.appendChild(actionCell);
         
         table.appendChild(row);
@@ -1524,12 +1848,24 @@ export class MainController {
         // 헤더 생성
         const thead = document.createElement('thead');
         const headerRow = document.createElement('tr');
-        headerRow.innerHTML = `
-            <th>번호</th>
-            <th>이름</th>
-            <th>성별</th>
-            <th>작업</th>
-        `;
+        const fixedRandomModeForHeader = document.querySelector('input[name="custom-mode-2"][value="fixed-random"]:checked') as HTMLInputElement;
+        
+        if (fixedRandomModeForHeader) {
+            headerRow.innerHTML = `
+                <th>번호</th>
+                <th>이름</th>
+                <th>성별</th>
+                <th title="미리보기 화면의 좌석 카드에 표시된 번호(#1, #2...)를 선택하세요. 고정 좌석을 지정하지 않으려면 '없음'을 선택하세요.">고정 좌석 <span style="font-size: 0.8em; color: #999;">(미리보기 좌석 번호)</span></th>
+                <th>작업</th>
+            `;
+        } else {
+            headerRow.innerHTML = `
+                <th>번호</th>
+                <th>이름</th>
+                <th>성별</th>
+                <th>작업</th>
+            `;
+        }
         thead.appendChild(headerRow);
         table.appendChild(thead);
 
@@ -1568,6 +1904,28 @@ export class MainController {
             genderSelect.value = student.gender;
             genderSelect.tabIndex = students.length + index + 1;
             genderCell.appendChild(genderSelect);
+            
+            // 고정 좌석 선택 열 (고정 좌석 모드일 때만)
+            let fixedSeatCell: HTMLTableCellElement | null = null;
+            const fixedRandomMode = document.querySelector('input[name="custom-mode-2"][value="fixed-random"]:checked') as HTMLInputElement;
+            if (fixedRandomMode) {
+                fixedSeatCell = document.createElement('td');
+                const fixedSeatSelect = document.createElement('select');
+                fixedSeatSelect.className = 'fixed-seat-select';
+                fixedSeatSelect.innerHTML = '<option value="">없음</option>';
+                
+                // 고정된 좌석이 있으면 옵션 추가
+                if (this.fixedSeatIds.size > 0) {
+                    this.fixedSeatIds.forEach(seatId => {
+                        const option = document.createElement('option');
+                        option.value = seatId.toString();
+                        option.textContent = `좌석 #${seatId}`;
+                        fixedSeatSelect.appendChild(option);
+                    });
+                }
+                
+                fixedSeatCell.appendChild(fixedSeatSelect);
+            }
             
             // 작업 열 (삭제 버튼)
             const actionCell = document.createElement('td');
@@ -1609,6 +1967,9 @@ export class MainController {
             row.appendChild(numCell);
             row.appendChild(nameCell);
             row.appendChild(genderCell);
+            if (fixedSeatCell) {
+                row.appendChild(fixedSeatCell);
+            }
             row.appendChild(actionCell);
             
             tbody.appendChild(row);
@@ -1765,6 +2126,21 @@ export class MainController {
             // 학생 데이터를 Student 객체로 변환
             this.students = StudentModel.createMultiple(studentData);
             
+            // 고정 좌석 모드인지 확인
+            const fixedRandomMode = document.querySelector('input[name="custom-mode-2"][value="fixed-random"]:checked') as HTMLInputElement;
+            
+            // 고정 좌석 정보를 테이블에서 읽어오기
+            if (fixedRandomMode) {
+                const fixedSeatSelects = document.querySelectorAll('.fixed-seat-select') as NodeListOf<HTMLSelectElement>;
+                fixedSeatSelects.forEach((select, index) => {
+                    const seatIdStr = select.value;
+                    if (seatIdStr && this.students[index]) {
+                        this.students[index].fixedSeatId = parseInt(seatIdStr, 10);
+                        console.log(`학생 ${this.students[index].name} → 고정 좌석 ${seatIdStr}`);
+                    }
+                });
+            }
+            
             // 남학생과 여학생 분리
             const maleStudents = this.students.filter(s => s.gender === 'M');
             const femaleStudents = this.students.filter(s => s.gender === 'F');
@@ -1785,46 +2161,106 @@ export class MainController {
                 return;
             }
             
-            // 남학생과 여학생을 무작위로 섞기
-            const shuffledMales = [...maleStudents].sort(() => Math.random() - 0.5);
-            const shuffledFemales = [...femaleStudents].sort(() => Math.random() - 0.5);
-            
-            console.log('섞인 남학생:', shuffledMales.map(s => s.name));
-            console.log('섞인 여학생:', shuffledFemales.map(s => s.name));
-            
-            let maleIndex = 0;
-            let femaleIndex = 0;
-            
-            // 각 카드에 이름 할당
-            existingCards.forEach((card, index) => {
-                const cardElement = card as HTMLElement;
-                
-                // 카드의 성별 확인
-                const isMaleCard = cardElement.classList.contains('gender-m');
-                const isFemaleCard = cardElement.classList.contains('gender-f');
-                
-                console.log(`카드 ${index}: 남성카드=${isMaleCard}, 여성카드=${isFemaleCard}`);
-                
-                if (isMaleCard && maleIndex < shuffledMales.length) {
-                    // 남학생 카드에 남학생 이름 할당
+            // 고정 좌석 모드인 경우
+            if (fixedRandomMode && this.fixedSeatIds.size > 0) {
+                // 1단계: 모든 카드의 이름 초기화
+                existingCards.forEach((card) => {
+                    const cardElement = card as HTMLElement;
                     const nameDiv = cardElement.querySelector('.student-name') as HTMLElement;
-                    console.log(`남학생 카드 ${index}의 이름 요소:`, nameDiv);
                     if (nameDiv) {
-                        nameDiv.textContent = shuffledMales[maleIndex].name;
-                        console.log(`남학생 카드 ${index}에 이름 할당:`, shuffledMales[maleIndex].name);
+                        nameDiv.textContent = '';
                     }
-                    maleIndex++;
-                } else if (isFemaleCard && femaleIndex < shuffledFemales.length) {
-                    // 여학생 카드에 여학생 이름 할당
-                    const nameDiv = cardElement.querySelector('.student-name') as HTMLElement;
-                    console.log(`여학생 카드 ${index}의 이름 요소:`, nameDiv);
-                    if (nameDiv) {
-                        nameDiv.textContent = shuffledFemales[femaleIndex].name;
-                        console.log(`여학생 카드 ${index}에 이름 할당:`, shuffledFemales[femaleIndex].name);
+                });
+                
+                // 2단계: 고정 좌석에 지정된 학생 배치
+                const fixedStudents = this.students.filter(s => s.fixedSeatId !== undefined);
+                existingCards.forEach((card) => {
+                    const cardElement = card as HTMLElement;
+                    const seatIdStr = cardElement.getAttribute('data-seat-id');
+                    if (!seatIdStr) return;
+                    
+                    const seatId = parseInt(seatIdStr, 10);
+                    
+                    // 고정 좌석인 경우
+                    if (this.fixedSeatIds.has(seatId)) {
+                        const fixedStudent = fixedStudents.find(s => s.fixedSeatId === seatId);
+                        if (fixedStudent) {
+                            const nameDiv = cardElement.querySelector('.student-name') as HTMLElement;
+                            if (nameDiv) {
+                                nameDiv.textContent = fixedStudent.name;
+                                console.log(`고정 좌석 ${seatId}에 ${fixedStudent.name} 배치`);
+                            }
+                        }
                     }
-                    femaleIndex++;
-                }
-            });
+                });
+                
+                // 3단계: 나머지 좌석에 랜덤 배치
+                const allRemainingMales = maleStudents.filter(s => !s.fixedSeatId);
+                const allRemainingFemales = femaleStudents.filter(s => !s.fixedSeatId);
+                const shuffledMales = [...allRemainingMales].sort(() => Math.random() - 0.5);
+                const shuffledFemales = [...allRemainingFemales].sort(() => Math.random() - 0.5);
+                
+                let maleIndex = 0;
+                let femaleIndex = 0;
+                
+                existingCards.forEach((card) => {
+                    const cardElement = card as HTMLElement;
+                    const seatIdStr = cardElement.getAttribute('data-seat-id');
+                    if (!seatIdStr) return;
+                    
+                    const seatId = parseInt(seatIdStr, 10);
+                    
+                    // 고정 좌석이 아니고 아직 이름이 없는 경우
+                    if (!this.fixedSeatIds.has(seatId)) {
+                        const nameDiv = cardElement.querySelector('.student-name') as HTMLElement;
+                        if (nameDiv && !nameDiv.textContent?.trim()) {
+                            const isMaleCard = cardElement.classList.contains('gender-m');
+                            const isFemaleCard = cardElement.classList.contains('gender-f');
+                            
+                            if (isMaleCard && maleIndex < shuffledMales.length) {
+                                nameDiv.textContent = shuffledMales[maleIndex].name;
+                                maleIndex++;
+                            } else if (isFemaleCard && femaleIndex < shuffledFemales.length) {
+                                nameDiv.textContent = shuffledFemales[femaleIndex].name;
+                                femaleIndex++;
+                            }
+                        }
+                    }
+                });
+            } else {
+                // 일반 랜덤 배치 모드
+                const shuffledMales = [...maleStudents].sort(() => Math.random() - 0.5);
+                const shuffledFemales = [...femaleStudents].sort(() => Math.random() - 0.5);
+                
+                console.log('섞인 남학생:', shuffledMales.map(s => s.name));
+                console.log('섞인 여학생:', shuffledFemales.map(s => s.name));
+                
+                let maleIndex = 0;
+                let femaleIndex = 0;
+                
+                // 각 카드에 이름 할당
+                existingCards.forEach((card) => {
+                    const cardElement = card as HTMLElement;
+                    
+                    // 카드의 성별 확인
+                    const isMaleCard = cardElement.classList.contains('gender-m');
+                    const isFemaleCard = cardElement.classList.contains('gender-f');
+                    
+                    if (isMaleCard && maleIndex < shuffledMales.length) {
+                        const nameDiv = cardElement.querySelector('.student-name') as HTMLElement;
+                        if (nameDiv) {
+                            nameDiv.textContent = shuffledMales[maleIndex].name;
+                        }
+                        maleIndex++;
+                    } else if (isFemaleCard && femaleIndex < shuffledFemales.length) {
+                        const nameDiv = cardElement.querySelector('.student-name') as HTMLElement;
+                        if (nameDiv) {
+                            nameDiv.textContent = shuffledFemales[femaleIndex].name;
+                        }
+                        femaleIndex++;
+                    }
+                });
+            }
             
             this.outputModule.showSuccess('좌석 배치가 완료되었습니다!');
             

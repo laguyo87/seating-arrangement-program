@@ -697,6 +697,7 @@ button:disabled {
     cursor: pointer;
     transition: all 0.3s ease;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    position: relative;
 }
 
 .student-seat-card:hover {
@@ -711,6 +712,34 @@ button:disabled {
 
 .student-seat-card.gender-f {
     background: linear-gradient(135deg, #fce4ec 0%, #f8bbd9 100%);
+}
+
+/* 고정 좌석 스타일 */
+.student-seat-card.fixed-seat {
+    border: 3px solid #dc3545 !important;
+    border-style: dashed;
+    background: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 10px,
+        rgba(220, 53, 69, 0.1) 10px,
+        rgba(220, 53, 69, 0.1) 20px
+    ) !important;
+    position: relative;
+}
+
+.fixed-seat-lock {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    font-size: 1.2em;
+    z-index: 10;
+    pointer-events: none;
+}
+
+.student-seat-card.fixed-seat:hover {
+    border-color: #c82333 !important;
+    box-shadow: 0 4px 16px rgba(220, 53, 69, 0.3) !important;
 }
 
 .student-name {

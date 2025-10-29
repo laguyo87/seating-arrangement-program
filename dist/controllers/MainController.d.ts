@@ -11,6 +11,8 @@ export declare class MainController {
     private students;
     private seats;
     private isInitialized;
+    private fixedSeatIds;
+    private nextSeatId;
     constructor();
     /**
      * 초기 캔버스에 칠판과 교탁 그리기
@@ -24,6 +26,18 @@ export declare class MainController {
      * 라디오 버튼 이벤트 리스너 초기화
      */
     private initializeRadioListeners;
+    /**
+     * 고정 좌석 모드 활성화
+     */
+    private enableFixedSeatMode;
+    /**
+     * 고정 좌석 모드 비활성화
+     */
+    private disableFixedSeatMode;
+    /**
+     * 좌석 카드 클릭 이벤트 핸들러
+     */
+    private handleSeatCardClick;
     /**
      * 최종 자리 배치도 렌더링
      */
@@ -40,6 +54,18 @@ export declare class MainController {
      * 학생 카드 생성 헬퍼 메서드
      */
     private createStudentCard;
+    /**
+     * 고정 좌석 클릭 핸들러 설정
+     */
+    private setupFixedSeatClickHandler;
+    /**
+     * 고정 좌석 토글
+     */
+    private toggleFixedSeat;
+    /**
+     * 테이블의 고정 좌석 드롭다운 업데이트
+     */
+    private updateFixedSeatDropdowns;
     /**
      * 성별별 학생 수에 따라 미리보기 업데이트
      */
