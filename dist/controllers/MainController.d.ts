@@ -13,7 +13,12 @@ export declare class MainController {
     private isInitialized;
     private fixedSeatIds;
     private nextSeatId;
+    private dragSourceCard;
     constructor();
+    /**
+     * 앱 초기 상태로 되돌리기
+     */
+    private resetApp;
     /**
      * 초기 캔버스에 칠판과 교탁 그리기
      */
@@ -54,6 +59,10 @@ export declare class MainController {
      * 학생 카드 생성 헬퍼 메서드
      */
     private createStudentCard;
+    /**
+     * 좌석 카드 드래그&드롭 스왑 기능 활성화 (이벤트 위임)
+     */
+    private enableSeatSwapDragAndDrop;
     /**
      * 고정 좌석 클릭 핸들러 설정
      */

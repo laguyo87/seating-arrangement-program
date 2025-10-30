@@ -46,9 +46,20 @@ function startApplication() {
 init();
 // 전역 에러 핸들러
 window.addEventListener('error', (event) => {
+    // 브라우저 확장 프로그램 에러는 무시
+    if (event.filename && (event.filename.includes('content.js') || event.filename.includes('extension'))) {
+        return;
+    }
     console.error('전역 오류 발생:', event.error);
 });
 window.addEventListener('unhandledrejection', (event) => {
+    // 메시지 포트 관련 에러는 브라우저 확장 프로그램에서 발생하는 것으로 무시
+    const errorMessage = event.reason?.message || event.reason?.toString() || '';
+    if (errorMessage.includes('message port') || errorMessage.includes('chrome-extension')) {
+        event.preventDefault(); // 기본 에러 처리 방지
+        return;
+    }
     console.error('처리되지 않은 Promise 거부:', event.reason);
+    event.preventDefault(); // 에러가 콘솔에 표시되지 않도록
 });
 //# sourceMappingURL=main.js.map
