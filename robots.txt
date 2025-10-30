@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://laguyo87.github.io/seating-arrangement-program/sitemap.xml
