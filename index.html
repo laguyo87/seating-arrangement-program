@@ -11,7 +11,7 @@
     <!-- 상단 헤더 -->
     <header class="top-header">
         <div class="header-content">
-            <h1>교실 자리 배치 프로그램</h1>
+            <h1><span class="title-icon">🪑</span>교실 자리 배치 프로그램</h1>
             <p class="version">Version 1.0.0</p>
         </div>
     </header>
@@ -150,6 +150,7 @@
             </div>
 
             </div>
+            <div class="sidebar-footer">ⓒ 만든이: 김신회 (laguyo87@gmail.com)</div>
         </aside>
 
         <!-- 우측 메인창 (미리보기) -->
@@ -171,15 +172,15 @@
                 <div id="card-layout-container" style="padding: 20px; background: white; border-radius: 8px; margin: 20px 0;">
                     <div id="classroom-layout" style="min-height: 600px; background: #f8f9fa; border: 2px dashed #ddd; border-radius: 10px; padding: 20px; position: relative;">
                         <!-- 칠판 영역 -->
-                        <div class="classroom-item" id="blackboard-area" style="position: absolute; top: 20px; left: 50%; transform: translateX(-50%); width: 300px; height: 80px; background: #2c3e50; border: 3px solid #1a252f; border-radius: 5px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 18px;">
+                        <div class="classroom-item" id="blackboard-area" style="position: absolute; top: 20px; left: 50%; transform: translateX(-50%); width: 300px; height: 40px; background: #2c3e50; border: 3px solid #1a252f; border-radius: 5px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 16px;">
                             📝 칠판
                         </div>
                         <!-- 교탁 영역 -->
-                        <div class="classroom-item" id="teacher-desk-area" style="position: absolute; top: 120px; left: 50%; transform: translateX(-50%); width: 120px; height: 40px; background: #95a5a6; border: 2px solid #7f8c8d; border-radius: 5px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">
+                        <div class="classroom-item" id="teacher-desk-area" style="position: absolute; top: 84px; left: 50%; transform: translateX(-50%); width: 120px; height: 40px; background: #95a5a6; border: 2px solid #7f8c8d; border-radius: 5px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">
                             🖥️ 교탁
                         </div>
                         <!-- 좌석 배치 영역 -->
-                        <div id="seats-area" style="margin-top: 200px; display: grid; gap: 10px; justify-content: center;">
+                        <div id="seats-area" style="margin-top: 140px; display: grid; gap: 10px; justify-content: center;">
                             <!-- 좌석 카드들이 여기에 동적으로 추가됨 -->
                         </div>
                     </div>

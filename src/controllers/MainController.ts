@@ -1591,8 +1591,12 @@ export class MainController {
         const actionButtons = document.createElement('div');
         actionButtons.className = 'table-action-buttons';
         actionButtons.innerHTML = `
-            <button id="add-student-row-btn">행 추가</button>
-            <button id="arrange-seats" class="arrange-seats-btn">자리 배치하기</button>
+            <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: flex-start;">
+                <button id="add-student-row-btn" style="width: auto; flex: 0 0 auto; min-width: 0;">행 추가</button>
+                <button id="arrange-seats" class="arrange-seats-btn" style="width: auto; flex: 0 0 auto; min-width: 0;">자리 배치하기</button>
+                <label style="display:flex; align-items:center; gap:4px; margin:0; white-space:nowrap;"><input type="checkbox" id="avoid-prev-seat" /><span>이전 좌석 안 앉기</span></label>
+                <label style="display:flex; align-items:center; gap:4px; margin:0; white-space:nowrap;"><input type="checkbox" id="avoid-prev-partner" /><span>이전 짝 금지</span></label>
+            </div>
         `;
         studentTableContainer.appendChild(actionButtons);
         
@@ -2178,8 +2182,12 @@ export class MainController {
         const actionButtons = document.createElement('div');
         actionButtons.className = 'table-action-buttons';
         actionButtons.innerHTML = `
-            <button id="add-student-row-btn">행 추가</button>
-            <button id="arrange-seats" class="arrange-seats-btn">자리 배치하기</button>
+            <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: flex-start;">
+                <button id="add-student-row-btn" style="width: auto; flex: 0 0 auto; min-width: 0;">행 추가</button>
+                <button id="arrange-seats" class="arrange-seats-btn" style="width: auto; flex: 0 0 auto; min-width: 0;">자리 배치하기</button>
+                <label style="display:flex; align-items:center; gap:4px; margin:0; white-space:nowrap;"><input type="checkbox" id="avoid-prev-seat" /><span>이전 좌석 안 앉기</span></label>
+                <label style="display:flex; align-items:center; gap:4px; margin:0; white-space:nowrap;"><input type="checkbox" id="avoid-prev-partner" /><span>이전 짝 금지</span></label>
+            </div>
         `;
         studentTableContainer.appendChild(actionButtons);
         
@@ -2357,6 +2365,18 @@ export class MainController {
                 return;
             }
             
+            // 옵션 체크박스 값 읽기
+            const avoidPrevSeat = (document.getElementById('avoid-prev-seat') as HTMLInputElement | null)?.checked === true;
+            const avoidPrevPartner = (document.getElementById('avoid-prev-partner') as HTMLInputElement | null)?.checked === true;
+
+            // 이전 배치 기록 불러오기
+            const lastSeatByStudent: Record<string, number> = (() => {
+                try { return JSON.parse(localStorage.getItem('lastSeatByStudent') || '{}'); } catch { return {}; }
+            })();
+            const lastPartnerByStudent: Record<string, string> = (() => {
+                try { return JSON.parse(localStorage.getItem('lastPartnerByStudent') || '{}'); } catch { return {}; }
+            })();
+            
             // 고정 좌석 모드인 경우
             if (fixedRandomMode && this.fixedSeatIds.size > 0) {
                 // 1단계: 모든 카드의 이름 초기화
@@ -2393,71 +2413,201 @@ export class MainController {
                 // 3단계: 나머지 좌석에 랜덤 배치
                 const allRemainingMales = maleStudents.filter(s => !s.fixedSeatId);
                 const allRemainingFemales = femaleStudents.filter(s => !s.fixedSeatId);
-                const shuffledMales = [...allRemainingMales].sort(() => Math.random() - 0.5);
-                const shuffledFemales = [...allRemainingFemales].sort(() => Math.random() - 0.5);
+                let shuffledMales = [...allRemainingMales].sort(() => Math.random() - 0.5);
+                let shuffledFemales = [...allRemainingFemales].sort(() => Math.random() - 0.5);
                 
-                let maleIndex = 0;
-                let femaleIndex = 0;
-                
-                existingCards.forEach((card) => {
-                    const cardElement = card as HTMLElement;
-                    const seatIdStr = cardElement.getAttribute('data-seat-id');
-                    if (!seatIdStr) return;
-                    
-                    const seatId = parseInt(seatIdStr, 10);
-                    
-                    // 고정 좌석이 아니고 아직 이름이 없는 경우
-                    if (!this.fixedSeatIds.has(seatId)) {
-                        const nameDiv = cardElement.querySelector('.student-name') as HTMLElement;
-                        if (nameDiv && !nameDiv.textContent?.trim()) {
-                            const isMaleCard = cardElement.classList.contains('gender-m');
-                            const isFemaleCard = cardElement.classList.contains('gender-f');
-                            
-                            if (isMaleCard && maleIndex < shuffledMales.length) {
-                                nameDiv.textContent = shuffledMales[maleIndex].name;
-                                maleIndex++;
-                            } else if (isFemaleCard && femaleIndex < shuffledFemales.length) {
-                                nameDiv.textContent = shuffledFemales[femaleIndex].name;
-                                femaleIndex++;
-                            }
+                // 페어 컨테이너 우선 처리 (짝 제약 고려)
+                const seatsAreaEl = document.getElementById('seats-area')!;
+                const pairContainers: HTMLElement[] = [];
+                Array.from(seatsAreaEl.querySelectorAll('.student-seat-card')).forEach(card => {
+                    const parent = (card as HTMLElement).parentElement as HTMLElement;
+                    const siblings = parent ? parent.querySelectorAll('.student-seat-card') : null;
+                    if (siblings && siblings.length === 2 && pairContainers.indexOf(parent) === -1) {
+                        pairContainers.push(parent);
+                    }
+                });
+
+                pairContainers.forEach(container => {
+                    const cards = Array.from(container.querySelectorAll('.student-seat-card')) as HTMLElement[];
+                    if (cards.length !== 2) return;
+                    const [cardA, cardB] = cards;
+                    const seatIdA = parseInt(cardA.getAttribute('data-seat-id') || '0', 10);
+                    const seatIdB = parseInt(cardB.getAttribute('data-seat-id') || '0', 10);
+                    const isMaleA = cardA.classList.contains('gender-m');
+                    const isMaleB = cardB.classList.contains('gender-m');
+                    const nameDivA = cardA.querySelector('.student-name') as HTMLElement;
+                    const nameDivB = cardB.querySelector('.student-name') as HTMLElement;
+
+                    const poolA = isMaleA ? shuffledMales : shuffledFemales;
+                    const poolB = isMaleB ? shuffledMales : shuffledFemales;
+
+                    let idxA = 0;
+                    if (avoidPrevSeat) {
+                        for (let i = 0; i < poolA.length; i++) {
+                            const cand = poolA[i];
+                            if (lastSeatByStudent[cand.name] !== seatIdA) { idxA = i; break; }
                         }
                     }
+                    const chosenA = poolA.splice(idxA, 1)[0];
+                    if (nameDivA) nameDivA.textContent = chosenA?.name || '';
+
+                    let idxB = 0;
+                    for (let i = 0; i < poolB.length; i++) {
+                        const cand = poolB[i];
+                        const seatOk = !avoidPrevSeat || lastSeatByStudent[cand.name] !== seatIdB;
+                        const partnerOk = !avoidPrevPartner || (
+                            (chosenA && lastPartnerByStudent[chosenA.name] !== cand.name) && (lastPartnerByStudent[cand.name] !== (chosenA?.name || ''))
+                        );
+                        if (seatOk && partnerOk) { idxB = i; break; }
+                    }
+                    const chosenB = poolB.splice(idxB, 1)[0];
+                    if (nameDivB) nameDivB.textContent = chosenB?.name || '';
+
+                    if (isMaleA) shuffledMales = poolA; else shuffledFemales = poolA;
+                    if (isMaleB) shuffledMales = poolB; else shuffledFemales = poolB;
+                });
+
+                // 나머지 단일 카드 처리
+                const singleCards: HTMLElement[] = [];
+                Array.from(seatsAreaEl.querySelectorAll('.student-seat-card')).forEach(card => {
+                    const parent = (card as HTMLElement).parentElement as HTMLElement;
+                    const siblings = parent ? parent.querySelectorAll('.student-seat-card') : null;
+                    if (!siblings || siblings.length !== 2) {
+                        singleCards.push(card as HTMLElement);
+                    }
+                });
+                singleCards.forEach(cardElement => {
+                    const seatIdStr = cardElement.getAttribute('data-seat-id');
+                    if (!seatIdStr) return;
+                    const seatId = parseInt(seatIdStr, 10);
+                    const nameDiv = cardElement.querySelector('.student-name') as HTMLElement;
+                    const isMaleCard = cardElement.classList.contains('gender-m');
+                    const pool = isMaleCard ? shuffledMales : shuffledFemales;
+                    if (pool.length === 0) { if (nameDiv) nameDiv.textContent = ''; return; }
+                    let pickIdx = 0;
+                    if (avoidPrevSeat) {
+                        for (let i = 0; i < pool.length; i++) {
+                            const cand = pool[i];
+                            if (lastSeatByStudent[cand.name] !== seatId) { pickIdx = i; break; }
+                        }
+                    }
+                    const chosen = pool.splice(pickIdx, 1)[0];
+                    if (nameDiv) nameDiv.textContent = chosen?.name || '';
+                    if (isMaleCard) shuffledMales = pool; else shuffledFemales = pool;
                 });
             } else {
                 // 일반 랜덤 배치 모드
-                const shuffledMales = [...maleStudents].sort(() => Math.random() - 0.5);
-                const shuffledFemales = [...femaleStudents].sort(() => Math.random() - 0.5);
+                let shuffledMales = [...maleStudents].sort(() => Math.random() - 0.5);
+                let shuffledFemales = [...femaleStudents].sort(() => Math.random() - 0.5);
                 
                 console.log('섞인 남학생:', shuffledMales.map(s => s.name));
                 console.log('섞인 여학생:', shuffledFemales.map(s => s.name));
                 
-                let maleIndex = 0;
-                let femaleIndex = 0;
-                
-                // 각 카드에 이름 할당
-                existingCards.forEach((card) => {
-                    const cardElement = card as HTMLElement;
-                    
-                    // 카드의 성별 확인
-                    const isMaleCard = cardElement.classList.contains('gender-m');
-                    const isFemaleCard = cardElement.classList.contains('gender-f');
-                    
-                    if (isMaleCard && maleIndex < shuffledMales.length) {
-                        const nameDiv = cardElement.querySelector('.student-name') as HTMLElement;
-                        if (nameDiv) {
-                            nameDiv.textContent = shuffledMales[maleIndex].name;
-                        }
-                        maleIndex++;
-                    } else if (isFemaleCard && femaleIndex < shuffledFemales.length) {
-                        const nameDiv = cardElement.querySelector('.student-name') as HTMLElement;
-                        if (nameDiv) {
-                            nameDiv.textContent = shuffledFemales[femaleIndex].name;
-                        }
-                        femaleIndex++;
+                // 페어 컨테이너 우선 처리
+                const seatsAreaEl = document.getElementById('seats-area')!;
+                const pairContainers: HTMLElement[] = [];
+                Array.from(seatsAreaEl.querySelectorAll('.student-seat-card')).forEach(card => {
+                    const parent = (card as HTMLElement).parentElement as HTMLElement;
+                    const siblings = parent ? parent.querySelectorAll('.student-seat-card') : null;
+                    if (siblings && siblings.length === 2 && pairContainers.indexOf(parent) === -1) {
+                        pairContainers.push(parent);
                     }
+                });
+
+                pairContainers.forEach(container => {
+                    const cards = Array.from(container.querySelectorAll('.student-seat-card')) as HTMLElement[];
+                    if (cards.length !== 2) return;
+                    const [cardA, cardB] = cards;
+                    const seatIdA = parseInt(cardA.getAttribute('data-seat-id') || '0', 10);
+                    const seatIdB = parseInt(cardB.getAttribute('data-seat-id') || '0', 10);
+                    const isMaleA = cardA.classList.contains('gender-m');
+                    const isMaleB = cardB.classList.contains('gender-m');
+                    const nameDivA = cardA.querySelector('.student-name') as HTMLElement;
+                    const nameDivB = cardB.querySelector('.student-name') as HTMLElement;
+
+                    const poolA = isMaleA ? shuffledMales : shuffledFemales;
+                    const poolB = isMaleB ? shuffledMales : shuffledFemales;
+
+                    let idxA = 0;
+                    if (avoidPrevSeat) {
+                        for (let i = 0; i < poolA.length; i++) {
+                            const cand = poolA[i];
+                            if (lastSeatByStudent[cand.name] !== seatIdA) { idxA = i; break; }
+                        }
+                    }
+                    const chosenA = poolA.splice(idxA, 1)[0];
+                    if (nameDivA) nameDivA.textContent = chosenA?.name || '';
+
+                    let idxB = 0;
+                    for (let i = 0; i < poolB.length; i++) {
+                        const cand = poolB[i];
+                        const seatOk = !avoidPrevSeat || lastSeatByStudent[cand.name] !== seatIdB;
+                        const partnerOk = !avoidPrevPartner || (
+                            (chosenA && lastPartnerByStudent[chosenA.name] !== cand.name) && (lastPartnerByStudent[cand.name] !== (chosenA?.name || ''))
+                        );
+                        if (seatOk && partnerOk) { idxB = i; break; }
+                    }
+                    const chosenB = poolB.splice(idxB, 1)[0];
+                    if (nameDivB) nameDivB.textContent = chosenB?.name || '';
+
+                    if (isMaleA) shuffledMales = poolA; else shuffledFemales = poolA;
+                    if (isMaleB) shuffledMales = poolB; else shuffledFemales = poolB;
+                });
+
+                // 나머지 단일 카드 처리
+                const singleCards: HTMLElement[] = [];
+                Array.from(seatsAreaEl.querySelectorAll('.student-seat-card')).forEach(card => {
+                    const parent = (card as HTMLElement).parentElement as HTMLElement;
+                    const siblings = parent ? parent.querySelectorAll('.student-seat-card') : null;
+                    if (!siblings || siblings.length !== 2) {
+                        singleCards.push(card as HTMLElement);
+                    }
+                });
+                singleCards.forEach(cardElement => {
+                    const seatIdStr = cardElement.getAttribute('data-seat-id');
+                    if (!seatIdStr) return;
+                    const seatId = parseInt(seatIdStr, 10);
+                    const nameDiv = cardElement.querySelector('.student-name') as HTMLElement;
+                    const isMaleCard = cardElement.classList.contains('gender-m');
+                    const pool = isMaleCard ? shuffledMales : shuffledFemales;
+                    if (pool.length === 0) { if (nameDiv) nameDiv.textContent = ''; return; }
+                    let pickIdx = 0;
+                    if (avoidPrevSeat) {
+                        for (let i = 0; i < pool.length; i++) {
+                            const cand = pool[i];
+                            if (lastSeatByStudent[cand.name] !== seatId) { pickIdx = i; break; }
+                        }
+                    }
+                    const chosen = pool.splice(pickIdx, 1)[0];
+                    if (nameDiv) nameDiv.textContent = chosen?.name || '';
+                    if (isMaleCard) shuffledMales = pool; else shuffledFemales = pool;
                 });
             }
             
+            // 현재 배치 결과 저장 (이전 좌석/짝 정보)
+            const newLastSeatByStudent: Record<string, number> = {};
+            const newLastPartnerByStudent: Record<string, string> = {};
+            const allCards = Array.from(document.querySelectorAll('#seats-area .student-seat-card')) as HTMLElement[];
+            allCards.forEach(card => {
+                const name = (card.querySelector('.student-name') as HTMLElement)?.textContent?.trim() || '';
+                const seatId = parseInt(card.getAttribute('data-seat-id') || '0', 10);
+                if (name) newLastSeatByStudent[name] = seatId;
+                const parent = card.parentElement as HTMLElement | null;
+                if (parent) {
+                    const siblings = Array.from(parent.querySelectorAll('.student-seat-card')) as HTMLElement[];
+                    if (siblings.length === 2) {
+                        const other = siblings[0] === card ? siblings[1] : siblings[0];
+                        const otherName = (other.querySelector('.student-name') as HTMLElement)?.textContent?.trim() || '';
+                        if (name && otherName) {
+                            newLastPartnerByStudent[name] = otherName;
+                        }
+                    }
+                }
+            });
+            try {
+                localStorage.setItem('lastSeatByStudent', JSON.stringify(newLastSeatByStudent));
+                localStorage.setItem('lastPartnerByStudent', JSON.stringify(newLastPartnerByStudent));
+            } catch {}
             this.outputModule.showSuccess('좌석 배치가 완료되었습니다!');
             
             // 자리 배치도 액션 버튼들 표시
@@ -2465,6 +2615,28 @@ export class MainController {
             if (actionButtons) {
                 actionButtons.style.display = 'block';
             }
+            
+            // 배치 완료 후 화면을 맨 위로 스크롤 (스크롤 컨테이너와 윈도우 모두 시도)
+            try {
+                const resultContainer = document.querySelector('.result-container') as any;
+                const mainContent = document.querySelector('.main-content') as any;
+                const scrollTargets: any[] = [
+                    window as any,
+                    document.documentElement as any,
+                    document.body as any,
+                    resultContainer,
+                    mainContent
+                ].filter(Boolean);
+                scrollTargets.forEach((t) => {
+                    try {
+                        if (typeof t.scrollTo === 'function') {
+                            t.scrollTo({ top: 0, behavior: 'smooth' });
+                        } else if (typeof t.scrollTop === 'number') {
+                            t.scrollTop = 0;
+                        }
+                    } catch {}
+                });
+            } catch {}
             
         } catch (error) {
             console.error('좌석 배치 중 오류:', error);
