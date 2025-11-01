@@ -248,5 +248,9 @@ export declare class MainController {
      * 모달 창으로 자리 배치도 공유하기
      */
     private showShareModal;
+    /**
+     * 사용설명서 모달 표시
+     */
+    private showUserManual;
 }
 //# sourceMappingURL=MainController.d.ts.map
