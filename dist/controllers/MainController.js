@@ -400,6 +400,10 @@ export class MainController {
             if (target.id === 'save-layout') {
                 this.handleSaveLayout();
             }
+            // 사용설명서 버튼 클릭
+            if (target.id === 'user-manual-btn') {
+                this.showUserManual();
+            }
         });
     }
     /**
@@ -4182,6 +4186,164 @@ export class MainController {
             textarea.focus();
             textarea.select();
         }, 100);
+    }
+    /**
+     * 사용설명서 모달 표시
+     */
+    showUserManual() {
+        // 모달 창 생성
+        const modal = document.createElement('div');
+        modal.id = 'user-manual-modal';
+        modal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            overflow-y: auto;
+            padding: 20px;
+        `;
+        const modalContent = document.createElement('div');
+        modalContent.style.cssText = `
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 800px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        `;
+        const title = document.createElement('h2');
+        title.textContent = '📖 사용설명서';
+        title.style.cssText = `
+            margin-top: 0;
+            margin-bottom: 20px;
+            color: #333;
+            font-size: 1.8em;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        `;
+        const content = document.createElement('div');
+        content.innerHTML = `
+            <div style="line-height: 1.8; color: #444;">
+                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">1️⃣ 기본 사용 방법</h3>
+                <ol style="padding-left: 25px; margin-bottom: 20px;">
+                    <li><strong>1단계: 학생 자리 수 입력</strong> - 남학생 수와 여학생 수를 입력하세요. 우측에 미리보기가 자동으로 표시됩니다.</li>
+                    <li><strong>2단계: 분단 개수</strong> - 교실의 분단 수를 입력하세요 (예: 2분단, 3분단, 6분단 등)</li>
+                    <li><strong>3단계: 좌석 배치 형태</strong> - 원하는 배치 유형을 선택하세요
+                        <ul style="padding-left: 20px; margin-top: 8px;">
+                            <li>일렬 배치: 모든 좌석을 한 줄로 배치</li>
+                            <li>모둠 배치: 모둠 단위로 좌석 배치</li>
+                            <li>페어 배치: 두 명씩 짝지어 배치</li>
+                        </ul>
+                    </li>
+                    <li><strong>4단계: 맞춤 구성</strong> - 추가 옵션을 선택하세요</li>
+                    <li><strong>5단계: 학생 정보 입력</strong> - 학생 이름과 성별을 입력하세요</li>
+                    <li><strong>자리 배치하기</strong> - 버튼을 클릭하면 좌석에 학생들이 랜덤 배치됩니다</li>
+                </ol>
+
+                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">2️⃣ 고정 좌석 기능</h3>
+                <ul style="padding-left: 25px; margin-bottom: 20px;">
+                    <li><strong>고정 좌석 지정</strong>: "고정 좌석 지정 후 랜덤 배치" 옵션을 선택하세요</li>
+                    <li>미리보기 화면에서 원하는 좌석 카드를 클릭하면 🔒 아이콘과 빨간 테두리가 표시됩니다</li>
+                    <li>학생 정보 입력 테이블의 "고정 좌석" 드롭다운에서 고정된 좌석을 선택하여 학생을 연결하세요</li>
+                    <li>고정 좌석이 선택된 행의 번호 셀은 파란색 배경으로 표시됩니다</li>
+                    <li>고정 좌석을 제외한 나머지 좌석에만 학생들이 랜덤 배치됩니다</li>
+                </ul>
+
+                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">3️⃣ 자리 배치 옵션</h3>
+                <ul style="padding-left: 25px; margin-bottom: 20px;">
+                    <li><strong>남녀 짝꿍하기</strong>: 남학생과 여학생을 짝지어 배치합니다</li>
+                    <li><strong>같은 성끼리 짝꿍하기</strong>: 같은 성별끼리 짝지어 배치합니다</li>
+                    <li><strong>이전 좌석 안 앉기</strong>: 이전에 앉았던 좌석을 피하여 배치합니다</li>
+                    <li><strong>이전 짝 금지</strong>: 이전에 같은 짝이었던 학생과 다시 짝지어지지 않도록 합니다</li>
+                </ul>
+
+                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">4️⃣ 자리 바꾸기</h3>
+                <ul style="padding-left: 25px; margin-bottom: 20px;">
+                    <li>자리 배치가 완료된 후, 좌석 카드를 드래그하여 다른 좌석에 드롭하면 자리를 바꿀 수 있습니다</li>
+                    <li>두 카드를 서로 드래그 & 드롭하면 위치가 교환됩니다</li>
+                </ul>
+
+                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">5️⃣ 학생 정보 입력</h3>
+                <ul style="padding-left: 25px; margin-bottom: 20px;">
+                    <li><strong>엑셀 파일에서 가져오기</strong>: 엑셀 파일을 업로드하여 학생 정보를 한 번에 입력할 수 있습니다</li>
+                    <li><strong>양식 파일 다운로드</strong>: 엑셀 양식 파일을 다운로드하여 학생 정보를 작성한 후 업로드하세요</li>
+                    <li><strong>행 추가</strong>: 학생 정보 입력 테이블에서 "행 추가" 버튼을 클릭하여 학생을 추가할 수 있습니다</li>
+                    <li><strong>저장</strong>: 학생 정보 입력 후 "저장" 버튼을 클릭하면 1단계 입력값이 자동으로 업데이트됩니다</li>
+                </ul>
+
+                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">6️⃣ 공유 및 저장</h3>
+                <ul style="padding-left: 25px; margin-bottom: 20px;">
+                    <li><strong>공유하기</strong>: 공유 주소(URL)를 생성하여 다른 사람과 자리 배치도를 공유할 수 있습니다</li>
+                    <li><strong>인쇄하기</strong>: 현재 자리 배치도를 인쇄합니다</li>
+                    <li><strong>저장하기</strong>: 자리 배치도를 브라우저에 저장합니다</li>
+                </ul>
+
+                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">💡 유용한 팁</h3>
+                <ul style="padding-left: 25px; margin-bottom: 20px;">
+                    <li>학생 정보 입력 테이블 하단의 통계를 확인하여 남학생/여학생 수와 고정 좌석 수를 확인할 수 있습니다</li>
+                    <li>1단계 입력값과 학생 정보 테이블의 학생 수가 일치하지 않으면 경고 메시지가 표시됩니다</li>
+                    <li>고정 좌석 모드에서는 미리보기 화면에서 좌석을 클릭하여 고정할 수 있습니다</li>
+                    <li>자리 배치 후에는 드래그 & 드롭으로 자유롭게 자리를 조정할 수 있습니다</li>
+                </ul>
+
+                <div style="margin-top: 30px; padding: 15px; background: #f0f8ff; border-left: 4px solid #667eea; border-radius: 4px;">
+                    <strong style="color: #667eea;">버전 정보:</strong> Version 1.0.0<br>
+                    <strong style="color: #667eea;">제작자:</strong> 김신회 (laguyo87@gmail.com)
+                </div>
+            </div>
+        `;
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.cssText = `
+            margin-top: 25px;
+            text-align: right;
+        `;
+        const closeButton = document.createElement('button');
+        closeButton.textContent = '❌ 닫기';
+        closeButton.className = 'primary-btn';
+        closeButton.style.cssText = `
+            padding: 10px 24px;
+            font-size: 1em;
+        `;
+        // 모달 닫기 함수
+        const closeModal = () => {
+            try {
+                if (modal && modal.parentNode) {
+                    document.body.removeChild(modal);
+                }
+                document.removeEventListener('keydown', handleKeyDown);
+            }
+            catch (error) {
+                console.warn('모달 닫기 중 오류 (무시됨):', error);
+            }
+        };
+        closeButton.onclick = closeModal;
+        // ESC 키로 모달 닫기
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        };
+        buttonContainer.appendChild(closeButton);
+        modalContent.appendChild(title);
+        modalContent.appendChild(content);
+        modalContent.appendChild(buttonContainer);
+        modal.appendChild(modalContent);
+        document.body.appendChild(modal);
+        document.addEventListener('keydown', handleKeyDown);
+        // 모달 배경 클릭으로 닫기
+        modal.onclick = (e) => {
+            if (e.target === modal) {
+                closeModal();
+            }
+        };
     }
 }
 //# sourceMappingURL=MainController.js.map
