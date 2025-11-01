@@ -8,14 +8,21 @@
     "watch": "tsc --watch",
     "dev": "vite",
     "preview": "vite preview",
-    "start": "python3 -m http.server 8000"
+    "start": "python3 -m http.server 8000",
+    "generate:og-image": "node generate-og-image.js"
   },
-  "keywords": ["seating", "arrangement", "education"],
+  "keywords": [
+    "seating",
+    "arrangement",
+    "education"
+  ],
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "typescript": "^5.0.0",
-    "@types/node": "^20.0.0"
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "canvas": "^3.2.0"
   }
 }
-

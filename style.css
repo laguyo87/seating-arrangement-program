@@ -42,6 +42,12 @@ body {
     font-size: 1.1em;
 }
 
+.header-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
 .version {
     font-size: 0.9em;
     opacity: 0.9;
@@ -49,6 +55,20 @@ body {
     padding: 5px 15px;
     border-radius: 15px;
     margin: 0;
+}
+
+.visitor-count {
+    font-size: 0.9em;
+    opacity: 0.9;
+    background: rgba(255, 255, 255, 0.2);
+    padding: 5px 15px;
+    border-radius: 15px;
+    margin: 0;
+    white-space: nowrap;
+}
+
+.visitor-count span {
+    font-weight: 600;
 }
 
 /* 메인 컨테이너 */

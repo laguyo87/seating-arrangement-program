@@ -255,6 +255,7 @@ export class MainController {
             // 입력값이 변경될 때마다 실시간으로 업데이트
             maleCountInput.addEventListener('input', () => {
                 this.updatePreviewForGenderCounts();
+                this.updateStudentTableStats(); // 통계 업데이트
             });
         }
         // 좌석 카드 드래그&드롭(스왑) 활성화
@@ -275,6 +276,7 @@ export class MainController {
             // 입력값이 변경될 때마다 실시간으로 업데이트
             femaleCountInput.addEventListener('input', () => {
                 this.updatePreviewForGenderCounts();
+                this.updateStudentTableStats(); // 통계 업데이트
             });
         }
         // 학생 정보 입력 테이블 생성 버튼
@@ -409,6 +411,7 @@ export class MainController {
     }
     /**
      * 고정 좌석 모드 활성화
+     * 기존 좌석 카드들에 클릭 이벤트를 다시 설정
      */
     enableFixedSeatMode() {
         console.log('고정 좌석 모드 활성화');
@@ -417,6 +420,31 @@ export class MainController {
         if (seatsArea) {
             seatsArea.style.cursor = 'pointer';
             seatsArea.addEventListener('click', this.handleSeatCardClick);
+            // 기존 좌석 카드들에 스타일 및 시각적 표시 업데이트
+            const cards = seatsArea.querySelectorAll('.student-seat-card');
+            cards.forEach((card) => {
+                const cardElement = card;
+                const seatIdStr = cardElement.getAttribute('data-seat-id');
+                if (seatIdStr) {
+                    const seatId = parseInt(seatIdStr, 10);
+                    cardElement.style.cursor = 'pointer';
+                    // 이미 고정된 좌석인 경우 시각적 표시
+                    if (this.fixedSeatIds.has(seatId)) {
+                        cardElement.classList.add('fixed-seat');
+                        cardElement.title = '고정 좌석 (클릭하여 해제)';
+                        if (!cardElement.querySelector('.fixed-seat-lock')) {
+                            const lockIcon = document.createElement('div');
+                            lockIcon.className = 'fixed-seat-lock';
+                            lockIcon.textContent = '🔒';
+                            lockIcon.style.cssText = 'position: absolute; top: 5px; right: 5px; font-size: 1.2em; z-index: 10; pointer-events: none;';
+                            cardElement.appendChild(lockIcon);
+                        }
+                    }
+                    else {
+                        cardElement.title = '클릭하여 고정 좌석 지정/해제';
+                    }
+                }
+            });
         }
     }
     /**
@@ -638,6 +666,8 @@ export class MainController {
                 const rowsPerPartition = Math.ceil(pairs.length / partitionCount);
                 let pairIndex = 0;
                 for (let row = 0; row < rowsPerPartition; row++) {
+                    if (pairIndex >= pairs.length)
+                        break; // 외부 루프도 종료
                     for (let partition = 0; partition < partitionCount; partition++) {
                         if (pairIndex >= pairs.length)
                             break;
@@ -750,6 +780,17 @@ export class MainController {
             card.classList.add('gender-f');
         }
         card.appendChild(nameDiv);
+        // 이미 고정된 좌석인 경우 시각적 표시
+        if (this.fixedSeatIds.has(seatId)) {
+            card.classList.add('fixed-seat');
+            card.title = '고정 좌석 (클릭하여 해제)';
+            // 🔒 아이콘 추가
+            const lockIcon = document.createElement('div');
+            lockIcon.className = 'fixed-seat-lock';
+            lockIcon.textContent = '🔒';
+            lockIcon.style.cssText = 'position: absolute; top: 5px; right: 5px; font-size: 1.2em; z-index: 10; pointer-events: none;';
+            card.appendChild(lockIcon);
+        }
         // 고정 좌석 모드일 때 클릭 이벤트 추가
         this.setupFixedSeatClickHandler(card, seatId);
         return card;
@@ -831,10 +872,19 @@ export class MainController {
             card.addEventListener('click', () => {
                 this.toggleFixedSeat(seatId, card);
             });
-        }
-        // 이미 고정된 좌석인지 확인
-        if (this.fixedSeatIds.has(seatId)) {
-            card.classList.add('fixed-seat');
+            // 이미 고정된 좌석인지 확인하여 시각적 표시
+            if (this.fixedSeatIds.has(seatId)) {
+                card.classList.add('fixed-seat');
+                card.title = '고정 좌석 (클릭하여 해제)';
+                // 🔒 아이콘 추가 (없는 경우만)
+                if (!card.querySelector('.fixed-seat-lock')) {
+                    const lockIcon = document.createElement('div');
+                    lockIcon.className = 'fixed-seat-lock';
+                    lockIcon.textContent = '🔒';
+                    lockIcon.style.cssText = 'position: absolute; top: 5px; right: 5px; font-size: 1.2em; z-index: 10; pointer-events: none;';
+                    card.appendChild(lockIcon);
+                }
+            }
         }
     }
     /**
@@ -846,12 +896,25 @@ export class MainController {
             this.fixedSeatIds.delete(seatId);
             card.classList.remove('fixed-seat');
             card.title = '클릭하여 고정 좌석 지정';
+            // 🔒 아이콘 제거
+            const lockIcon = card.querySelector('.fixed-seat-lock');
+            if (lockIcon) {
+                lockIcon.remove();
+            }
         }
         else {
             // 고정 설정
             this.fixedSeatIds.add(seatId);
             card.classList.add('fixed-seat');
             card.title = '고정 좌석 (클릭하여 해제)';
+            // 🔒 아이콘 추가 (없는 경우만)
+            if (!card.querySelector('.fixed-seat-lock')) {
+                const lockIcon = document.createElement('div');
+                lockIcon.className = 'fixed-seat-lock';
+                lockIcon.textContent = '🔒';
+                lockIcon.style.cssText = 'position: absolute; top: 5px; right: 5px; font-size: 1.2em; z-index: 10; pointer-events: none;';
+                card.appendChild(lockIcon);
+            }
         }
         // 테이블의 드롭다운 업데이트
         this.updateFixedSeatDropdowns();
@@ -1368,6 +1431,23 @@ export class MainController {
             tbody.appendChild(row);
         }
         table.appendChild(tbody);
+        // 통계 표시를 위한 tfoot 추가
+        const tfoot = document.createElement('tfoot');
+        tfoot.id = 'student-table-stats';
+        const colCount = fixedRandomMode ? 5 : 4;
+        const statsRow = document.createElement('tr');
+        const statsCell = document.createElement('td');
+        statsCell.colSpan = colCount;
+        statsCell.id = 'student-table-stats-cell';
+        statsCell.style.cssText = `
+            padding: 12px;
+            background: #f8f9fa;
+            border-top: 2px solid #dee2e6;
+            font-size: 0.95em;
+        `;
+        statsRow.appendChild(statsCell);
+        tfoot.appendChild(statsRow);
+        table.appendChild(tfoot);
         studentTableContainer.appendChild(table);
         // 작업 버튼 추가
         const actionButtons = document.createElement('div');
@@ -1382,6 +1462,15 @@ export class MainController {
         `;
         studentTableContainer.appendChild(actionButtons);
         outputSection.appendChild(studentTableContainer);
+        // 초기 통계 업데이트
+        this.updateStudentTableStats();
+        // 통계 업데이트를 위한 이벤트 리스너 추가
+        tbody.addEventListener('input', () => {
+            this.updateStudentTableStats();
+        });
+        tbody.addEventListener('change', () => {
+            this.updateStudentTableStats();
+        });
         this.outputModule.showInfo(`${count}명의 학생 명렬표가 생성되었습니다.`);
     }
     /**
@@ -1392,6 +1481,7 @@ export class MainController {
         if (confirm('이 학생을 삭제하시겠습니까?')) {
             row.remove();
             this.updateRowNumbers();
+            this.updateStudentTableStats(); // 통계 업데이트
         }
     }
     /**
@@ -1470,6 +1560,85 @@ export class MainController {
         }
         row.appendChild(actionCell);
         table.appendChild(row);
+        // 통계 업데이트
+        this.updateStudentTableStats();
+        // 새 행에 이벤트 리스너 추가
+        if (nameInput) {
+            nameInput.addEventListener('input', () => this.updateStudentTableStats());
+        }
+        if (genderSelect) {
+            genderSelect.addEventListener('change', () => this.updateStudentTableStats());
+        }
+        // 고정 좌석 셀에서 select 요소 찾기
+        if (fixedSeatCell) {
+            const fixedSeatSelectInCell = fixedSeatCell.querySelector('.fixed-seat-select');
+            if (fixedSeatSelectInCell) {
+                fixedSeatSelectInCell.addEventListener('change', () => this.updateStudentTableStats());
+            }
+        }
+    }
+    /**
+     * 학생 테이블 통계 업데이트
+     */
+    updateStudentTableStats() {
+        const statsCell = document.getElementById('student-table-stats-cell');
+        if (!statsCell)
+            return;
+        const outputSection = document.getElementById('output-section');
+        const rows = outputSection?.querySelectorAll('.student-input-table tbody tr');
+        if (!rows)
+            return;
+        let maleCount = 0;
+        let femaleCount = 0;
+        let fixedSeatCount = 0;
+        rows.forEach((row) => {
+            const genderSelect = row.querySelector('.student-gender-select');
+            const fixedSeatSelect = row.querySelector('.fixed-seat-select');
+            if (genderSelect) {
+                const gender = genderSelect.value;
+                if (gender === 'M') {
+                    maleCount++;
+                }
+                else if (gender === 'F') {
+                    femaleCount++;
+                }
+            }
+            if (fixedSeatSelect && fixedSeatSelect.value) {
+                fixedSeatCount++;
+            }
+        });
+        // 사이드바의 남녀 숫자 가져오기
+        const maleCountInput = document.getElementById('male-students');
+        const femaleCountInput = document.getElementById('female-students');
+        const expectedMaleCount = maleCountInput ? parseInt(maleCountInput.value || '0', 10) : 0;
+        const expectedFemaleCount = femaleCountInput ? parseInt(femaleCountInput.value || '0', 10) : 0;
+        // 통계 표시
+        let statsHTML = `
+            <div style="display: flex; gap: 20px; align-items: center; flex-wrap: wrap;">
+                <span><strong>남자:</strong> <span id="stats-male-count">${maleCount}</span>명</span>
+                <span><strong>여자:</strong> <span id="stats-female-count">${femaleCount}</span>명</span>
+                <span><strong>고정 자리:</strong> <span id="stats-fixed-seat-count">${fixedSeatCount}</span>개</span>
+            </div>
+        `;
+        // 경고 메시지 추가
+        const warnings = [];
+        if (expectedMaleCount > 0 && maleCount !== expectedMaleCount) {
+            warnings.push(`남학생 수가 일치하지 않습니다. (입력: ${expectedMaleCount}명, 테이블: ${maleCount}명)`);
+        }
+        if (expectedFemaleCount > 0 && femaleCount !== expectedFemaleCount) {
+            warnings.push(`여학생 수가 일치하지 않습니다. (입력: ${expectedFemaleCount}명, 테이블: ${femaleCount}명)`);
+        }
+        if (warnings.length > 0) {
+            statsHTML += `
+                <div style="margin-top: 10px; padding: 10px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; color: #856404;">
+                    <strong>⚠️ 경고:</strong>
+                    <ul style="margin: 5px 0 0 0; padding-left: 20px;">
+                        ${warnings.map(w => `<li>${w}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+        }
+        statsCell.innerHTML = statsHTML;
     }
     /**
      * 행 번호 업데이트
@@ -2001,6 +2170,30 @@ export class MainController {
      */
     handleArrangeSeats() {
         try {
+            // 사이드바의 남녀 숫자와 테이블의 수 일치 여부 확인
+            const maleCountInput = document.getElementById('male-students');
+            const femaleCountInput = document.getElementById('female-students');
+            const expectedMaleCount = maleCountInput ? parseInt(maleCountInput.value || '0', 10) : 0;
+            const expectedFemaleCount = femaleCountInput ? parseInt(femaleCountInput.value || '0', 10) : 0;
+            if (expectedMaleCount > 0 || expectedFemaleCount > 0) {
+                // 테이블에서 실제 학생 데이터 가져오기
+                const studentData = this.inputModule.getStudentData();
+                const actualMaleCount = studentData.filter(s => s.gender === 'M').length;
+                const actualFemaleCount = studentData.filter(s => s.gender === 'F').length;
+                const warnings = [];
+                if (expectedMaleCount > 0 && actualMaleCount !== expectedMaleCount) {
+                    warnings.push(`남학생 수가 일치하지 않습니다. (입력: ${expectedMaleCount}명, 테이블: ${actualMaleCount}명)`);
+                }
+                if (expectedFemaleCount > 0 && actualFemaleCount !== expectedFemaleCount) {
+                    warnings.push(`여학생 수가 일치하지 않습니다. (입력: ${expectedFemaleCount}명, 테이블: ${actualFemaleCount}명)`);
+                }
+                if (warnings.length > 0) {
+                    const warningMessage = '⚠️ 경고:\n\n' + warnings.join('\n') + '\n\n자리 배치를 계속하시겠습니까?';
+                    if (!confirm(warningMessage)) {
+                        return;
+                    }
+                }
+            }
             // 테이블에서 학생 데이터 가져오기
             const studentData = this.inputModule.getStudentData();
             if (studentData.length === 0) {
@@ -2017,9 +2210,12 @@ export class MainController {
                 const fixedSeatSelects = document.querySelectorAll('.fixed-seat-select');
                 fixedSeatSelects.forEach((select, index) => {
                     const seatIdStr = select.value;
-                    if (seatIdStr && this.students[index]) {
-                        this.students[index].fixedSeatId = parseInt(seatIdStr, 10);
-                        console.log(`학생 ${this.students[index].name} → 고정 좌석 ${seatIdStr}`);
+                    if (seatIdStr && index < this.students.length && this.students[index]) {
+                        const seatId = parseInt(seatIdStr, 10);
+                        if (!isNaN(seatId)) {
+                            this.students[index].fixedSeatId = seatId;
+                            console.log(`학생 ${this.students[index].name} → 고정 좌석 ${seatIdStr}`);
+                        }
                     }
                 });
             }
@@ -2089,10 +2285,21 @@ export class MainController {
                     }
                 });
                 // 3단계: 나머지 좌석에 랜덤 배치
+                // 고정 좌석에 배치된 학생들을 제외한 나머지 학생들
                 const allRemainingMales = maleStudents.filter(s => !s.fixedSeatId);
                 const allRemainingFemales = femaleStudents.filter(s => !s.fixedSeatId);
                 let shuffledMales = [...allRemainingMales].sort(() => Math.random() - 0.5);
                 let shuffledFemales = [...allRemainingFemales].sort(() => Math.random() - 0.5);
+                // 고정 좌석이 아닌 좌석만 필터링
+                const nonFixedCards = Array.from(existingCards).filter(card => {
+                    const seatIdStr = card.getAttribute('data-seat-id');
+                    if (!seatIdStr)
+                        return false;
+                    const seatId = parseInt(seatIdStr, 10);
+                    return !this.fixedSeatIds.has(seatId);
+                });
+                console.log(`고정 좌석 제외: 총 ${existingCards.length}개 좌석 중 ${nonFixedCards.length}개 좌석만 랜덤 배치 대상`);
+                console.log(`고정 학생 제외: 남학생 ${allRemainingMales.length}명, 여학생 ${allRemainingFemales.length}명만 랜덤 배치 대상`);
                 // 페어 컨테이너 우선 처리 (짝 제약 고려)
                 const seatsAreaEl = document.getElementById('seats-area');
                 const pairContainers = [];
@@ -2114,50 +2321,145 @@ export class MainController {
                     const isMaleB = cardB.classList.contains('gender-m');
                     const nameDivA = cardA.querySelector('.student-name');
                     const nameDivB = cardB.querySelector('.student-name');
+                    // 각 카드의 이름 존재 여부 확인 (고정 좌석 모드)
+                    const hasNameA = nameDivA && nameDivA.textContent && nameDivA.textContent.trim() !== '';
+                    const hasNameB = nameDivB && nameDivB.textContent && nameDivB.textContent.trim() !== '';
+                    // 둘 다 이름이 있으면 이미 모두 배치된 것이므로 스킵
+                    if (hasNameA && hasNameB) {
+                        return;
+                    }
                     const poolA = isMaleA ? shuffledMales : shuffledFemales;
                     const poolB = isMaleB ? shuffledMales : shuffledFemales;
-                    let idxA = 0;
-                    if (avoidPrevSeat) {
-                        for (let i = 0; i < poolA.length; i++) {
-                            const cand = poolA[i];
-                            if (lastSeatByStudent[cand.name] !== seatIdA) {
-                                idxA = i;
-                                break;
+                    // A 카드 처리 (이름이 없는 경우만)
+                    let chosenA = undefined;
+                    if (!hasNameA) {
+                        if (poolA.length === 0) {
+                            // poolA가 비어있으면 다른 성별에서 시도
+                            const alternativePoolA = isMaleA ? shuffledFemales : shuffledMales;
+                            if (alternativePoolA.length > 0) {
+                                let idxA = 0;
+                                if (avoidPrevSeat) {
+                                    for (let i = 0; i < alternativePoolA.length; i++) {
+                                        const cand = alternativePoolA[i];
+                                        if (lastSeatByStudent[cand.name] !== seatIdA) {
+                                            idxA = i;
+                                            break;
+                                        }
+                                    }
+                                }
+                                chosenA = alternativePoolA.splice(idxA, 1)[0];
+                                if (nameDivA && chosenA)
+                                    nameDivA.textContent = chosenA.name || '';
+                                if (isMaleA)
+                                    shuffledMales = alternativePoolA;
+                                else
+                                    shuffledFemales = alternativePoolA;
                             }
                         }
-                    }
-                    const chosenA = poolA.splice(idxA, 1)[0];
-                    if (nameDivA)
-                        nameDivA.textContent = chosenA?.name || '';
-                    let idxB = 0;
-                    for (let i = 0; i < poolB.length; i++) {
-                        const cand = poolB[i];
-                        const seatOk = !avoidPrevSeat || lastSeatByStudent[cand.name] !== seatIdB;
-                        const partnerOk = !avoidPrevPartner || ((chosenA && lastPartnerByStudent[chosenA.name] !== cand.name) && (lastPartnerByStudent[cand.name] !== (chosenA?.name || '')));
-                        if (seatOk && partnerOk) {
-                            idxB = i;
-                            break;
+                        else {
+                            let idxA = 0;
+                            if (avoidPrevSeat) {
+                                for (let i = 0; i < poolA.length; i++) {
+                                    const cand = poolA[i];
+                                    if (lastSeatByStudent[cand.name] !== seatIdA) {
+                                        idxA = i;
+                                        break;
+                                    }
+                                }
+                            }
+                            chosenA = poolA.splice(idxA, 1)[0];
+                            if (nameDivA && chosenA)
+                                nameDivA.textContent = chosenA.name || '';
+                            if (isMaleA)
+                                shuffledMales = poolA;
+                            else
+                                shuffledFemales = poolA;
                         }
                     }
-                    const chosenB = poolB.splice(idxB, 1)[0];
-                    if (nameDivB)
-                        nameDivB.textContent = chosenB?.name || '';
-                    if (isMaleA)
-                        shuffledMales = poolA;
-                    else
-                        shuffledFemales = poolA;
-                    if (isMaleB)
-                        shuffledMales = poolB;
-                    else
-                        shuffledFemales = poolB;
+                    else {
+                        // A에 이미 이름이 있으면 해당 학생 정보 가져오기 (partner 제약 확인용)
+                        const existingName = nameDivA.textContent?.trim() || '';
+                        chosenA = this.students.find(s => s.name === existingName);
+                    }
+                    // B 카드 처리 (이름이 없는 경우만)
+                    if (!hasNameB) {
+                        if (poolB.length === 0) {
+                            // poolB가 비어있으면 다른 성별에서 시도
+                            const alternativePoolB = isMaleB ? shuffledFemales : shuffledMales;
+                            if (alternativePoolB.length > 0) {
+                                let idxB = 0;
+                                // partner 제약 고려
+                                if (chosenA) {
+                                    for (let i = 0; i < alternativePoolB.length; i++) {
+                                        const cand = alternativePoolB[i];
+                                        const seatOk = !avoidPrevSeat || lastSeatByStudent[cand.name] !== seatIdB;
+                                        const partnerOk = !avoidPrevPartner || (lastPartnerByStudent[chosenA.name] !== cand.name &&
+                                            lastPartnerByStudent[cand.name] !== chosenA.name);
+                                        if (seatOk && partnerOk) {
+                                            idxB = i;
+                                            break;
+                                        }
+                                    }
+                                }
+                                else if (avoidPrevSeat) {
+                                    for (let i = 0; i < alternativePoolB.length; i++) {
+                                        const cand = alternativePoolB[i];
+                                        if (lastSeatByStudent[cand.name] !== seatIdB) {
+                                            idxB = i;
+                                            break;
+                                        }
+                                    }
+                                }
+                                const chosenB = alternativePoolB.splice(idxB, 1)[0];
+                                if (nameDivB && chosenB)
+                                    nameDivB.textContent = chosenB.name || '';
+                                if (isMaleB)
+                                    shuffledMales = alternativePoolB;
+                                else
+                                    shuffledFemales = alternativePoolB;
+                            }
+                        }
+                        else {
+                            let idxB = -1;
+                            // partner 제약 고려
+                            for (let i = 0; i < poolB.length; i++) {
+                                const cand = poolB[i];
+                                const seatOk = !avoidPrevSeat || lastSeatByStudent[cand.name] !== seatIdB;
+                                const partnerOk = !avoidPrevPartner || !chosenA || (lastPartnerByStudent[chosenA.name] !== cand.name &&
+                                    lastPartnerByStudent[cand.name] !== chosenA.name);
+                                if (seatOk && partnerOk) {
+                                    idxB = i;
+                                    break;
+                                }
+                            }
+                            // 조건을 만족하는 학생이 없으면 첫 번째 학생을 선택 (강제 배치)
+                            if (idxB === -1) {
+                                idxB = 0;
+                            }
+                            const chosenB = poolB.splice(idxB, 1)[0];
+                            if (nameDivB && chosenB)
+                                nameDivB.textContent = chosenB.name || '';
+                            if (isMaleB)
+                                shuffledMales = poolB;
+                            else
+                                shuffledFemales = poolB;
+                        }
+                    }
                 });
-                // 나머지 단일 카드 처리
+                // 나머지 단일 카드 처리 (고정 좌석 제외)
                 const singleCards = [];
                 Array.from(seatsAreaEl.querySelectorAll('.student-seat-card')).forEach(card => {
                     const parent = card.parentElement;
                     const siblings = parent ? parent.querySelectorAll('.student-seat-card') : null;
                     if (!siblings || siblings.length !== 2) {
-                        singleCards.push(card);
+                        const seatIdStr = card.getAttribute('data-seat-id');
+                        if (seatIdStr) {
+                            const seatId = parseInt(seatIdStr, 10);
+                            // 고정 좌석이 아닌 경우만 추가
+                            if (!this.fixedSeatIds.has(seatId)) {
+                                singleCards.push(card);
+                            }
+                        }
                     }
                 });
                 singleCards.forEach(cardElement => {
@@ -2166,8 +2468,18 @@ export class MainController {
                         return;
                     const seatId = parseInt(seatIdStr, 10);
                     const nameDiv = cardElement.querySelector('.student-name');
+                    // 이미 이름이 있는 카드는 스킵 (이미 페어 컨테이너에서 배치된 경우)
+                    const hasName = nameDiv && nameDiv.textContent && nameDiv.textContent.trim() !== '';
+                    if (hasName) {
+                        return;
+                    }
                     const isMaleCard = cardElement.classList.contains('gender-m');
-                    const pool = isMaleCard ? shuffledMales : shuffledFemales;
+                    // 남은 학생 중에서 성별에 맞는 학생 찾기, 없으면 다른 성별도 허용
+                    let pool = isMaleCard ? shuffledMales : shuffledFemales;
+                    if (pool.length === 0) {
+                        // 성별에 맞는 학생이 없으면 다른 성별에서 가져오기
+                        pool = isMaleCard ? shuffledFemales : shuffledMales;
+                    }
                     if (pool.length === 0) {
                         if (nameDiv)
                             nameDiv.textContent = '';
@@ -2184,8 +2496,8 @@ export class MainController {
                         }
                     }
                     const chosen = pool.splice(pickIdx, 1)[0];
-                    if (nameDiv)
-                        nameDiv.textContent = chosen?.name || '';
+                    if (nameDiv && chosen)
+                        nameDiv.textContent = chosen.name || '';
                     if (isMaleCard)
                         shuffledMales = pool;
                     else
@@ -2221,6 +2533,22 @@ export class MainController {
                     const nameDivB = cardB.querySelector('.student-name');
                     const poolA = isMaleA ? shuffledMales : shuffledFemales;
                     const poolB = isMaleB ? shuffledMales : shuffledFemales;
+                    // poolA가 비어있으면 스킵
+                    if (poolA.length === 0) {
+                        if (nameDivA)
+                            nameDivA.textContent = '';
+                        if (nameDivB)
+                            nameDivB.textContent = '';
+                        if (isMaleA)
+                            shuffledMales = poolA;
+                        else
+                            shuffledFemales = poolA;
+                        if (isMaleB)
+                            shuffledMales = poolB;
+                        else
+                            shuffledFemales = poolB;
+                        return;
+                    }
                     let idxA = 0;
                     if (avoidPrevSeat) {
                         for (let i = 0; i < poolA.length; i++) {
@@ -2234,7 +2562,31 @@ export class MainController {
                     const chosenA = poolA.splice(idxA, 1)[0];
                     if (nameDivA)
                         nameDivA.textContent = chosenA?.name || '';
-                    let idxB = 0;
+                    // poolB가 비어있으면 다른 성별에서 시도 (고정 좌석 모드)
+                    if (poolB.length === 0) {
+                        // 성별에 맞는 학생이 없으면 다른 성별에서 가져오기
+                        const alternativePoolB = isMaleB ? shuffledFemales : shuffledMales;
+                        if (alternativePoolB.length > 0) {
+                            // 대체 풀에서 학생 선택
+                            const chosenB = alternativePoolB.splice(0, 1)[0];
+                            if (nameDivB && chosenB)
+                                nameDivB.textContent = chosenB.name || '';
+                            if (isMaleB)
+                                shuffledMales = alternativePoolB;
+                            else
+                                shuffledFemales = alternativePoolB;
+                        }
+                        else {
+                            if (nameDivB)
+                                nameDivB.textContent = '';
+                        }
+                        if (isMaleA)
+                            shuffledMales = poolA;
+                        else
+                            shuffledFemales = poolA;
+                        return;
+                    }
+                    let idxB = -1;
                     for (let i = 0; i < poolB.length; i++) {
                         const cand = poolB[i];
                         const seatOk = !avoidPrevSeat || lastSeatByStudent[cand.name] !== seatIdB;
@@ -2243,6 +2595,10 @@ export class MainController {
                             idxB = i;
                             break;
                         }
+                    }
+                    // 조건을 만족하는 학생이 없으면 첫 번째 학생을 선택 (강제 배치)
+                    if (idxB === -1) {
+                        idxB = 0;
                     }
                     const chosenB = poolB.splice(idxB, 1)[0];
                     if (nameDivB)
@@ -2272,7 +2628,12 @@ export class MainController {
                     const seatId = parseInt(seatIdStr, 10);
                     const nameDiv = cardElement.querySelector('.student-name');
                     const isMaleCard = cardElement.classList.contains('gender-m');
-                    const pool = isMaleCard ? shuffledMales : shuffledFemales;
+                    // 남은 학생 중에서 성별에 맞는 학생 찾기, 없으면 다른 성별도 허용
+                    let pool = isMaleCard ? shuffledMales : shuffledFemales;
+                    if (pool.length === 0) {
+                        // 성별에 맞는 학생이 없으면 다른 성별에서 가져오기
+                        pool = isMaleCard ? shuffledFemales : shuffledMales;
+                    }
                     if (pool.length === 0) {
                         if (nameDiv)
                             nameDiv.textContent = '';
@@ -2289,8 +2650,8 @@ export class MainController {
                         }
                     }
                     const chosen = pool.splice(pickIdx, 1)[0];
-                    if (nameDiv)
-                        nameDiv.textContent = chosen?.name || '';
+                    if (nameDiv && chosen)
+                        nameDiv.textContent = chosen.name || '';
                     if (isMaleCard)
                         shuffledMales = pool;
                     else

@@ -33,6 +33,7 @@ export declare class MainController {
     private initializeRadioListeners;
     /**
      * 고정 좌석 모드 활성화
+     * 기존 좌석 카드들에 클릭 이벤트를 다시 설정
      */
     private enableFixedSeatMode;
     /**
@@ -128,6 +129,10 @@ export declare class MainController {
      * 학생 행 추가 처리
      */
     private handleAddStudentRow;
+    /**
+     * 학생 테이블 통계 업데이트
+     */
+    private updateStudentTableStats;
     /**
      * 행 번호 업데이트
      */
