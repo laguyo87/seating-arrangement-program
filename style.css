@@ -357,6 +357,18 @@ button:disabled {
     overflow: hidden;
 }
 
+/* 고정 좌석 모드 도움말 */
+.fixed-seat-help {
+    font-size: 0.9em;
+    color: #667eea;
+    background: rgba(102, 126, 234, 0.1);
+    padding: 8px 15px;
+    border-radius: 20px;
+    border: 1px solid rgba(102, 126, 234, 0.3);
+    white-space: nowrap;
+    margin-left: 15px;
+}
+
 .main-header {
     padding: 10px 30px; /* 상하 폭 50% 축소 */
     background: #f8f9fa;
@@ -387,7 +399,7 @@ button:disabled {
 /* 학생 입력 테이블 스타일 */
 .student-table-container {
     width: 100%;
-    max-width: 800px;
+    max-width: 100%;
     margin: 0 auto;
 }
 
@@ -400,6 +412,7 @@ button:disabled {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     margin-bottom: 20px;
     border: 1px solid #d0d0d0;
+    table-layout: auto; /* 자동 너비 조정 허용 */
 }
 
 .student-input-table thead {
@@ -413,6 +426,35 @@ button:disabled {
     font-weight: 600;
     font-size: 0.9em;
     border-right: 1px solid rgba(255, 255, 255, 0.2);
+    white-space: nowrap; /* 헤더 텍스트 줄바꿈 방지 */
+}
+
+/* 테이블 열 너비 설정 */
+.student-input-table th:nth-child(1) { /* 번호 열 */
+    width: 60px;
+    min-width: 60px;
+    text-align: center;
+}
+
+.student-input-table th:nth-child(2) { /* 이름 열 */
+    width: auto;
+    min-width: 150px; /* 이름 입력란 최소 너비 */
+}
+
+.student-input-table th:nth-child(3) { /* 성별 열 */
+    width: auto;
+    min-width: 100px; /* 성별 선택란 최소 너비 */
+}
+
+.student-input-table th:nth-child(4) { /* 고정 좌석 열 */
+    width: auto;
+    min-width: 180px; /* 고정 좌석 선택란 최소 너비 */
+}
+
+.student-input-table th:nth-child(5) { /* 작업 열 */
+    width: auto;
+    min-width: 80px; /* 삭제 버튼 최소 너비 */
+    text-align: center;
 }
 
 .student-input-table th:last-child {
@@ -423,6 +465,30 @@ button:disabled {
     padding: 0;
     border: 1px solid #e0e0e0;
     background: white;
+}
+
+/* td에도 동일한 너비 제약 적용 */
+.student-input-table td:nth-child(1) {
+    width: 60px;
+    min-width: 60px;
+    text-align: center;
+}
+
+.student-input-table td:nth-child(2) {
+    min-width: 150px;
+}
+
+.student-input-table td:nth-child(3) {
+    min-width: 100px;
+}
+
+.student-input-table td:nth-child(4) {
+    min-width: 180px;
+}
+
+.student-input-table td:nth-child(5) {
+    min-width: 80px;
+    text-align: center;
 }
 
 .student-input-table tbody tr:hover {
@@ -438,8 +504,10 @@ button:disabled {
 }
 
 .student-name-input,
-.student-gender-select {
+.student-gender-select,
+.fixed-seat-select {
     width: 100%;
+    min-width: 100px; /* 최소 너비 보장 */
     padding: 10px 12px;
     border: none;
     border-radius: 0;
@@ -448,8 +516,21 @@ button:disabled {
     box-sizing: border-box;
 }
 
+.student-name-input {
+    min-width: 120px; /* 이름 입력란은 더 넓게 */
+}
+
+.student-gender-select {
+    min-width: 80px; /* 성별 선택란 최소 너비 */
+}
+
+.fixed-seat-select {
+    min-width: 160px; /* 고정 좌석 선택란 최소 너비 */
+}
+
 .student-name-input:focus,
-.student-gender-select:focus {
+.student-gender-select:focus,
+.fixed-seat-select:focus {
     outline: 2px solid #667eea;
     outline-offset: -2px;
     background: #f8f9ff;

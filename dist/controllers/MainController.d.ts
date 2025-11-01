@@ -14,6 +14,7 @@ export declare class MainController {
     private fixedSeatIds;
     private nextSeatId;
     private dragSourceCard;
+    private isSyncing;
     constructor();
     /**
      * 앱 초기 상태로 되돌리기
@@ -126,13 +127,28 @@ export declare class MainController {
      */
     private handleDeleteStudentRow;
     /**
-     * 학생 행 추가 처리
+     * 학생 행 추가 처리 (마지막 행 뒤에 추가)
      */
     private handleAddStudentRow;
     /**
      * 학생 테이블 통계 업데이트
      */
     private updateStudentTableStats;
+    /**
+     * 학생 정보 입력 테이블 저장 처리
+     * 테이블의 학생 수를 계산하여 1단계 사이드바에 반영하고 미리보기를 업데이트
+     */
+    private handleSaveStudentTable;
+    /**
+     * 테이블의 숫자를 1단계 사이드바로 동기화
+     * 테이블에 실제 입력된 학생 수를 1단계 입력 필드에 반영하고 미리보기를 업데이트
+     */
+    private syncSidebarToTable;
+    /**
+     * 1단계 사이드바 값을 테이블로 동기화
+     * 1단계에 입력된 숫자에 맞춰 테이블에 행을 추가하거나 삭제
+     */
+    private syncTableToSidebar;
     /**
      * 행 번호 업데이트
      */

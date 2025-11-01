@@ -176,7 +176,13 @@
         <!-- 우측 메인창 (미리보기) -->
         <main class="main-content">
             <div class="main-header">
-                <h2>자리 배치도</h2>
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <h2>자리 배치도</h2>
+                    <!-- 고정 좌석 모드 도움말 (초기에는 숨김) -->
+                    <div id="fixed-seat-help" class="fixed-seat-help" style="display: none;">
+                        💡 학생 책상(카드)을 클릭하면 고정 자리가 됩니다
+                    </div>
+                </div>
                <!-- 자리 배치도 액션 버튼들 (초기에는 숨김) -->
                <div id="layout-action-buttons" style="display: none;">
                    <div style="display: flex; gap: 10px;">
