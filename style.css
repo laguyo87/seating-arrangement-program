@@ -364,9 +364,47 @@ button:disabled {
     background: rgba(102, 126, 234, 0.1);
     padding: 8px 15px;
     border-radius: 20px;
-    border: 1px solid rgba(102, 126, 234, 0.3);
+    border: 2px solid #667eea;
     white-space: nowrap;
     margin-left: 15px;
+    animation: borderBlinkBlue 2s infinite;
+}
+
+/* 드래그 & 드롭 안내 메시지 */
+.drag-drop-help {
+    font-size: 0.9em;
+    color: #dc3545;
+    background: rgba(220, 53, 69, 0.1);
+    padding: 8px 15px;
+    border-radius: 20px;
+    border: 2px solid #dc3545;
+    white-space: nowrap;
+    margin-left: 15px;
+    animation: borderBlinkRed 2s infinite;
+}
+
+/* 파란색 테두리 깜박임 애니메이션 */
+@keyframes borderBlinkBlue {
+    0%, 100% {
+        border-color: #667eea;
+        box-shadow: 0 0 5px rgba(102, 126, 234, 0.5);
+    }
+    50% {
+        border-color: #764ba2;
+        box-shadow: 0 0 15px rgba(102, 126, 234, 0.8);
+    }
+}
+
+/* 빨간색 테두리 깜박임 애니메이션 */
+@keyframes borderBlinkRed {
+    0%, 100% {
+        border-color: #dc3545;
+        box-shadow: 0 0 5px rgba(220, 53, 69, 0.5);
+    }
+    50% {
+        border-color: #ff6b6b;
+        box-shadow: 0 0 15px rgba(220, 53, 69, 0.8);
+    }
 }
 
 .main-header {
@@ -438,7 +476,7 @@ button:disabled {
 
 .student-input-table th:nth-child(2) { /* 이름 열 */
     width: auto;
-    min-width: 150px; /* 이름 입력란 최소 너비 */
+    min-width: 105px; /* 이름 입력란 최소 너비 (30% 축소: 150px → 105px) */
 }
 
 .student-input-table th:nth-child(3) { /* 성별 열 */
@@ -448,7 +486,7 @@ button:disabled {
 
 .student-input-table th:nth-child(4) { /* 고정 좌석 열 */
     width: auto;
-    min-width: 180px; /* 고정 좌석 선택란 최소 너비 */
+    min-width: 90px; /* 고정 좌석 선택란 최소 너비 (50% 축소: 180px → 90px) */
 }
 
 .student-input-table th:nth-child(5) { /* 작업 열 */
@@ -475,7 +513,7 @@ button:disabled {
 }
 
 .student-input-table td:nth-child(2) {
-    min-width: 150px;
+    min-width: 105px; /* 이름 입력란 최소 너비 (30% 축소) */
 }
 
 .student-input-table td:nth-child(3) {
@@ -483,7 +521,7 @@ button:disabled {
 }
 
 .student-input-table td:nth-child(4) {
-    min-width: 180px;
+    min-width: 90px; /* 고정 좌석 선택란 최소 너비 (50% 축소) */
 }
 
 .student-input-table td:nth-child(5) {
@@ -517,7 +555,19 @@ button:disabled {
 }
 
 .student-name-input {
-    min-width: 120px; /* 이름 입력란은 더 넓게 */
+    min-width: 90px; /* 이름 입력란 최소 너비 (30% 축소: 120px → 84px, 여유를 두고 90px) */
+}
+
+.student-gender-select,
+.fixed-seat-select {
+    padding-right: 35px; /* 화살표 공간 확보 */
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 12px;
 }
 
 .student-gender-select {
@@ -525,7 +575,7 @@ button:disabled {
 }
 
 .fixed-seat-select {
-    min-width: 160px; /* 고정 좌석 선택란 최소 너비 */
+    min-width: 80px; /* 고정 좌석 선택란 최소 너비 (50% 축소: 160px → 80px) */
 }
 
 .student-name-input:focus,
@@ -542,11 +592,30 @@ button:disabled {
 }
 
 .delete-row-btn {
-    padding: 6px 12px !important;
-    background: #dc3545 !important;
-    font-size: 0.85em !important;
-    width: auto !important;
+    padding: 8px !important;
+    background: transparent !important;
+    font-size: 1.2em !important;
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
     margin: 0 !important;
+    border: none !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: opacity 0.2s, transform 0.2s !important;
+}
+
+.delete-row-btn:hover {
+    opacity: 0.7 !important;
+    transform: scale(1.1) !important;
+}
+
+.delete-row-btn:active {
+    opacity: 0.5 !important;
+    transform: scale(0.95) !important;
 }
 
 .upload-label {

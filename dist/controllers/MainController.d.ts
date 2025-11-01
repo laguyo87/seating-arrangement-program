@@ -237,9 +237,13 @@ export declare class MainController {
      */
     private handleShareLayout;
     /**
-     * 간단한 공유 코드 생성
+     * 공유된 배치 데이터 로드
      */
-    private generateShareCode;
+    private loadSharedLayout;
+    /**
+     * 간단한 공유 주소(URL) 생성
+     */
+    private generateShareUrl;
     /**
      * 모달 창으로 자리 배치도 공유하기
      */
