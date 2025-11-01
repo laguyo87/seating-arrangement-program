@@ -22,23 +22,36 @@ export class MainController {
         this.fixedSeatIds = new Set(); // 고정 좌석 ID 목록
         this.nextSeatId = 1; // 좌석 카드 고유 ID 생성기
         this.dragSourceCard = null; // 드래그 시작 카드 참조
+        this.isSyncing = false; // 동기화 중 플래그 (무한 루프 방지)
         /**
          * 좌석 카드 클릭 이벤트 핸들러
          */
         this.handleSeatCardClick = (e) => {
+            // 드래그가 발생했으면 클릭 이벤트 무시
+            if (this.dragSourceCard) {
+                return;
+            }
             const target = e.target;
             const card = target.closest('.student-seat-card');
             if (!card)
+                return;
+            // 고정 좌석 모드가 활성화되어 있는지 확인
+            const fixedRandomMode = document.querySelector('input[name="custom-mode-2"][value="fixed-random"]:checked');
+            if (!fixedRandomMode)
                 return;
             const seatIdStr = card.getAttribute('data-seat-id');
             if (!seatIdStr)
                 return;
             const seatId = parseInt(seatIdStr, 10);
+            // 이벤트 전파 중단 (다른 이벤트 핸들러와의 충돌 방지)
+            e.stopPropagation();
+            e.preventDefault();
             // 고정 좌석 토글
             if (this.fixedSeatIds.has(seatId)) {
                 // 고정 해제
                 this.fixedSeatIds.delete(seatId);
                 card.classList.remove('fixed-seat');
+                card.title = '클릭하여 고정 좌석 지정';
                 const lockIcon = card.querySelector('.fixed-seat-lock');
                 if (lockIcon) {
                     lockIcon.remove();
@@ -49,12 +62,15 @@ export class MainController {
                 // 고정 설정
                 this.fixedSeatIds.add(seatId);
                 card.classList.add('fixed-seat');
-                // 🔒 아이콘 추가
-                const lockIcon = document.createElement('div');
-                lockIcon.className = 'fixed-seat-lock';
-                lockIcon.textContent = '🔒';
-                lockIcon.style.cssText = 'position: absolute; top: 5px; right: 5px; font-size: 1.2em; z-index: 10;';
-                card.appendChild(lockIcon);
+                card.title = '고정 좌석 (클릭하여 해제)';
+                // 🔒 아이콘 추가 (없는 경우만)
+                if (!card.querySelector('.fixed-seat-lock')) {
+                    const lockIcon = document.createElement('div');
+                    lockIcon.className = 'fixed-seat-lock';
+                    lockIcon.textContent = '🔒';
+                    lockIcon.style.cssText = 'position: absolute; top: 5px; right: 5px; font-size: 1.2em; z-index: 10; pointer-events: none;';
+                    card.appendChild(lockIcon);
+                }
                 console.log(`좌석 ${seatId} 고정 설정`);
             }
             // 테이블의 고정 좌석 드롭다운 업데이트
@@ -353,6 +369,10 @@ export class MainController {
             if (target.id === 'add-student-row-btn') {
                 this.handleAddStudentRow();
             }
+            // 저장 버튼 클릭
+            if (target.id === 'save-student-table-btn') {
+                this.handleSaveStudentTable();
+            }
             // 공유하기 버튼 클릭
             if (target.id === 'share-layout') {
                 console.log('공유하기 버튼 클릭됨');
@@ -415,6 +435,11 @@ export class MainController {
      */
     enableFixedSeatMode() {
         console.log('고정 좌석 모드 활성화');
+        // 고정 좌석 모드 도움말 표시
+        const fixedSeatHelp = document.getElementById('fixed-seat-help');
+        if (fixedSeatHelp) {
+            fixedSeatHelp.style.display = 'block';
+        }
         // 좌석 카드에 클릭 이벤트 추가 (이벤트 위임)
         const seatsArea = document.getElementById('seats-area');
         if (seatsArea) {
@@ -452,6 +477,11 @@ export class MainController {
      */
     disableFixedSeatMode() {
         console.log('고정 좌석 모드 비활성화');
+        // 고정 좌석 모드 도움말 숨김
+        const fixedSeatHelp = document.getElementById('fixed-seat-help');
+        if (fixedSeatHelp) {
+            fixedSeatHelp.style.display = 'none';
+        }
         // 고정 좌석 초기화
         this.fixedSeatIds.clear();
         // 모든 좌석 카드에서 고정 표시 제거
@@ -808,6 +838,12 @@ export class MainController {
             const target = e.target?.closest('.student-seat-card');
             if (!target)
                 return;
+            // 고정 좌석 모드가 활성화되어 있으면 드래그 비활성화
+            const fixedRandomMode = document.querySelector('input[name="custom-mode-2"][value="fixed-random"]:checked');
+            if (fixedRandomMode) {
+                e.preventDefault();
+                return;
+            }
             // 고정 좌석은 드래그 불가
             if (target.classList.contains('fixed-seat')) {
                 e.preventDefault();
@@ -820,6 +856,10 @@ export class MainController {
             catch { }
             if (e.dataTransfer)
                 e.dataTransfer.effectAllowed = 'move';
+        });
+        // dragend - 드래그가 끝나면 dragSourceCard 초기화 (드롭되지 않은 경우 대비)
+        seatsArea.addEventListener('dragend', () => {
+            this.dragSourceCard = null;
         });
         // dragover
         seatsArea.addEventListener('dragover', (ev) => {
@@ -869,9 +909,6 @@ export class MainController {
         if (fixedRandomMode) {
             card.style.cursor = 'pointer';
             card.title = '클릭하여 고정 좌석 지정/해제';
-            card.addEventListener('click', () => {
-                this.toggleFixedSeat(seatId, card);
-            });
             // 이미 고정된 좌석인지 확인하여 시각적 표시
             if (this.fixedSeatIds.has(seatId)) {
                 card.classList.add('fixed-seat');
@@ -886,6 +923,7 @@ export class MainController {
                 }
             }
         }
+        // 개별 클릭 이벤트는 추가하지 않음 - 이벤트 위임 방식 사용 (handleSeatCardClick)
     }
     /**
      * 고정 좌석 토글
@@ -1250,11 +1288,35 @@ export class MainController {
         // 새 테이블 컨테이너 생성
         studentTableContainer = document.createElement('div');
         studentTableContainer.className = 'student-table-container';
+        // 가로 방향 2-3단 레이아웃을 위한 스타일 적용
+        // 화면 크기에 따라 자동으로 2-3단으로 조정
+        studentTableContainer.style.cssText = `
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 20px;
+        `;
+        // 반응형: 작은 화면에서는 2단, 큰 화면에서는 3단
+        const style = document.createElement('style');
+        style.textContent = `
+            @media (max-width: 1200px) {
+                .student-table-container {
+                    grid-template-columns: repeat(2, 1fr) !important;
+                }
+            }
+            @media (max-width: 800px) {
+                .student-table-container {
+                    grid-template-columns: 1fr !important;
+                }
+            }
+        `;
+        document.head.appendChild(style);
         // 버튼 컨테이너 생성
         const buttonContainer = document.createElement('div');
         buttonContainer.style.display = 'flex';
         buttonContainer.style.gap = '10px';
         buttonContainer.style.marginBottom = '15px';
+        buttonContainer.style.gridColumn = '1 / -1'; // 전체 그리드 너비 사용
         // 양식 다운로드 버튼
         const downloadBtn = document.createElement('button');
         downloadBtn.id = 'download-template';
@@ -1282,179 +1344,213 @@ export class MainController {
         buttonContainer.appendChild(uploadBtn);
         buttonContainer.appendChild(fileInput);
         studentTableContainer.appendChild(buttonContainer);
-        // 테이블 생성
-        const table = document.createElement('table');
-        table.className = 'student-input-table';
-        // 헤더 생성
-        const thead = document.createElement('thead');
-        const headerRow = document.createElement('tr');
         // '고정 좌석 지정 후 랜덤 배치' 모드인지 확인
         const fixedRandomMode = document.querySelector('input[name="custom-mode-2"][value="fixed-random"]:checked');
-        if (fixedRandomMode) {
-            headerRow.innerHTML = `
-                <th>번호</th>
-                <th>이름</th>
-                <th>성별</th>
-                <th title="미리보기 화면의 좌석 카드에 표시된 번호(#1, #2...)를 선택하세요. 고정 좌석을 지정하지 않으려면 '없음'을 선택하세요.">고정 좌석 <span style="font-size: 0.8em; color: #999;">(미리보기 좌석 번호)</span></th>
-                <th>작업</th>
+        // 학생 수에 따라 테이블 개수 결정 (10명씩 그룹화)
+        const studentsPerTable = 10;
+        const numberOfTables = Math.ceil(count / studentsPerTable);
+        // 각 테이블 생성 (10명씩)
+        for (let tableIndex = 0; tableIndex < numberOfTables; tableIndex++) {
+            const startIndex = tableIndex * studentsPerTable;
+            const endIndex = Math.min(startIndex + studentsPerTable, count);
+            const studentsInThisTable = endIndex - startIndex;
+            // 개별 테이블 래퍼 생성
+            const tableWrapper = document.createElement('div');
+            tableWrapper.style.cssText = `
+                border: 1px solid #dee2e6;
+                border-radius: 8px;
+                padding: 15px;
+                background: white;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                min-width: 0; /* 그리드 아이템이 축소될 수 있도록 */
+                overflow-x: auto; /* 테이블이 너무 넓으면 가로 스크롤 */
             `;
-        }
-        else {
-            headerRow.innerHTML = `
-                <th>번호</th>
-                <th>이름</th>
-                <th>성별</th>
-                <th>작업</th>
+            // 테이블 제목 추가 (2개 이상일 때만)
+            if (numberOfTables > 1) {
+                const tableTitle = document.createElement('div');
+                tableTitle.style.cssText = `
+                    font-weight: bold;
+                    margin-bottom: 10px;
+                    color: #495057;
+                    font-size: 1.1em;
+                    padding-bottom: 8px;
+                    border-bottom: 2px solid #dee2e6;
+                `;
+                tableTitle.textContent = `${startIndex + 1}번 ~ ${endIndex}번`;
+                tableWrapper.appendChild(tableTitle);
+            }
+            // 테이블 생성
+            const table = document.createElement('table');
+            table.className = 'student-input-table';
+            table.style.cssText = `
+                width: 100%;
+                border-collapse: collapse;
             `;
-        }
-        thead.appendChild(headerRow);
-        table.appendChild(thead);
-        // 본문 생성
-        const tbody = document.createElement('tbody');
-        for (let i = 1; i <= count; i++) {
-            const row = document.createElement('tr');
-            row.dataset.studentIndex = (i - 1).toString();
-            // 번호 열
-            const numCell = document.createElement('td');
-            numCell.textContent = i.toString();
-            numCell.style.textAlign = 'center';
-            numCell.style.padding = '10px';
-            numCell.style.background = '#f8f9fa';
-            // 이름 입력 열
-            const nameCell = document.createElement('td');
-            const nameInput = document.createElement('input');
-            nameInput.type = 'text';
-            nameInput.placeholder = '학생 이름';
-            nameInput.className = 'student-name-input';
-            nameInput.id = `student-name-${i}`;
-            nameInput.tabIndex = i;
-            nameCell.appendChild(nameInput);
-            // 성별 선택 열
-            const genderCell = document.createElement('td');
-            const genderSelect = document.createElement('select');
-            genderSelect.className = 'student-gender-select';
-            genderSelect.id = `student-gender-${i}`;
-            genderSelect.innerHTML = `
-                <option value="">선택</option>
-                <option value="M">남</option>
-                <option value="F">여</option>
-            `;
-            genderSelect.tabIndex = count + i;
-            genderCell.appendChild(genderSelect);
-            // 고정 좌석 선택 열 (고정 좌석 모드일 때만)
-            let fixedSeatCell = null;
+            // 헤더 생성
+            const thead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
             if (fixedRandomMode) {
-                fixedSeatCell = document.createElement('td');
-                const fixedSeatSelect = document.createElement('select');
-                fixedSeatSelect.className = 'fixed-seat-select';
-                fixedSeatSelect.id = `fixed-seat-${i}`;
-                fixedSeatSelect.innerHTML = '<option value="">없음</option>';
-                fixedSeatSelect.tabIndex = count * 2 + i;
-                // 고정된 좌석이 있으면 옵션 추가
-                if (this.fixedSeatIds.size > 0) {
-                    this.fixedSeatIds.forEach(seatId => {
-                        const option = document.createElement('option');
-                        option.value = seatId.toString();
-                        option.textContent = `좌석 #${seatId}`;
-                        fixedSeatSelect.appendChild(option);
+                headerRow.innerHTML = `
+                    <th>번호</th>
+                    <th>이름</th>
+                    <th>성별</th>
+                    <th title="미리보기 화면의 좌석 카드에 표시된 번호(#1, #2...)를 선택하세요. 고정 좌석을 지정하지 않으려면 '없음'을 선택하세요.">고정 좌석 <span style="font-size: 0.8em; color: #999;">(미리보기 좌석 번호)</span></th>
+                    <th>작업</th>
+                `;
+            }
+            else {
+                headerRow.innerHTML = `
+                    <th>번호</th>
+                    <th>이름</th>
+                    <th>성별</th>
+                    <th>작업</th>
+                `;
+            }
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+            // 본문 생성
+            const tbody = document.createElement('tbody');
+            for (let i = startIndex + 1; i <= endIndex; i++) {
+                const localIndex = i - startIndex; // 현재 테이블 내에서의 인덱스 (1부터 시작)
+                const row = document.createElement('tr');
+                row.dataset.studentIndex = (i - 1).toString();
+                // 번호 열
+                const numCell = document.createElement('td');
+                numCell.textContent = i.toString();
+                numCell.style.textAlign = 'center';
+                numCell.style.padding = '10px';
+                numCell.style.background = '#f8f9fa';
+                // 이름 입력 열
+                const nameCell = document.createElement('td');
+                const nameInput = document.createElement('input');
+                nameInput.type = 'text';
+                nameInput.placeholder = '학생 이름';
+                nameInput.className = 'student-name-input';
+                nameInput.id = `student-name-${i}`;
+                nameInput.tabIndex = i;
+                nameCell.appendChild(nameInput);
+                // 성별 선택 열
+                const genderCell = document.createElement('td');
+                const genderSelect = document.createElement('select');
+                genderSelect.className = 'student-gender-select';
+                genderSelect.id = `student-gender-${i}`;
+                genderSelect.innerHTML = `
+                    <option value="">선택</option>
+                    <option value="M">남</option>
+                    <option value="F">여</option>
+                `;
+                genderSelect.tabIndex = count + i;
+                genderCell.appendChild(genderSelect);
+                // 고정 좌석 선택 열 (고정 좌석 모드일 때만)
+                let fixedSeatCell = null;
+                if (fixedRandomMode) {
+                    fixedSeatCell = document.createElement('td');
+                    const fixedSeatSelect = document.createElement('select');
+                    fixedSeatSelect.className = 'fixed-seat-select';
+                    fixedSeatSelect.id = `fixed-seat-${i}`;
+                    fixedSeatSelect.innerHTML = '<option value="">없음</option>';
+                    fixedSeatSelect.tabIndex = count * 2 + i;
+                    // 고정된 좌석이 있으면 옵션 추가
+                    if (this.fixedSeatIds.size > 0) {
+                        this.fixedSeatIds.forEach(seatId => {
+                            const option = document.createElement('option');
+                            option.value = seatId.toString();
+                            option.textContent = `좌석 #${seatId}`;
+                            fixedSeatSelect.appendChild(option);
+                        });
+                    }
+                    // 고정 좌석 선택 변경 이벤트
+                    fixedSeatSelect.addEventListener('change', () => {
+                        const selectedSeatId = fixedSeatSelect.value;
+                        const studentIndex = parseInt(row.dataset.studentIndex || '0', 10);
+                        // 학생 데이터에 고정 좌석 ID 저장
+                        if (this.students[studentIndex]) {
+                            if (selectedSeatId) {
+                                this.students[studentIndex].fixedSeatId = parseInt(selectedSeatId, 10);
+                            }
+                            else {
+                                delete this.students[studentIndex].fixedSeatId;
+                            }
+                        }
+                        console.log(`학생 ${studentIndex}의 고정 좌석: ${selectedSeatId || '없음'}`);
                     });
+                    fixedSeatCell.appendChild(fixedSeatSelect);
                 }
-                // 고정 좌석 선택 변경 이벤트
-                fixedSeatSelect.addEventListener('change', () => {
-                    const selectedSeatId = fixedSeatSelect.value;
-                    const studentIndex = parseInt(row.dataset.studentIndex || '0', 10);
-                    // 학생 데이터에 고정 좌석 ID 저장
-                    if (this.students[studentIndex]) {
-                        if (selectedSeatId) {
-                            this.students[studentIndex].fixedSeatId = parseInt(selectedSeatId, 10);
-                        }
-                        else {
-                            delete this.students[studentIndex].fixedSeatId;
-                        }
+                // 작업 열 (삭제 버튼)
+                const actionCell = document.createElement('td');
+                actionCell.style.textAlign = 'center';
+                actionCell.style.padding = '8px';
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = '삭제';
+                deleteBtn.type = 'button';
+                deleteBtn.className = 'delete-row-btn';
+                deleteBtn.onclick = () => this.handleDeleteStudentRow(row);
+                actionCell.appendChild(deleteBtn);
+                // 키보드 이벤트 추가 (이름 입력 필드)
+                nameInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        genderSelect.focus();
                     }
-                    console.log(`학생 ${studentIndex}의 고정 좌석: ${selectedSeatId || '없음'}`);
+                    else if (e.key === 'ArrowDown') {
+                        this.moveToCell(tbody, localIndex, 'name', 'down');
+                    }
+                    else if (e.key === 'ArrowUp') {
+                        this.moveToCell(tbody, localIndex, 'name', 'up');
+                    }
                 });
-                fixedSeatCell.appendChild(fixedSeatSelect);
-            }
-            // 작업 열 (삭제 버튼)
-            const actionCell = document.createElement('td');
-            actionCell.style.textAlign = 'center';
-            actionCell.style.padding = '8px';
-            const deleteBtn = document.createElement('button');
-            deleteBtn.textContent = '삭제';
-            deleteBtn.type = 'button';
-            deleteBtn.className = 'delete-row-btn';
-            deleteBtn.onclick = () => this.handleDeleteStudentRow(row);
-            actionCell.appendChild(deleteBtn);
-            // 키보드 이벤트 추가 (이름 입력 필드)
-            nameInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    // 다음 셀(성별)로 이동
-                    genderSelect.focus();
-                }
-                else if (e.key === 'ArrowDown') {
-                    // 다음 행의 같은 열로 이동
-                    this.moveToCell(tbody, i, 'name', 'down');
-                }
-                else if (e.key === 'ArrowUp') {
-                    // 이전 행의 같은 열로 이동
-                    this.moveToCell(tbody, i, 'name', 'up');
-                }
-            });
-            // 키보드 이벤트 추가 (성별 선택 필드)
-            genderSelect.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' || e.key === 'Tab') {
-                    // 다음 행의 이름 필드로 이동
-                    const nextRow = tbody.querySelector(`tr:nth-child(${Math.min(i + 1, count)})`);
-                    const nextNameInput = nextRow?.querySelector('.student-name-input');
-                    if (nextNameInput) {
-                        nextNameInput.focus();
-                        nextNameInput.select();
+                // 키보드 이벤트 추가 (성별 선택 필드)
+                genderSelect.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === 'Tab') {
+                        const nextRow = tbody.querySelector(`tr:nth-child(${Math.min(localIndex + 1, studentsInThisTable)})`);
+                        const nextNameInput = nextRow?.querySelector('.student-name-input');
+                        if (nextNameInput) {
+                            nextNameInput.focus();
+                            nextNameInput.select();
+                        }
                     }
+                    else if (e.key === 'ArrowDown') {
+                        this.moveToCell(tbody, localIndex, 'gender', 'down');
+                    }
+                    else if (e.key === 'ArrowUp') {
+                        this.moveToCell(tbody, localIndex, 'gender', 'up');
+                    }
+                });
+                row.appendChild(numCell);
+                row.appendChild(nameCell);
+                row.appendChild(genderCell);
+                if (fixedSeatCell) {
+                    row.appendChild(fixedSeatCell);
                 }
-                else if (e.key === 'ArrowDown') {
-                    // 다음 행의 같은 열로 이동
-                    this.moveToCell(tbody, i, 'gender', 'down');
-                }
-                else if (e.key === 'ArrowUp') {
-                    // 이전 행의 같은 열로 이동
-                    this.moveToCell(tbody, i, 'gender', 'up');
-                }
-            });
-            row.appendChild(numCell);
-            row.appendChild(nameCell);
-            row.appendChild(genderCell);
-            if (fixedSeatCell) {
-                row.appendChild(fixedSeatCell);
+                row.appendChild(actionCell);
+                tbody.appendChild(row);
             }
-            row.appendChild(actionCell);
-            tbody.appendChild(row);
+            table.appendChild(tbody);
+            tableWrapper.appendChild(table);
+            studentTableContainer.appendChild(tableWrapper);
         }
-        table.appendChild(tbody);
-        // 통계 표시를 위한 tfoot 추가
-        const tfoot = document.createElement('tfoot');
-        tfoot.id = 'student-table-stats';
-        const colCount = fixedRandomMode ? 5 : 4;
-        const statsRow = document.createElement('tr');
-        const statsCell = document.createElement('td');
-        statsCell.colSpan = colCount;
-        statsCell.id = 'student-table-stats-cell';
-        statsCell.style.cssText = `
+        // 통계 표시를 위한 컨테이너 추가 (모든 테이블 아래에 하나만)
+        const statsContainer = document.createElement('div');
+        statsContainer.style.cssText = `
+            grid-column: 1 / -1;
             padding: 12px;
             background: #f8f9fa;
-            border-top: 2px solid #dee2e6;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
             font-size: 0.95em;
+            margin-top: 10px;
         `;
-        statsRow.appendChild(statsCell);
-        tfoot.appendChild(statsRow);
-        table.appendChild(tfoot);
-        studentTableContainer.appendChild(table);
+        statsContainer.id = 'student-table-stats';
+        const statsCell = document.createElement('div');
+        statsCell.id = 'student-table-stats-cell';
+        statsContainer.appendChild(statsCell);
+        studentTableContainer.appendChild(statsContainer);
         // 작업 버튼 추가
         const actionButtons = document.createElement('div');
         actionButtons.className = 'table-action-buttons';
         actionButtons.innerHTML = `
             <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: flex-start;">
                 <button id="add-student-row-btn" style="width: auto; flex: 0 0 auto; min-width: 0;">행 추가</button>
+                <button id="save-student-table-btn" class="save-btn" style="width: auto; flex: 0 0 auto; min-width: 0; background: #28a745; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;">💾 저장</button>
                 <button id="arrange-seats" class="arrange-seats-btn" style="width: auto; flex: 0 0 auto; min-width: 0;">자리 배치하기</button>
                 <label style="display:flex; align-items:center; gap:4px; margin:0; white-space:nowrap;"><input type="checkbox" id="avoid-prev-seat" /><span>이전 좌석 안 앉기</span></label>
                 <label style="display:flex; align-items:center; gap:4px; margin:0; white-space:nowrap;"><input type="checkbox" id="avoid-prev-partner" /><span>이전 짝 금지</span></label>
@@ -1464,12 +1560,25 @@ export class MainController {
         outputSection.appendChild(studentTableContainer);
         // 초기 통계 업데이트
         this.updateStudentTableStats();
-        // 통계 업데이트를 위한 이벤트 리스너 추가
-        tbody.addEventListener('input', () => {
-            this.updateStudentTableStats();
-        });
-        tbody.addEventListener('change', () => {
-            this.updateStudentTableStats();
+        // 통계 업데이트를 위한 이벤트 리스너 추가 (이벤트 위임으로 모든 변경사항 감지)
+        // 모든 테이블의 tbody에 이벤트 리스너 추가
+        const allTbodies = studentTableContainer.querySelectorAll('tbody');
+        allTbodies.forEach(tbody => {
+            tbody.addEventListener('input', () => {
+                this.updateStudentTableStats();
+            });
+            tbody.addEventListener('change', () => {
+                this.updateStudentTableStats();
+            });
+            // 테이블이 동적으로 변경될 때를 대비한 MutationObserver 추가
+            const observer = new MutationObserver(() => {
+                this.updateStudentTableStats();
+            });
+            observer.observe(tbody, {
+                childList: true,
+                subtree: true,
+                attributes: false
+            });
         });
         this.outputModule.showInfo(`${count}명의 학생 명렬표가 생성되었습니다.`);
     }
@@ -1485,32 +1594,129 @@ export class MainController {
         }
     }
     /**
-     * 학생 행 추가 처리
+     * 학생 행 추가 처리 (마지막 행 뒤에 추가)
      */
     handleAddStudentRow() {
         const outputSection = document.getElementById('output-section');
-        const table = outputSection?.querySelector('.student-input-table tbody');
-        if (!table)
+        if (!outputSection)
             return;
-        const newRowIndex = table.children.length;
+        // 모든 tbody 찾기
+        const allTbodies = outputSection.querySelectorAll('.student-input-table tbody');
+        if (allTbodies.length === 0)
+            return;
+        // 마지막 tbody 찾기
+        const lastTbody = allTbodies[allTbodies.length - 1];
+        // 전체 행 수 계산 (새 행 번호 결정용)
+        let totalRows = 0;
+        allTbodies.forEach(tbody => {
+            totalRows += tbody.querySelectorAll('tr').length;
+        });
+        const newGlobalIndex = totalRows; // 전체 행 번호 (0부터 시작)
+        // 마지막 테이블의 현재 행 수 확인
+        const studentsPerTable = 10;
+        const currentRowsInLastTable = lastTbody.querySelectorAll('tr').length;
+        // 마지막 테이블이 10명으로 가득 찬 경우 새로운 테이블 생성
+        let targetTbody = lastTbody;
+        if (currentRowsInLastTable >= studentsPerTable) {
+            // 새로운 테이블을 만들어야 함
+            const studentTableContainer = outputSection.querySelector('.student-table-container');
+            if (studentTableContainer) {
+                const fixedRandomMode = document.querySelector('input[name="custom-mode-2"][value="fixed-random"]:checked');
+                const tableWrapper = document.createElement('div');
+                tableWrapper.style.cssText = `
+                    border: 1px solid #dee2e6;
+                    border-radius: 8px;
+                    padding: 15px;
+                    background: white;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    min-width: 0;
+                    overflow-x: auto;
+                `;
+                // 테이블 제목 추가
+                const numberOfTables = Math.ceil((totalRows + 1) / studentsPerTable);
+                const startIndex = Math.floor(totalRows / studentsPerTable) * studentsPerTable;
+                const endIndex = totalRows + 1;
+                if (numberOfTables > 1) {
+                    const tableTitle = document.createElement('div');
+                    tableTitle.style.cssText = `
+                        font-weight: bold;
+                        margin-bottom: 10px;
+                        color: #495057;
+                        font-size: 1.1em;
+                        padding-bottom: 8px;
+                        border-bottom: 2px solid #dee2e6;
+                    `;
+                    tableTitle.textContent = `${startIndex + 1}번 ~ ${endIndex}번`;
+                    tableWrapper.appendChild(tableTitle);
+                }
+                const table = document.createElement('table');
+                table.className = 'student-input-table';
+                table.style.cssText = `
+                    width: 100%;
+                    border-collapse: collapse;
+                `;
+                // 헤더 생성
+                const thead = document.createElement('thead');
+                const headerRow = document.createElement('tr');
+                if (fixedRandomMode) {
+                    headerRow.innerHTML = `
+                        <th>번호</th>
+                        <th>이름</th>
+                        <th>성별</th>
+                        <th title="미리보기 화면의 좌석 카드에 표시된 번호(#1, #2...)를 선택하세요. 고정 좌석을 지정하지 않으려면 '없음'을 선택하세요.">고정 좌석 <span style="font-size: 0.8em; color: #999;">(미리보기 좌석 번호)</span></th>
+                        <th>작업</th>
+                    `;
+                }
+                else {
+                    headerRow.innerHTML = `
+                        <th>번호</th>
+                        <th>이름</th>
+                        <th>성별</th>
+                        <th>작업</th>
+                    `;
+                }
+                thead.appendChild(headerRow);
+                table.appendChild(thead);
+                const newTbody = document.createElement('tbody');
+                table.appendChild(newTbody);
+                tableWrapper.appendChild(table);
+                // 통계 컨테이너와 작업 버튼 앞에 삽입
+                const statsContainer = studentTableContainer.querySelector('#student-table-stats');
+                if (statsContainer) {
+                    studentTableContainer.insertBefore(tableWrapper, statsContainer);
+                }
+                else {
+                    studentTableContainer.appendChild(tableWrapper);
+                }
+                targetTbody = newTbody;
+            }
+        }
+        // 새 행 생성
         const row = document.createElement('tr');
-        row.dataset.studentIndex = newRowIndex.toString();
+        row.dataset.studentIndex = newGlobalIndex.toString();
         const numCell = document.createElement('td');
-        numCell.textContent = (newRowIndex + 1).toString();
+        numCell.textContent = (newGlobalIndex + 1).toString();
+        numCell.style.textAlign = 'center';
+        numCell.style.padding = '10px';
+        numCell.style.background = '#f8f9fa';
         const nameCell = document.createElement('td');
         const nameInput = document.createElement('input');
         nameInput.type = 'text';
         nameInput.placeholder = '학생 이름';
         nameInput.className = 'student-name-input';
+        nameInput.id = `student-name-${newGlobalIndex + 1}`;
+        nameInput.tabIndex = newGlobalIndex + 1;
         nameCell.appendChild(nameInput);
         const genderCell = document.createElement('td');
         const genderSelect = document.createElement('select');
         genderSelect.className = 'student-gender-select';
+        genderSelect.id = `student-gender-${newGlobalIndex + 1}`;
         genderSelect.innerHTML = `
             <option value="">선택</option>
             <option value="M">남</option>
             <option value="F">여</option>
         `;
+        genderSelect.tabIndex = totalRows + newGlobalIndex + 1;
         genderCell.appendChild(genderSelect);
         // 고정 좌석 선택 열 (고정 좌석 모드일 때만)
         let fixedSeatCell = null;
@@ -1519,7 +1725,9 @@ export class MainController {
             fixedSeatCell = document.createElement('td');
             const fixedSeatSelect = document.createElement('select');
             fixedSeatSelect.className = 'fixed-seat-select';
+            fixedSeatSelect.id = `fixed-seat-${newGlobalIndex + 1}`;
             fixedSeatSelect.innerHTML = '<option value="">없음</option>';
+            fixedSeatSelect.tabIndex = totalRows * 2 + newGlobalIndex + 1;
             // 고정된 좌석이 있으면 옵션 추가
             if (this.fixedSeatIds.size > 0) {
                 this.fixedSeatIds.forEach(seatId => {
@@ -1546,12 +1754,30 @@ export class MainController {
             fixedSeatCell.appendChild(fixedSeatSelect);
         }
         const actionCell = document.createElement('td');
+        actionCell.style.textAlign = 'center';
+        actionCell.style.padding = '8px';
         const deleteBtn = document.createElement('button');
         deleteBtn.textContent = '삭제';
         deleteBtn.type = 'button';
         deleteBtn.className = 'delete-row-btn';
         deleteBtn.onclick = () => this.handleDeleteStudentRow(row);
         actionCell.appendChild(deleteBtn);
+        // 키보드 이벤트 추가
+        nameInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                genderSelect.focus();
+            }
+        });
+        genderSelect.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === 'Tab') {
+                const nextRow = targetTbody.querySelector(`tr:nth-child(${targetTbody.querySelectorAll('tr').length + 1})`);
+                const nextNameInput = nextRow?.querySelector('.student-name-input');
+                if (nextNameInput) {
+                    nextNameInput.focus();
+                    nextNameInput.select();
+                }
+            }
+        });
         row.appendChild(numCell);
         row.appendChild(nameCell);
         row.appendChild(genderCell);
@@ -1559,7 +1785,10 @@ export class MainController {
             row.appendChild(fixedSeatCell);
         }
         row.appendChild(actionCell);
-        table.appendChild(row);
+        // 마지막 행 뒤에 추가
+        targetTbody.appendChild(row);
+        // 전체 행 번호 재정렬
+        this.updateRowNumbers();
         // 통계 업데이트
         this.updateStudentTableStats();
         // 새 행에 이벤트 리스너 추가
@@ -1576,18 +1805,22 @@ export class MainController {
                 fixedSeatSelectInCell.addEventListener('change', () => this.updateStudentTableStats());
             }
         }
+        // 새로 추가된 입력 필드에 포커스
+        setTimeout(() => {
+            nameInput.focus();
+        }, 100);
     }
     /**
      * 학생 테이블 통계 업데이트
      */
     updateStudentTableStats() {
         const statsCell = document.getElementById('student-table-stats-cell');
+        // 통계 셀이 없으면 테이블이 아직 생성되지 않았거나 제거된 상태
         if (!statsCell)
             return;
         const outputSection = document.getElementById('output-section');
-        const rows = outputSection?.querySelectorAll('.student-input-table tbody tr');
-        if (!rows)
-            return;
+        const rows = outputSection?.querySelectorAll('.student-input-table tbody tr') || [];
+        // rows가 없어도 통계는 표시해야 함 (0명일 수도 있으므로)
         let maleCount = 0;
         let femaleCount = 0;
         let fixedSeatCount = 0;
@@ -1639,6 +1872,175 @@ export class MainController {
             `;
         }
         statsCell.innerHTML = statsHTML;
+        // 자동 동기화 제거: 사용자가 명시적으로 '저장' 버튼을 클릭할 때만 동기화
+    }
+    /**
+     * 학생 정보 입력 테이블 저장 처리
+     * 테이블의 학생 수를 계산하여 1단계 사이드바에 반영하고 미리보기를 업데이트
+     */
+    handleSaveStudentTable() {
+        const outputSection = document.getElementById('output-section');
+        const rows = outputSection?.querySelectorAll('.student-input-table tbody tr') || [];
+        let maleCount = 0;
+        let femaleCount = 0;
+        rows.forEach((row) => {
+            const genderSelect = row.querySelector('.student-gender-select');
+            if (genderSelect) {
+                const gender = genderSelect.value;
+                if (gender === 'M') {
+                    maleCount++;
+                }
+                else if (gender === 'F') {
+                    femaleCount++;
+                }
+            }
+        });
+        // 테이블의 학생 수를 1단계 사이드바로 동기화
+        this.syncSidebarToTable(maleCount, femaleCount);
+    }
+    /**
+     * 테이블의 숫자를 1단계 사이드바로 동기화
+     * 테이블에 실제 입력된 학생 수를 1단계 입력 필드에 반영하고 미리보기를 업데이트
+     */
+    syncSidebarToTable(tableMaleCount, tableFemaleCount) {
+        this.isSyncing = true; // 동기화 시작
+        const maleCountInput = document.getElementById('male-students');
+        const femaleCountInput = document.getElementById('female-students');
+        if (!maleCountInput || !femaleCountInput) {
+            alert('입력 필드를 찾을 수 없습니다.');
+            this.isSyncing = false;
+            return;
+        }
+        // 1단계 입력 필드 업데이트
+        maleCountInput.value = tableMaleCount.toString();
+        femaleCountInput.value = tableFemaleCount.toString();
+        // 입력 필드 값 변경 이벤트 수동 발생 (이벤트 리스너가 제대로 작동하도록)
+        // 단, 통계 업데이트는 호출하지 않도록 (무한 루프 방지)
+        maleCountInput.dispatchEvent(new Event('input', { bubbles: true }));
+        femaleCountInput.dispatchEvent(new Event('input', { bubbles: true }));
+        maleCountInput.dispatchEvent(new Event('change', { bubbles: true }));
+        femaleCountInput.dispatchEvent(new Event('change', { bubbles: true }));
+        // 미리보기 업데이트 (카드 재생성) - 명시적으로 호출
+        this.updatePreviewForGenderCounts();
+        // 통계 업데이트 (경고 메시지 제거) - 동기화 플래그를 해제하기 전에
+        setTimeout(() => {
+            this.updateStudentTableStats();
+            this.isSyncing = false; // 동기화 완료
+        }, 100);
+        // 완료 메시지 표시
+        this.outputModule.showInfo(`1단계 입력 값이 테이블 기준으로 업데이트되었습니다. (남: ${tableMaleCount}명, 여: ${tableFemaleCount}명)`);
+    }
+    /**
+     * 1단계 사이드바 값을 테이블로 동기화
+     * 1단계에 입력된 숫자에 맞춰 테이블에 행을 추가하거나 삭제
+     */
+    syncTableToSidebar(sidebarMaleCount, sidebarFemaleCount) {
+        const outputSection = document.getElementById('output-section');
+        const tbody = outputSection?.querySelector('.student-input-table tbody');
+        if (!tbody) {
+            alert('테이블을 찾을 수 없습니다.');
+            return;
+        }
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        const totalNeeded = sidebarMaleCount + sidebarFemaleCount;
+        const currentTotal = rows.length;
+        // 현재 행들의 성별 카운트
+        let currentMaleCount = 0;
+        let currentFemaleCount = 0;
+        rows.forEach(row => {
+            const genderSelect = row.querySelector('.student-gender-select');
+            if (genderSelect) {
+                if (genderSelect.value === 'M') {
+                    currentMaleCount++;
+                }
+                else if (genderSelect.value === 'F') {
+                    currentFemaleCount++;
+                }
+            }
+        });
+        // 행 수 조정 (부족하면 추가, 많으면 삭제)
+        if (currentTotal < totalNeeded) {
+            // 행 추가 필요
+            const maleToAdd = Math.max(0, sidebarMaleCount - currentMaleCount);
+            const femaleToAdd = Math.max(0, sidebarFemaleCount - currentFemaleCount);
+            // 남학생 행 먼저 추가
+            for (let i = 0; i < maleToAdd; i++) {
+                this.handleAddStudentRow();
+                // 추가된 행의 성별을 남자로 설정
+                const newRows = Array.from(tbody.querySelectorAll('tr'));
+                const lastRow = newRows[newRows.length - 1];
+                const genderSelect = lastRow.querySelector('.student-gender-select');
+                if (genderSelect) {
+                    genderSelect.value = 'M';
+                }
+            }
+            // 여학생 행 추가
+            for (let i = 0; i < femaleToAdd; i++) {
+                this.handleAddStudentRow();
+                // 추가된 행의 성별을 여자로 설정
+                const newRows = Array.from(tbody.querySelectorAll('tr'));
+                const lastRow = newRows[newRows.length - 1];
+                const genderSelect = lastRow.querySelector('.student-gender-select');
+                if (genderSelect) {
+                    genderSelect.value = 'F';
+                }
+            }
+        }
+        else if (currentTotal > totalNeeded) {
+            // 행 삭제 필요 (맨 아래부터 삭제)
+            const toDelete = currentTotal - totalNeeded;
+            const rowsToDelete = Array.from(tbody.querySelectorAll('tr'));
+            // 맨 아래 행부터 삭제
+            for (let i = 0; i < toDelete; i++) {
+                const lastRow = rowsToDelete[rowsToDelete.length - 1 - i];
+                if (lastRow) {
+                    lastRow.remove();
+                }
+            }
+            // 행 번호 재정렬
+            this.updateRowNumbers();
+        }
+        // 성별 재분배 (필요한 경우)
+        const finalRows = Array.from(tbody.querySelectorAll('tr'));
+        let currentMales = 0;
+        let currentFemales = 0;
+        finalRows.forEach(row => {
+            const genderSelect = row.querySelector('.student-gender-select');
+            if (genderSelect) {
+                if (genderSelect.value === 'M') {
+                    currentMales++;
+                }
+                else if (genderSelect.value === 'F') {
+                    currentFemales++;
+                }
+            }
+        });
+        // 성별이 맞지 않으면 조정
+        if (currentMales !== sidebarMaleCount || currentFemales !== sidebarFemaleCount) {
+            let maleNeeded = sidebarMaleCount - currentMales;
+            let femaleNeeded = sidebarFemaleCount - currentFemales;
+            finalRows.forEach(row => {
+                const genderSelect = row.querySelector('.student-gender-select');
+                if (!genderSelect)
+                    return;
+                if (maleNeeded > 0 && genderSelect.value !== 'M') {
+                    genderSelect.value = 'M';
+                    maleNeeded--;
+                    if (genderSelect.value === 'F')
+                        femaleNeeded++;
+                }
+                else if (femaleNeeded > 0 && genderSelect.value !== 'F') {
+                    genderSelect.value = 'F';
+                    femaleNeeded--;
+                    if (genderSelect.value === 'M')
+                        maleNeeded++;
+                }
+            });
+        }
+        // 통계 업데이트
+        this.updateStudentTableStats();
+        // 완료 메시지 표시
+        this.outputModule.showInfo(`테이블이 1단계 입력 값에 맞춰 업데이트되었습니다. (남: ${sidebarMaleCount}명, 여: ${sidebarFemaleCount}명)`);
     }
     /**
      * 행 번호 업데이트
@@ -1921,138 +2323,258 @@ export class MainController {
         // 새 테이블 컨테이너 생성
         studentTableContainer = document.createElement('div');
         studentTableContainer.className = 'student-table-container';
-        // 테이블 생성
-        const table = document.createElement('table');
-        table.className = 'student-input-table';
-        // 헤더 생성
-        const thead = document.createElement('thead');
-        const headerRow = document.createElement('tr');
-        const fixedRandomModeForHeader = document.querySelector('input[name="custom-mode-2"][value="fixed-random"]:checked');
-        if (fixedRandomModeForHeader) {
-            headerRow.innerHTML = `
-                <th>번호</th>
-                <th>이름</th>
-                <th>성별</th>
-                <th title="미리보기 화면의 좌석 카드에 표시된 번호(#1, #2...)를 선택하세요. 고정 좌석을 지정하지 않으려면 '없음'을 선택하세요.">고정 좌석 <span style="font-size: 0.8em; color: #999;">(미리보기 좌석 번호)</span></th>
-                <th>작업</th>
-            `;
-        }
-        else {
-            headerRow.innerHTML = `
-                <th>번호</th>
-                <th>이름</th>
-                <th>성별</th>
-                <th>작업</th>
-            `;
-        }
-        thead.appendChild(headerRow);
-        table.appendChild(thead);
-        // 본문 생성
-        const tbody = document.createElement('tbody');
-        students.forEach((student, index) => {
-            const row = document.createElement('tr');
-            row.dataset.studentIndex = index.toString();
-            // 번호 열
-            const numCell = document.createElement('td');
-            numCell.textContent = (index + 1).toString();
-            numCell.style.textAlign = 'center';
-            numCell.style.padding = '10px';
-            numCell.style.background = '#f8f9fa';
-            // 이름 입력 열
-            const nameCell = document.createElement('td');
-            const nameInput = document.createElement('input');
-            nameInput.type = 'text';
-            nameInput.placeholder = '학생 이름';
-            nameInput.className = 'student-name-input';
-            nameInput.value = student.name;
-            nameInput.tabIndex = index + 1;
-            nameCell.appendChild(nameInput);
-            // 성별 선택 열
-            const genderCell = document.createElement('td');
-            const genderSelect = document.createElement('select');
-            genderSelect.className = 'student-gender-select';
-            genderSelect.innerHTML = `
-                <option value="">선택</option>
-                <option value="M">남</option>
-                <option value="F">여</option>
-            `;
-            genderSelect.value = student.gender;
-            genderSelect.tabIndex = students.length + index + 1;
-            genderCell.appendChild(genderSelect);
-            // 고정 좌석 선택 열 (고정 좌석 모드일 때만)
-            let fixedSeatCell = null;
-            const fixedRandomMode = document.querySelector('input[name="custom-mode-2"][value="fixed-random"]:checked');
-            if (fixedRandomMode) {
-                fixedSeatCell = document.createElement('td');
-                const fixedSeatSelect = document.createElement('select');
-                fixedSeatSelect.className = 'fixed-seat-select';
-                fixedSeatSelect.innerHTML = '<option value="">없음</option>';
-                // 고정된 좌석이 있으면 옵션 추가
-                if (this.fixedSeatIds.size > 0) {
-                    this.fixedSeatIds.forEach(seatId => {
-                        const option = document.createElement('option');
-                        option.value = seatId.toString();
-                        option.textContent = `좌석 #${seatId}`;
-                        fixedSeatSelect.appendChild(option);
-                    });
-                }
-                fixedSeatCell.appendChild(fixedSeatSelect);
-            }
-            // 작업 열 (삭제 버튼)
-            const actionCell = document.createElement('td');
-            actionCell.style.textAlign = 'center';
-            actionCell.style.padding = '8px';
-            const deleteBtn = document.createElement('button');
-            deleteBtn.textContent = '삭제';
-            deleteBtn.type = 'button';
-            deleteBtn.className = 'delete-row-btn';
-            deleteBtn.onclick = () => this.handleDeleteStudentRow(row);
-            actionCell.appendChild(deleteBtn);
-            // 키보드 이벤트 추가
-            nameInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    genderSelect.focus();
-                }
-                else if (e.key === 'ArrowDown') {
-                    this.moveToCell(tbody, index + 1, 'name', 'down');
-                }
-                else if (e.key === 'ArrowUp') {
-                    this.moveToCell(tbody, index + 1, 'name', 'up');
-                }
-            });
-            genderSelect.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' || e.key === 'Tab') {
-                    const nextRow = tbody.querySelector(`tr:nth-child(${Math.min(index + 2, students.length)})`);
-                    const nextNameInput = nextRow?.querySelector('.student-name-input');
-                    if (nextNameInput) {
-                        nextNameInput.focus();
-                        nextNameInput.select();
-                    }
-                }
-                else if (e.key === 'ArrowDown') {
-                    this.moveToCell(tbody, index + 1, 'gender', 'down');
-                }
-                else if (e.key === 'ArrowUp') {
-                    this.moveToCell(tbody, index + 1, 'gender', 'up');
-                }
-            });
-            row.appendChild(numCell);
-            row.appendChild(nameCell);
-            row.appendChild(genderCell);
-            if (fixedSeatCell) {
-                row.appendChild(fixedSeatCell);
-            }
-            row.appendChild(actionCell);
-            tbody.appendChild(row);
+        // 가로 방향 2-3단 레이아웃을 위한 스타일 적용
+        studentTableContainer.style.cssText = `
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 20px;
+        `;
+        // 버튼 컨테이너 생성
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.display = 'flex';
+        buttonContainer.style.gap = '10px';
+        buttonContainer.style.marginBottom = '15px';
+        buttonContainer.style.gridColumn = '1 / -1';
+        // 양식 다운로드 버튼
+        const downloadBtn = document.createElement('button');
+        downloadBtn.id = 'download-template';
+        downloadBtn.className = 'secondary-btn';
+        downloadBtn.textContent = '양식 다운로드';
+        downloadBtn.style.flex = '1';
+        downloadBtn.addEventListener('click', () => this.downloadTemplateFile());
+        buttonContainer.appendChild(downloadBtn);
+        // 파일 업로드 버튼
+        const uploadBtn = document.createElement('button');
+        uploadBtn.id = 'upload-file';
+        uploadBtn.className = 'secondary-btn';
+        uploadBtn.textContent = '엑셀 파일에서 가져오기';
+        uploadBtn.style.flex = '1';
+        // 숨겨진 파일 입력
+        const fileInput = document.createElement('input');
+        fileInput.id = 'upload-file-input';
+        fileInput.type = 'file';
+        fileInput.accept = '.csv,.xlsx,.xls';
+        fileInput.style.display = 'none';
+        fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
+        uploadBtn.addEventListener('click', () => {
+            fileInput.click();
         });
-        table.appendChild(tbody);
-        studentTableContainer.appendChild(table);
+        buttonContainer.appendChild(uploadBtn);
+        buttonContainer.appendChild(fileInput);
+        studentTableContainer.appendChild(buttonContainer);
+        const count = students.length;
+        const fixedRandomMode = document.querySelector('input[name="custom-mode-2"][value="fixed-random"]:checked');
+        // 학생 수에 따라 테이블 개수 결정 (10명씩 그룹화)
+        const studentsPerTable = 10;
+        const numberOfTables = Math.ceil(count / studentsPerTable);
+        // 각 테이블 생성 (10명씩)
+        for (let tableIndex = 0; tableIndex < numberOfTables; tableIndex++) {
+            const startIndex = tableIndex * studentsPerTable;
+            const endIndex = Math.min(startIndex + studentsPerTable, count);
+            const studentsInThisTable = endIndex - startIndex;
+            // 개별 테이블 래퍼 생성
+            const tableWrapper = document.createElement('div');
+            tableWrapper.style.cssText = `
+                border: 1px solid #dee2e6;
+                border-radius: 8px;
+                padding: 15px;
+                background: white;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                min-width: 0; /* 그리드 아이템이 축소될 수 있도록 */
+                overflow-x: auto; /* 테이블이 너무 넓으면 가로 스크롤 */
+            `;
+            // 테이블 제목 추가 (2개 이상일 때만)
+            if (numberOfTables > 1) {
+                const tableTitle = document.createElement('div');
+                tableTitle.style.cssText = `
+                    font-weight: bold;
+                    margin-bottom: 10px;
+                    color: #495057;
+                    font-size: 1.1em;
+                    padding-bottom: 8px;
+                    border-bottom: 2px solid #dee2e6;
+                `;
+                tableTitle.textContent = `${startIndex + 1}번 ~ ${endIndex}번`;
+                tableWrapper.appendChild(tableTitle);
+            }
+            // 테이블 생성
+            const table = document.createElement('table');
+            table.className = 'student-input-table';
+            table.style.cssText = `
+                width: 100%;
+                border-collapse: collapse;
+            `;
+            // 헤더 생성
+            const thead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+            if (fixedRandomMode) {
+                headerRow.innerHTML = `
+                    <th>번호</th>
+                    <th>이름</th>
+                    <th>성별</th>
+                    <th title="미리보기 화면의 좌석 카드에 표시된 번호(#1, #2...)를 선택하세요. 고정 좌석을 지정하지 않으려면 '없음'을 선택하세요.">고정 좌석 <span style="font-size: 0.8em; color: #999;">(미리보기 좌석 번호)</span></th>
+                    <th>작업</th>
+                `;
+            }
+            else {
+                headerRow.innerHTML = `
+                    <th>번호</th>
+                    <th>이름</th>
+                    <th>성별</th>
+                    <th>작업</th>
+                `;
+            }
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+            // 본문 생성
+            const tbody = document.createElement('tbody');
+            for (let i = startIndex; i < endIndex; i++) {
+                const student = students[i];
+                const globalIndex = i + 1; // 전체 학생 중 인덱스 (1부터 시작)
+                const localIndex = i - startIndex + 1; // 현재 테이블 내에서의 인덱스 (1부터 시작)
+                const row = document.createElement('tr');
+                row.dataset.studentIndex = i.toString();
+                // 번호 열
+                const numCell = document.createElement('td');
+                numCell.textContent = globalIndex.toString();
+                numCell.style.textAlign = 'center';
+                numCell.style.padding = '10px';
+                numCell.style.background = '#f8f9fa';
+                // 이름 입력 열
+                const nameCell = document.createElement('td');
+                const nameInput = document.createElement('input');
+                nameInput.type = 'text';
+                nameInput.placeholder = '학생 이름';
+                nameInput.className = 'student-name-input';
+                nameInput.value = student.name;
+                nameInput.id = `student-name-${globalIndex}`;
+                nameInput.tabIndex = globalIndex;
+                nameCell.appendChild(nameInput);
+                // 성별 선택 열
+                const genderCell = document.createElement('td');
+                const genderSelect = document.createElement('select');
+                genderSelect.className = 'student-gender-select';
+                genderSelect.id = `student-gender-${globalIndex}`;
+                genderSelect.innerHTML = `
+                    <option value="">선택</option>
+                    <option value="M">남</option>
+                    <option value="F">여</option>
+                `;
+                genderSelect.value = student.gender;
+                genderSelect.tabIndex = count + globalIndex;
+                genderCell.appendChild(genderSelect);
+                // 고정 좌석 선택 열 (고정 좌석 모드일 때만)
+                let fixedSeatCell = null;
+                if (fixedRandomMode) {
+                    fixedSeatCell = document.createElement('td');
+                    const fixedSeatSelect = document.createElement('select');
+                    fixedSeatSelect.className = 'fixed-seat-select';
+                    fixedSeatSelect.id = `fixed-seat-${globalIndex}`;
+                    fixedSeatSelect.innerHTML = '<option value="">없음</option>';
+                    fixedSeatSelect.tabIndex = count * 2 + globalIndex;
+                    // 고정된 좌석이 있으면 옵션 추가
+                    if (this.fixedSeatIds.size > 0) {
+                        this.fixedSeatIds.forEach(seatId => {
+                            const option = document.createElement('option');
+                            option.value = seatId.toString();
+                            option.textContent = `좌석 #${seatId}`;
+                            fixedSeatSelect.appendChild(option);
+                        });
+                    }
+                    // 고정 좌석 선택 변경 이벤트
+                    fixedSeatSelect.addEventListener('change', () => {
+                        const selectedSeatId = fixedSeatSelect.value;
+                        const studentIndex = parseInt(row.dataset.studentIndex || '0', 10);
+                        // 학생 데이터에 고정 좌석 ID 저장
+                        if (this.students[studentIndex]) {
+                            if (selectedSeatId) {
+                                this.students[studentIndex].fixedSeatId = parseInt(selectedSeatId, 10);
+                            }
+                            else {
+                                delete this.students[studentIndex].fixedSeatId;
+                            }
+                        }
+                        console.log(`학생 ${studentIndex}의 고정 좌석: ${selectedSeatId || '없음'}`);
+                    });
+                    fixedSeatCell.appendChild(fixedSeatSelect);
+                }
+                // 작업 열 (삭제 버튼)
+                const actionCell = document.createElement('td');
+                actionCell.style.textAlign = 'center';
+                actionCell.style.padding = '8px';
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = '삭제';
+                deleteBtn.type = 'button';
+                deleteBtn.className = 'delete-row-btn';
+                deleteBtn.onclick = () => this.handleDeleteStudentRow(row);
+                actionCell.appendChild(deleteBtn);
+                // 키보드 이벤트 추가 (이름 입력 필드)
+                nameInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        genderSelect.focus();
+                    }
+                    else if (e.key === 'ArrowDown') {
+                        this.moveToCell(tbody, localIndex, 'name', 'down');
+                    }
+                    else if (e.key === 'ArrowUp') {
+                        this.moveToCell(tbody, localIndex, 'name', 'up');
+                    }
+                });
+                // 키보드 이벤트 추가 (성별 선택 필드)
+                genderSelect.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === 'Tab') {
+                        const nextRow = tbody.querySelector(`tr:nth-child(${Math.min(localIndex + 1, studentsInThisTable)})`);
+                        const nextNameInput = nextRow?.querySelector('.student-name-input');
+                        if (nextNameInput) {
+                            nextNameInput.focus();
+                            nextNameInput.select();
+                        }
+                    }
+                    else if (e.key === 'ArrowDown') {
+                        this.moveToCell(tbody, localIndex, 'gender', 'down');
+                    }
+                    else if (e.key === 'ArrowUp') {
+                        this.moveToCell(tbody, localIndex, 'gender', 'up');
+                    }
+                });
+                row.appendChild(numCell);
+                row.appendChild(nameCell);
+                row.appendChild(genderCell);
+                if (fixedSeatCell) {
+                    row.appendChild(fixedSeatCell);
+                }
+                row.appendChild(actionCell);
+                tbody.appendChild(row);
+            }
+            table.appendChild(tbody);
+            tableWrapper.appendChild(table);
+            studentTableContainer.appendChild(tableWrapper);
+        }
+        // 통계 표시를 위한 컨테이너 추가 (모든 테이블 아래에 하나만)
+        const statsContainer = document.createElement('div');
+        statsContainer.style.cssText = `
+            grid-column: 1 / -1;
+            padding: 12px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 0.95em;
+            margin-top: 10px;
+        `;
+        statsContainer.id = 'student-table-stats';
+        const statsCell = document.createElement('div');
+        statsCell.id = 'student-table-stats-cell';
+        statsContainer.appendChild(statsCell);
+        studentTableContainer.appendChild(statsContainer);
         // 작업 버튼 추가
         const actionButtons = document.createElement('div');
         actionButtons.className = 'table-action-buttons';
+        actionButtons.style.cssText = 'grid-column: 1 / -1;';
         actionButtons.innerHTML = `
             <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: flex-start;">
                 <button id="add-student-row-btn" style="width: auto; flex: 0 0 auto; min-width: 0;">행 추가</button>
+                <button id="save-student-table-btn" class="save-btn" style="width: auto; flex: 0 0 auto; min-width: 0; background: #28a745; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;">💾 저장</button>
                 <button id="arrange-seats" class="arrange-seats-btn" style="width: auto; flex: 0 0 auto; min-width: 0;">자리 배치하기</button>
                 <label style="display:flex; align-items:center; gap:4px; margin:0; white-space:nowrap;"><input type="checkbox" id="avoid-prev-seat" /><span>이전 좌석 안 앉기</span></label>
                 <label style="display:flex; align-items:center; gap:4px; margin:0; white-space:nowrap;"><input type="checkbox" id="avoid-prev-partner" /><span>이전 짝 금지</span></label>
@@ -2060,11 +2582,28 @@ export class MainController {
         `;
         studentTableContainer.appendChild(actionButtons);
         outputSection.appendChild(studentTableContainer);
-        // 버튼 이벤트
-        const addRowBtn = document.getElementById('add-student-row-btn');
-        if (addRowBtn) {
-            addRowBtn.addEventListener('click', () => this.handleAddStudentRow());
-        }
+        // 초기 통계 업데이트
+        this.updateStudentTableStats();
+        // 통계 업데이트를 위한 이벤트 리스너 추가 (이벤트 위임으로 모든 변경사항 감지)
+        // 모든 테이블의 tbody에 이벤트 리스너 추가
+        const allTbodies = studentTableContainer.querySelectorAll('tbody');
+        allTbodies.forEach(tbody => {
+            tbody.addEventListener('input', () => {
+                this.updateStudentTableStats();
+            });
+            tbody.addEventListener('change', () => {
+                this.updateStudentTableStats();
+            });
+            // 테이블이 동적으로 변경될 때를 대비한 MutationObserver 추가
+            const observer = new MutationObserver(() => {
+                this.updateStudentTableStats();
+            });
+            observer.observe(tbody, {
+                childList: true,
+                subtree: true,
+                attributes: false
+            });
+        });
     }
     /**
      * 교탁과 칠판 그리기
