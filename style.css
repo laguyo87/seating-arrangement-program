@@ -573,7 +573,7 @@ button:disabled {
 
 .student-input-table th:nth-child(5) { /* 작업 열 */
     width: auto;
-    min-width: 80px; /* 삭제 버튼 최소 너비 */
+    min-width: 48px; /* 삭제 버튼 최소 너비 (40% 축소: 80px -> 48px) */
     text-align: center;
 }
 
@@ -607,7 +607,7 @@ button:disabled {
 }
 
 .student-input-table td:nth-child(5) {
-    min-width: 80px;
+    min-width: 48px; /* 40% 축소: 80px -> 48px */
     text-align: center;
 }
 
