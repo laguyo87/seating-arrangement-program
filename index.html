@@ -39,8 +39,12 @@
 
     <!-- 메인 컨테이너 -->
     <div class="main-container">
+        <!-- 사이드바 토글 버튼 -->
+        <button id="sidebar-toggle-btn" class="sidebar-toggle-btn" title="사이드바 접기/펼치기">
+            <span class="toggle-icon">◀</span>
+        </button>
         <!-- 좌측 사이드바 (설정) -->
-        <aside class="sidebar">
+        <aside class="sidebar" id="sidebar">
             <div class="sidebar-content">
             <!-- 1단계: 학생 자리 수 입력 -->
             <section id="input-section" class="step-section">
@@ -68,9 +72,11 @@
                 <h2>2단계: 분단 개수</h2>
                 
                 <div class="form-group">
-                    <label for="number-of-partitions">분단 수:</label>
-                    <div class="count-input-container">
-                        <input type="number" id="number-of-partitions" min="1" max="10" placeholder="분단 수" value="6" />
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: nowrap;">
+                        <label for="number-of-partitions" style="margin-bottom: 0; white-space: nowrap; font-size: 0.95em;">분단 수:</label>
+                        <div class="count-input-container" style="flex: 0 0 auto;">
+                            <input type="number" id="number-of-partitions" min="1" max="10" placeholder="분단 수" value="6" style="width: 80px;" />
+                        </div>
                     </div>
                     <p class="help-text" style="margin-top: 8px; color: #666; font-size: 0.9em;">
                         교실의 분단 수를 입력하세요 (예: 2분단, 3분단 등)
@@ -158,7 +164,7 @@
                 <h2>5단계: 좌석 배치하기</h2>
                 
                 <div class="form-group">
-                    <button id="create-student-table" class="primary-btn">학생 정보 입력 테이블 생성</button>
+                    <button id="create-student-table" class="primary-btn">학생 이름 입력하기</button>
                     <p class="help-text" style="margin-top: 8px; color: #666; font-size: 0.9em;">
                         학생 정보를 입력할 테이블을 생성합니다.
                     </p>
@@ -176,6 +182,13 @@
 
         <!-- 우측 메인창 (미리보기) -->
         <main class="main-content">
+            <!-- 커튼 애니메이션용 오버레이 -->
+            <div id="curtain-overlay" class="curtain-overlay">
+                <div class="curtain-left"></div>
+                <div class="curtain-right"></div>
+            </div>
+            <!-- 폭죽 애니메이션용 컨테이너 -->
+            <div id="fireworks-container" class="fireworks-container"></div>
             <div class="main-header">
                 <div style="display: flex; align-items: center; gap: 15px;">
                     <h2>자리 배치도</h2>

@@ -252,5 +252,29 @@ export declare class MainController {
      * 사용설명서 모달 표시
      */
     private showUserManual;
+    /**
+     * 사이드바 토글
+     */
+    private toggleSidebar;
+    /**
+     * 커튼 애니메이션 시작 (닫기)
+     */
+    private startCurtainAnimation;
+    /**
+     * 커튼 애니메이션 종료 (열기)
+     */
+    private openCurtain;
+    /**
+     * 커튼 애니메이션 즉시 종료 (에러 시)
+     */
+    private stopCurtainAnimation;
+    /**
+     * 폭죽 애니메이션 시작
+     */
+    private startFireworks;
+    /**
+     * 개별 폭죽 생성 및 파티클 애니메이션
+     */
+    private createFirework;
 }
 //# sourceMappingURL=MainController.d.ts.map

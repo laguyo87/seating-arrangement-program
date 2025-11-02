@@ -413,6 +413,11 @@ export class MainController {
             if (target.id === 'user-manual-btn') {
                 this.showUserManual();
             }
+            
+            // 사이드바 토글 버튼 클릭
+            if (target.id === 'sidebar-toggle-btn' || target.closest('#sidebar-toggle-btn')) {
+                this.toggleSidebar();
+            }
         });
     }
 
@@ -699,14 +704,11 @@ export class MainController {
         
         // 2명씩 짝꿍 배치인 경우
         if (layoutType === 'pair-uniform') {
-            // 분단 레이블 추가
-            const labelsRow = document.createElement('div');
-            labelsRow.style.gridColumn = `1 / -1`;
-            labelsRow.style.display = 'grid';
-            labelsRow.style.gridTemplateColumns = `repeat(${partitionCount}, 1fr)`;
-            labelsRow.style.gap = '40px';
-            labelsRow.style.marginBottom = '5px';
+            // seatsArea의 그리드 설정 먼저
+            seatsArea.style.gridTemplateColumns = `repeat(${partitionCount}, 1fr)`;
+            seatsArea.style.gap = '10px 40px';
             
+            // 분단 레이블을 각 컬럼에 직접 추가 (중첩 그리드 구조 제거)
             for (let i = 1; i <= partitionCount; i++) {
                 const label = document.createElement('div');
                 label.textContent = `${i}분단`;
@@ -714,13 +716,10 @@ export class MainController {
                 label.style.fontWeight = 'bold';
                 label.style.color = '#667eea';
                 label.style.fontSize = '0.9em';
-                labelsRow.appendChild(label);
+                label.style.marginBottom = '5px';
+                // 각 레이블이 해당 분단 컬럼에 직접 배치되도록 grid-column 지정 안함 (자동으로 배치됨)
+                seatsArea.appendChild(label);
             }
-            
-            seatsArea.appendChild(labelsRow);
-            
-            seatsArea.style.gridTemplateColumns = `repeat(${partitionCount}, 1fr)`;
-            seatsArea.style.gap = '10px 40px';
             
             // 선택된 짝꿍 모드 확인
             const pairModeInput = document.querySelector('input[name="pair-mode"]:checked') as HTMLInputElement;
@@ -862,14 +861,11 @@ export class MainController {
             }
         } else {
             // '1명씩 한 줄로 배치' - 각 행에서 남녀 교대로 한 줄로 배치
-            // 분단 레이블 추가
-            const labelsRow = document.createElement('div');
-            labelsRow.style.gridColumn = `1 / -1`;
-            labelsRow.style.display = 'grid';
-            labelsRow.style.gridTemplateColumns = `repeat(${partitionCount}, 1fr)`;
-            labelsRow.style.gap = '40px';
-            labelsRow.style.marginBottom = '5px';
+            // seatsArea의 그리드 설정 먼저
+            seatsArea.style.gridTemplateColumns = `repeat(${partitionCount}, 1fr)`;
+            seatsArea.style.gap = '10px 40px'; // 분단 간 넓은 간격
             
+            // 분단 레이블을 각 컬럼에 직접 추가 (중첩 그리드 구조 제거)
             for (let i = 1; i <= partitionCount; i++) {
                 const label = document.createElement('div');
                 label.textContent = `${i}분단`;
@@ -877,14 +873,10 @@ export class MainController {
                 label.style.fontWeight = 'bold';
                 label.style.color = '#667eea';
                 label.style.fontSize = '0.9em';
-                labelsRow.appendChild(label);
+                label.style.marginBottom = '5px';
+                // 각 레이블이 해당 분단 컬럼에 직접 배치되도록 grid-column 지정 안함 (자동으로 배치됨)
+                seatsArea.appendChild(label);
             }
-            
-            seatsArea.appendChild(labelsRow);
-            
-            // 총 컬럼 수 = 분단 수 (사용자 입력값 그대로 사용)
-            seatsArea.style.gridTemplateColumns = `repeat(${partitionCount}, 1fr)`;
-            seatsArea.style.gap = '10px 40px'; // 분단 간 넓은 간격
             
             // 남학생과 여학생 분리
             const maleStudents = this.students.filter(s => s.gender === 'M');
@@ -1577,22 +1569,36 @@ export class MainController {
         buttonContainer.style.gap = '10px';
         buttonContainer.style.marginBottom = '15px';
         buttonContainer.style.gridColumn = '1 / -1'; // 전체 그리드 너비 사용
+        buttonContainer.style.justifyContent = 'space-between'; // 좌우 분리
+        buttonContainer.style.alignItems = 'center';
+        buttonContainer.style.flexWrap = 'wrap';
+        
+        // 왼쪽 버튼 그룹
+        const leftButtonGroup = document.createElement('div');
+        leftButtonGroup.style.display = 'flex';
+        leftButtonGroup.style.gap = '10px';
+        leftButtonGroup.style.alignItems = 'center';
+        leftButtonGroup.style.flexWrap = 'wrap';
         
         // 양식 다운로드 버튼
         const downloadBtn = document.createElement('button');
         downloadBtn.id = 'download-template';
         downloadBtn.className = 'secondary-btn';
-        downloadBtn.textContent = '양식 다운로드';
-        downloadBtn.style.flex = '1';
+        downloadBtn.textContent = '학생 이름 양식 다운로드';
+        downloadBtn.style.flex = 'none';
+        downloadBtn.style.width = 'auto';
+        downloadBtn.style.whiteSpace = 'nowrap';
         downloadBtn.addEventListener('click', () => this.downloadTemplateFile());
-        buttonContainer.appendChild(downloadBtn);
+        leftButtonGroup.appendChild(downloadBtn);
         
         // 파일 업로드 버튼
         const uploadBtn = document.createElement('button');
         uploadBtn.id = 'upload-file';
         uploadBtn.className = 'secondary-btn';
-        uploadBtn.textContent = '엑셀 파일에서 가져오기';
-        uploadBtn.style.flex = '1';
+        uploadBtn.textContent = '학생 이름 엑셀파일에서 가져오기';
+        uploadBtn.style.flex = 'none';
+        uploadBtn.style.width = 'auto';
+        uploadBtn.style.whiteSpace = 'nowrap';
         
         // 숨겨진 파일 입력
         const fileInput = document.createElement('input');
@@ -1606,9 +1612,52 @@ export class MainController {
             fileInput.click();
         });
         
-        buttonContainer.appendChild(uploadBtn);
-        buttonContainer.appendChild(fileInput);
+        leftButtonGroup.appendChild(uploadBtn);
+        leftButtonGroup.appendChild(fileInput);
         
+        // 오른쪽 버튼 그룹
+        const rightButtonGroup = document.createElement('div');
+        rightButtonGroup.style.display = 'flex';
+        rightButtonGroup.style.gap = '10px';
+        rightButtonGroup.style.alignItems = 'center';
+        rightButtonGroup.style.flexWrap = 'wrap';
+        
+        // 자리 배치 실행하기 버튼과 체크박스 추가
+        const arrangeBtn = document.createElement('button');
+        arrangeBtn.id = 'arrange-seats';
+        arrangeBtn.className = 'arrange-seats-btn';
+        arrangeBtn.textContent = '자리 배치 실행하기';
+        arrangeBtn.style.width = 'auto';
+        arrangeBtn.style.flex = 'none';
+        arrangeBtn.style.whiteSpace = 'nowrap';
+        rightButtonGroup.appendChild(arrangeBtn);
+        
+        // 이전 좌석 안 앉기 체크박스
+        const avoidPrevSeatLabel = document.createElement('label');
+        avoidPrevSeatLabel.style.cssText = 'display:flex; align-items:center; gap:4px; margin:0; white-space:nowrap;';
+        const avoidPrevSeatInput = document.createElement('input');
+        avoidPrevSeatInput.type = 'checkbox';
+        avoidPrevSeatInput.id = 'avoid-prev-seat';
+        const avoidPrevSeatSpan = document.createElement('span');
+        avoidPrevSeatSpan.textContent = '이전 좌석 안 앉기';
+        avoidPrevSeatLabel.appendChild(avoidPrevSeatInput);
+        avoidPrevSeatLabel.appendChild(avoidPrevSeatSpan);
+        rightButtonGroup.appendChild(avoidPrevSeatLabel);
+        
+        // 이전 짝 금지 체크박스
+        const avoidPrevPartnerLabel = document.createElement('label');
+        avoidPrevPartnerLabel.style.cssText = 'display:flex; align-items:center; gap:4px; margin:0; white-space:nowrap;';
+        const avoidPrevPartnerInput = document.createElement('input');
+        avoidPrevPartnerInput.type = 'checkbox';
+        avoidPrevPartnerInput.id = 'avoid-prev-partner';
+        const avoidPrevPartnerSpan = document.createElement('span');
+        avoidPrevPartnerSpan.textContent = '이전 짝 금지';
+        avoidPrevPartnerLabel.appendChild(avoidPrevPartnerInput);
+        avoidPrevPartnerLabel.appendChild(avoidPrevPartnerSpan);
+        rightButtonGroup.appendChild(avoidPrevPartnerLabel);
+        
+        buttonContainer.appendChild(leftButtonGroup);
+        buttonContainer.appendChild(rightButtonGroup);
         studentTableContainer.appendChild(buttonContainer);
 
         // '고정 좌석 지정 후 랜덤 배치' 모드인지 확인
@@ -1842,36 +1891,51 @@ export class MainController {
             studentTableContainer.appendChild(tableWrapper);
         }
         
+        // 통계와 버튼을 하나의 컨테이너로 묶기
+        const statsAndButtonsWrapper = document.createElement('div');
+        statsAndButtonsWrapper.style.cssText = `
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 10px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        `;
+        
         // 통계 표시를 위한 컨테이너 추가 (모든 테이블 아래에 하나만)
         const statsContainer = document.createElement('div');
         statsContainer.style.cssText = `
-            grid-column: 1 / -1;
             padding: 12px;
             background: #f8f9fa;
             border: 1px solid #dee2e6;
             border-radius: 8px;
             font-size: 0.95em;
-            margin-top: 10px;
+            flex: 0 0 auto;
+            width: fit-content;
         `;
         statsContainer.id = 'student-table-stats';
         const statsCell = document.createElement('div');
         statsCell.id = 'student-table-stats-cell';
         statsContainer.appendChild(statsCell);
-        studentTableContainer.appendChild(statsContainer);
+        statsAndButtonsWrapper.appendChild(statsContainer);
         
         // 작업 버튼 추가
         const actionButtons = document.createElement('div');
         actionButtons.className = 'table-action-buttons';
-        actionButtons.innerHTML = `
-            <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: flex-start;">
-                <button id="add-student-row-btn" style="width: auto; flex: 0 0 auto; min-width: 0;">행 추가</button>
-                <button id="save-student-table-btn" class="save-btn" style="width: auto; flex: 0 0 auto; min-width: 0; background: #28a745; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;">💾 저장</button>
-                <button id="arrange-seats" class="arrange-seats-btn" style="width: auto; flex: 0 0 auto; min-width: 0;">자리 배치하기</button>
-                <label style="display:flex; align-items:center; gap:4px; margin:0; white-space:nowrap;"><input type="checkbox" id="avoid-prev-seat" /><span>이전 좌석 안 앉기</span></label>
-                <label style="display:flex; align-items:center; gap:4px; margin:0; white-space:nowrap;"><input type="checkbox" id="avoid-prev-partner" /><span>이전 짝 금지</span></label>
-            </div>
+        actionButtons.style.cssText = `
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            flex: 0 0 auto;
         `;
-        studentTableContainer.appendChild(actionButtons);
+        actionButtons.innerHTML = `
+            <button id="add-student-row-btn" style="width: auto; flex: 0 0 auto; min-width: 0;">행 추가</button>
+            <button id="save-student-table-btn" class="save-btn" style="width: auto; flex: 0 0 auto; min-width: 0; background: #28a745; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;">💾 저장</button>
+        `;
+        statsAndButtonsWrapper.appendChild(actionButtons);
+        studentTableContainer.appendChild(statsAndButtonsWrapper);
         
         outputSection.appendChild(studentTableContainer);
         
@@ -2012,10 +2076,10 @@ export class MainController {
                 table.appendChild(newTbody);
                 tableWrapper.appendChild(table);
                 
-                // 통계 컨테이너와 작업 버튼 앞에 삽입
-                const statsContainer = studentTableContainer.querySelector('#student-table-stats');
-                if (statsContainer) {
-                    studentTableContainer.insertBefore(tableWrapper, statsContainer);
+                // 통계와 버튼 래퍼 앞에 삽입
+                const statsAndButtonsWrapper = studentTableContainer.querySelector('div[style*="grid-column: 1 / -1"]') as HTMLElement | null;
+                if (statsAndButtonsWrapper && statsAndButtonsWrapper.querySelector('#student-table-stats')) {
+                    studentTableContainer.insertBefore(tableWrapper, statsAndButtonsWrapper);
                 } else {
                     studentTableContainer.appendChild(tableWrapper);
                 }
@@ -2226,28 +2290,6 @@ export class MainController {
                 <span><strong>고정 자리:</strong> <span id="stats-fixed-seat-count">${fixedSeatCount}</span>개</span>
             </div>
         `;
-
-        // 경고 메시지 추가
-        const warnings: string[] = [];
-        
-        if (expectedMaleCount > 0 && maleCount !== expectedMaleCount) {
-            warnings.push(`남학생 수가 일치하지 않습니다. (입력: ${expectedMaleCount}명, 테이블: ${maleCount}명)`);
-        }
-        
-        if (expectedFemaleCount > 0 && femaleCount !== expectedFemaleCount) {
-            warnings.push(`여학생 수가 일치하지 않습니다. (입력: ${expectedFemaleCount}명, 테이블: ${femaleCount}명)`);
-        }
-
-        if (warnings.length > 0) {
-            statsHTML += `
-                <div style="margin-top: 10px; padding: 10px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; color: #856404;">
-                    <strong>⚠️ 경고:</strong>
-                    <ul style="margin: 5px 0 0 0; padding-left: 20px;">
-                        ${warnings.map(w => `<li>${w}</li>`).join('')}
-                    </ul>
-                </div>
-            `;
-        }
 
         statsCell.innerHTML = statsHTML;
         
@@ -2797,8 +2839,10 @@ export class MainController {
         const downloadBtn = document.createElement('button');
         downloadBtn.id = 'download-template';
         downloadBtn.className = 'secondary-btn';
-        downloadBtn.textContent = '양식 다운로드';
-        downloadBtn.style.flex = '1';
+        downloadBtn.textContent = '학생 이름 양식 다운로드';
+        downloadBtn.style.flex = 'none';
+        downloadBtn.style.width = 'auto';
+        downloadBtn.style.whiteSpace = 'nowrap';
         downloadBtn.addEventListener('click', () => this.downloadTemplateFile());
         buttonContainer.appendChild(downloadBtn);
         
@@ -2806,8 +2850,10 @@ export class MainController {
         const uploadBtn = document.createElement('button');
         uploadBtn.id = 'upload-file';
         uploadBtn.className = 'secondary-btn';
-        uploadBtn.textContent = '엑셀 파일에서 가져오기';
-        uploadBtn.style.flex = '1';
+        uploadBtn.textContent = '학생 이름 엑셀파일에서 가져오기';
+        uploadBtn.style.flex = 'none';
+        uploadBtn.style.width = 'auto';
+        uploadBtn.style.whiteSpace = 'nowrap';
         
         // 숨겨진 파일 입력
         const fileInput = document.createElement('input');
@@ -2823,6 +2869,40 @@ export class MainController {
         
         buttonContainer.appendChild(uploadBtn);
         buttonContainer.appendChild(fileInput);
+        
+        // 자리 배치하기 버튼과 체크박스 추가
+        const arrangeBtn = document.createElement('button');
+        arrangeBtn.id = 'arrange-seats';
+        arrangeBtn.className = 'arrange-seats-btn';
+        arrangeBtn.textContent = '자리 배치 실행하기';
+        arrangeBtn.style.width = 'auto';
+        arrangeBtn.style.flex = 'none';
+        arrangeBtn.style.whiteSpace = 'nowrap';
+        buttonContainer.appendChild(arrangeBtn);
+        
+        // 이전 좌석 안 앉기 체크박스
+        const avoidPrevSeatLabel = document.createElement('label');
+        avoidPrevSeatLabel.style.cssText = 'display:flex; align-items:center; gap:4px; margin:0; white-space:nowrap;';
+        const avoidPrevSeatInput = document.createElement('input');
+        avoidPrevSeatInput.type = 'checkbox';
+        avoidPrevSeatInput.id = 'avoid-prev-seat';
+        const avoidPrevSeatSpan = document.createElement('span');
+        avoidPrevSeatSpan.textContent = '이전 좌석 안 앉기';
+        avoidPrevSeatLabel.appendChild(avoidPrevSeatInput);
+        avoidPrevSeatLabel.appendChild(avoidPrevSeatSpan);
+        buttonContainer.appendChild(avoidPrevSeatLabel);
+        
+        // 이전 짝 금지 체크박스
+        const avoidPrevPartnerLabel = document.createElement('label');
+        avoidPrevPartnerLabel.style.cssText = 'display:flex; align-items:center; gap:4px; margin:0; white-space:nowrap;';
+        const avoidPrevPartnerInput = document.createElement('input');
+        avoidPrevPartnerInput.type = 'checkbox';
+        avoidPrevPartnerInput.id = 'avoid-prev-partner';
+        const avoidPrevPartnerSpan = document.createElement('span');
+        avoidPrevPartnerSpan.textContent = '이전 짝 금지';
+        avoidPrevPartnerLabel.appendChild(avoidPrevPartnerInput);
+        avoidPrevPartnerLabel.appendChild(avoidPrevPartnerSpan);
+        buttonContainer.appendChild(avoidPrevPartnerLabel);
         
         studentTableContainer.appendChild(buttonContainer);
 
@@ -3062,37 +3142,51 @@ export class MainController {
             studentTableContainer.appendChild(tableWrapper);
         }
         
+        // 통계와 버튼을 하나의 컨테이너로 묶기
+        const statsAndButtonsWrapper = document.createElement('div');
+        statsAndButtonsWrapper.style.cssText = `
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 10px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        `;
+        
         // 통계 표시를 위한 컨테이너 추가 (모든 테이블 아래에 하나만)
         const statsContainer = document.createElement('div');
         statsContainer.style.cssText = `
-            grid-column: 1 / -1;
             padding: 12px;
             background: #f8f9fa;
             border: 1px solid #dee2e6;
             border-radius: 8px;
             font-size: 0.95em;
-            margin-top: 10px;
+            flex: 0 0 auto;
+            width: fit-content;
         `;
         statsContainer.id = 'student-table-stats';
         const statsCell = document.createElement('div');
         statsCell.id = 'student-table-stats-cell';
         statsContainer.appendChild(statsCell);
-        studentTableContainer.appendChild(statsContainer);
+        statsAndButtonsWrapper.appendChild(statsContainer);
         
         // 작업 버튼 추가
         const actionButtons = document.createElement('div');
         actionButtons.className = 'table-action-buttons';
-        actionButtons.style.cssText = 'grid-column: 1 / -1;';
-        actionButtons.innerHTML = `
-            <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: flex-start;">
-                <button id="add-student-row-btn" style="width: auto; flex: 0 0 auto; min-width: 0;">행 추가</button>
-                <button id="save-student-table-btn" class="save-btn" style="width: auto; flex: 0 0 auto; min-width: 0; background: #28a745; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;">💾 저장</button>
-                <button id="arrange-seats" class="arrange-seats-btn" style="width: auto; flex: 0 0 auto; min-width: 0;">자리 배치하기</button>
-                <label style="display:flex; align-items:center; gap:4px; margin:0; white-space:nowrap;"><input type="checkbox" id="avoid-prev-seat" /><span>이전 좌석 안 앉기</span></label>
-                <label style="display:flex; align-items:center; gap:4px; margin:0; white-space:nowrap;"><input type="checkbox" id="avoid-prev-partner" /><span>이전 짝 금지</span></label>
-            </div>
+        actionButtons.style.cssText = `
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            flex: 0 0 auto;
         `;
-        studentTableContainer.appendChild(actionButtons);
+        actionButtons.innerHTML = `
+            <button id="add-student-row-btn" style="width: auto; flex: 0 0 auto; min-width: 0;">행 추가</button>
+            <button id="save-student-table-btn" class="save-btn" style="width: auto; flex: 0 0 auto; min-width: 0; background: #28a745; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;">💾 저장</button>
+        `;
+        statsAndButtonsWrapper.appendChild(actionButtons);
+        studentTableContainer.appendChild(statsAndButtonsWrapper);
         
         outputSection.appendChild(studentTableContainer);
         
@@ -3238,43 +3332,15 @@ export class MainController {
      */
     private handleArrangeSeats(): void {
         try {
-            // 사이드바의 남녀 숫자와 테이블의 수 일치 여부 확인
-            const maleCountInput = document.getElementById('male-students') as HTMLInputElement;
-            const femaleCountInput = document.getElementById('female-students') as HTMLInputElement;
+            // 커튼 애니메이션 시작
+            this.startCurtainAnimation();
             
-            const expectedMaleCount = maleCountInput ? parseInt(maleCountInput.value || '0', 10) : 0;
-            const expectedFemaleCount = femaleCountInput ? parseInt(femaleCountInput.value || '0', 10) : 0;
-
-            if (expectedMaleCount > 0 || expectedFemaleCount > 0) {
-                // 테이블에서 실제 학생 데이터 가져오기
-                const studentData = this.inputModule.getStudentData();
-                
-                const actualMaleCount = studentData.filter(s => s.gender === 'M').length;
-                const actualFemaleCount = studentData.filter(s => s.gender === 'F').length;
-
-                const warnings: string[] = [];
-                
-                if (expectedMaleCount > 0 && actualMaleCount !== expectedMaleCount) {
-                    warnings.push(`남학생 수가 일치하지 않습니다. (입력: ${expectedMaleCount}명, 테이블: ${actualMaleCount}명)`);
-                }
-                
-                if (expectedFemaleCount > 0 && actualFemaleCount !== expectedFemaleCount) {
-                    warnings.push(`여학생 수가 일치하지 않습니다. (입력: ${expectedFemaleCount}명, 테이블: ${actualFemaleCount}명)`);
-                }
-
-                if (warnings.length > 0) {
-                    const warningMessage = '⚠️ 경고:\n\n' + warnings.join('\n') + '\n\n자리 배치를 계속하시겠습니까?';
-                    if (!confirm(warningMessage)) {
-                        return;
-                    }
-                }
-            }
-
             // 테이블에서 학생 데이터 가져오기
             const studentData = this.inputModule.getStudentData();
             
             if (studentData.length === 0) {
                 alert('학생 정보를 먼저 입력해주세요.');
+                this.stopCurtainAnimation();
                 return;
             }
 
@@ -3728,6 +3794,16 @@ export class MainController {
             if (dragDropHelp) {
                 dragDropHelp.style.display = 'block';
             }
+            
+            // 1초 후 폭죽 애니메이션 시작
+            setTimeout(() => {
+                this.startFireworks();
+            }, 1000);
+            
+            // 3초 후 커튼 열기
+            setTimeout(() => {
+                this.openCurtain();
+            }, 3000);
             
             // 배치 완료 후 화면을 맨 위로 스크롤 (스크롤 컨테이너와 윈도우 모두 시도)
             try {
@@ -4701,7 +4777,7 @@ export class MainController {
                     </li>
                     <li><strong>4단계: 맞춤 구성</strong> - 추가 옵션을 선택하세요</li>
                     <li><strong>5단계: 학생 정보 입력</strong> - 학생 이름과 성별을 입력하세요</li>
-                    <li><strong>자리 배치하기</strong> - 버튼을 클릭하면 좌석에 학생들이 랜덤 배치됩니다</li>
+                    <li><strong>자리 배치 실행하기</strong> - 버튼을 클릭하면 좌석에 학생들이 랜덤 배치됩니다</li>
                 </ol>
 
                 <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">2️⃣ 고정 좌석 기능</h3>
@@ -4729,8 +4805,8 @@ export class MainController {
 
                 <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">5️⃣ 학생 정보 입력</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
-                    <li><strong>엑셀 파일에서 가져오기</strong>: 엑셀 파일을 업로드하여 학생 정보를 한 번에 입력할 수 있습니다</li>
-                    <li><strong>양식 파일 다운로드</strong>: 엑셀 양식 파일을 다운로드하여 학생 정보를 작성한 후 업로드하세요</li>
+                    <li><strong>학생 이름 엑셀파일에서 가져오기</strong>: 엑셀 파일을 업로드하여 학생 정보를 한 번에 입력할 수 있습니다</li>
+                    <li><strong>학생 이름 양식 다운로드</strong>: 엑셀 양식 파일을 다운로드하여 학생 정보를 작성한 후 업로드하세요</li>
                     <li><strong>행 추가</strong>: 학생 정보 입력 테이블에서 "행 추가" 버튼을 클릭하여 학생을 추가할 수 있습니다</li>
                     <li><strong>저장</strong>: 학생 정보 입력 후 "저장" 버튼을 클릭하면 1단계 입력값이 자동으로 업데이트됩니다</li>
                 </ul>
@@ -4745,7 +4821,6 @@ export class MainController {
                 <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">💡 유용한 팁</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
                     <li>학생 정보 입력 테이블 하단의 통계를 확인하여 남학생/여학생 수와 고정 좌석 수를 확인할 수 있습니다</li>
-                    <li>1단계 입력값과 학생 정보 테이블의 학생 수가 일치하지 않으면 경고 메시지가 표시됩니다</li>
                     <li>고정 좌석 모드에서는 미리보기 화면에서 좌석을 클릭하여 고정할 수 있습니다</li>
                     <li>자리 배치 후에는 드래그 & 드롭으로 자유롭게 자리를 조정할 수 있습니다</li>
                 </ul>
@@ -4808,6 +4883,197 @@ export class MainController {
                 closeModal();
             }
         };
+    }
+
+    /**
+     * 사이드바 토글
+     */
+    private toggleSidebar(): void {
+        const sidebar = document.getElementById('sidebar');
+        const mainContainer = document.querySelector('.main-container');
+        
+        if (sidebar && mainContainer) {
+            sidebar.classList.toggle('collapsed');
+            mainContainer.classList.toggle('sidebar-collapsed');
+        }
+    }
+
+    /**
+     * 커튼 애니메이션 시작 (닫기)
+     */
+    private startCurtainAnimation(): void {
+        const curtainOverlay = document.getElementById('curtain-overlay');
+        if (!curtainOverlay) return;
+
+        // 커튼 오버레이 활성화
+        curtainOverlay.classList.add('active');
+        curtainOverlay.classList.remove('opening');
+        
+        // 약간의 지연 후 닫기 애니메이션 시작 (렌더링 보장)
+        setTimeout(() => {
+            curtainOverlay.classList.add('closing');
+        }, 10);
+    }
+
+    /**
+     * 커튼 애니메이션 종료 (열기)
+     */
+    private openCurtain(): void {
+        const curtainOverlay = document.getElementById('curtain-overlay');
+        if (!curtainOverlay) return;
+
+        // 열기 애니메이션 시작
+        curtainOverlay.classList.remove('closing');
+        curtainOverlay.classList.add('opening');
+
+        // 애니메이션 완료 후 오버레이 숨기기
+        setTimeout(() => {
+            curtainOverlay.classList.remove('active', 'opening');
+        }, 600); // transition 시간과 동일 (0.6s)
+    }
+
+    /**
+     * 커튼 애니메이션 즉시 종료 (에러 시)
+     */
+    private stopCurtainAnimation(): void {
+        const curtainOverlay = document.getElementById('curtain-overlay');
+        if (!curtainOverlay) return;
+
+        curtainOverlay.classList.remove('active', 'closing', 'opening');
+    }
+
+    /**
+     * 폭죽 애니메이션 시작
+     */
+    private startFireworks(): void {
+        const container = document.getElementById('fireworks-container');
+        if (!container) return;
+
+        // 컨테이너 활성화 및 초기화
+        container.classList.add('active');
+        container.innerHTML = '';
+
+        // 화면 중앙 위치 계산
+        const rect = container.getBoundingClientRect();
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+
+        // 여러 폭죽 동시 발사 (8-12개로 증가)
+        const fireworkCount = 8 + Math.floor(Math.random() * 5);
+        
+        for (let i = 0; i < fireworkCount; i++) {
+            // 각 폭죽의 위치를 화면 중앙 주변에 랜덤 배치 (범위 확대)
+            const offsetX = (Math.random() - 0.5) * (rect.width * 0.8);
+            const offsetY = (Math.random() - 0.5) * (rect.height * 0.8);
+            const x = centerX + offsetX;
+            const y = centerY + offsetY;
+
+            // 약간의 지연을 주어 순차적으로 터지게 (간격 단축)
+            setTimeout(() => {
+                this.createFirework(container, x, y);
+            }, i * 100);
+        }
+
+        // 애니메이션 완료 후 컨테이너 비활성화 (시간 연장)
+        setTimeout(() => {
+            container.classList.remove('active');
+            container.innerHTML = '';
+        }, 3000);
+    }
+
+    /**
+     * 개별 폭죽 생성 및 파티클 애니메이션
+     */
+    private createFirework(container: HTMLElement, x: number, y: number): void {
+        // 폭죽 색상 배열 (더 화려한 색상들 추가)
+        const colors = [
+            '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8',
+            '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8C471', '#82E0AA',
+            '#FF6B9D', '#C44569', '#F8B500', '#00D2FF', '#FC6C85',
+            '#A29BFE', '#FD79A8', '#FDCB6E', '#00B894', '#E17055'
+        ];
+
+        // 랜덤 색상 선택 (3-5개로 증가)
+        const fireworkColors = [];
+        const colorCount = 3 + Math.floor(Math.random() * 3);
+        for (let i = 0; i < colorCount; i++) {
+            fireworkColors.push(colors[Math.floor(Math.random() * colors.length)]);
+        }
+
+        // 폭죽 중심점 생성 (더 크게)
+        const center = document.createElement('div');
+        center.className = 'firework';
+        center.style.left = `${x}px`;
+        center.style.top = `${y}px`;
+        center.style.width = '8px';
+        center.style.height = '8px';
+        center.style.backgroundColor = fireworkColors[0];
+        center.style.boxShadow = `0 0 20px ${fireworkColors[0]}, 0 0 40px ${fireworkColors[0]}`;
+        container.appendChild(center);
+
+        // 파티클 생성 (40-60개로 증가)
+        const particleCount = 40 + Math.floor(Math.random() * 21);
+        const angleStep = (Math.PI * 2) / particleCount;
+        
+        for (let i = 0; i < particleCount; i++) {
+            const angle = angleStep * i;
+            // 거리 증가 (120-220px)
+            const distance = 120 + Math.random() * 100;
+            const dx = Math.cos(angle) * distance;
+            const dy = Math.sin(angle) * distance;
+
+            // 파티클 색상 (주기적으로 다른 색상 사용)
+            const colorIndex = i % fireworkColors.length;
+            const color = fireworkColors[colorIndex];
+
+            const particle = document.createElement('div');
+            particle.className = 'firework-particle';
+            particle.style.left = `${x}px`;
+            particle.style.top = `${y}px`;
+            particle.style.width = '8px';
+            particle.style.height = '8px';
+            particle.style.backgroundColor = color;
+            particle.style.boxShadow = `0 0 12px ${color}, 0 0 24px ${color}`;
+            particle.style.setProperty('--dx', `${dx}px`);
+            particle.style.setProperty('--dy', `${dy}px`);
+            
+            container.appendChild(particle);
+        }
+
+        // 추가: 별 모양 파티클 (더 화려하게)
+        if (Math.random() > 0.5) {
+            const starCount = 8 + Math.floor(Math.random() * 5);
+            const starAngleStep = (Math.PI * 2) / starCount;
+            for (let i = 0; i < starCount; i++) {
+                const angle = starAngleStep * i;
+                const starDistance = 160 + Math.random() * 80;
+                const dx = Math.cos(angle) * starDistance;
+                const dy = Math.sin(angle) * starDistance;
+                const starColor = fireworkColors[i % fireworkColors.length];
+
+                const star = document.createElement('div');
+                star.className = 'firework-particle';
+                star.style.left = `${x}px`;
+                star.style.top = `${y}px`;
+                star.style.width = '12px';
+                star.style.height = '12px';
+                star.style.borderRadius = '0';
+                star.style.backgroundColor = starColor;
+                star.style.clipPath = 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)';
+                star.style.boxShadow = `0 0 15px ${starColor}, 0 0 30px ${starColor}`;
+                star.style.setProperty('--dx', `${dx}px`);
+                star.style.setProperty('--dy', `${dy}px`);
+                
+                container.appendChild(star);
+            }
+        }
+
+        // 폭죽 중심 제거 (애니메이션 후)
+        setTimeout(() => {
+            if (center.parentNode) {
+                center.remove();
+            }
+        }, 1000);
     }
 }
 
