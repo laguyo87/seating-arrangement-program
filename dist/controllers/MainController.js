@@ -89,10 +89,20 @@ export class MainController {
             this.outputModule = new OutputModule('output-section');
             // 이벤트 리스너 설정
             this.initializeEventListeners();
-            // 초기 상태에서도 4단계 비활성화 체크
+            // 이력 드롭다운 초기화
+            this.initializeHistoryDropdown();
+            // 저장된 옵션 설정 불러오기
+            this.loadOptions();
+            // 초기 상태에서도 4단계 비활성화 체크 및 분단 개수 제한 적용
             const checkedLayoutType = document.querySelector('input[name="layout-type"]:checked');
-            if (checkedLayoutType && checkedLayoutType.value === 'single-uniform') {
-                this.toggleCustomMode1(true);
+            if (checkedLayoutType) {
+                if (checkedLayoutType.value === 'single-uniform') {
+                    this.toggleCustomMode1(true);
+                    this.updatePartitionLimitForSingleUniform();
+                }
+                else if (checkedLayoutType.value === 'pair-uniform') {
+                    this.updatePartitionLimitForPair();
+                }
             }
             // 초기 상태에서 고정 좌석 모드 확인
             const checkedFixedRandomMode = document.querySelector('input[name="custom-mode-2"][value="fixed-random"]:checked');
@@ -132,6 +142,13 @@ export class MainController {
             console.error('초기화 실패:', error);
             alert('프로그램 초기화 중 오류가 발생했습니다.');
         }
+    }
+    /**
+     * 초기화 시 이력 드롭다운 업데이트
+     */
+    initializeHistoryDropdown() {
+        // 드롭다운은 항상 표시되므로 내용만 업데이트
+        this.updateHistoryDropdown();
     }
     /**
      * 앱 초기 상태로 되돌리기
@@ -204,6 +221,145 @@ export class MainController {
         }
     }
     /**
+     * 옵션 설정 저장
+     */
+    saveOptions() {
+        try {
+            const options = {};
+            // 옵션1: 좌석 배치 형태
+            const layoutType = document.querySelector('input[name="layout-type"]:checked');
+            if (layoutType) {
+                options.layoutType = layoutType.value;
+            }
+            const pairMode = document.querySelector('input[name="pair-mode"]:checked');
+            if (pairMode) {
+                options.pairMode = pairMode.value;
+            }
+            const groupSize = document.querySelector('input[name="group-size"]:checked');
+            if (groupSize) {
+                options.groupSize = groupSize.value;
+            }
+            const groupGenderMix = document.getElementById('group-gender-mix');
+            if (groupGenderMix) {
+                options.groupGenderMix = groupGenderMix.checked;
+            }
+            // 옵션2: 학생 자리 수
+            const maleStudents = document.getElementById('male-students');
+            if (maleStudents) {
+                options.maleStudents = maleStudents.value;
+            }
+            const femaleStudents = document.getElementById('female-students');
+            if (femaleStudents) {
+                options.femaleStudents = femaleStudents.value;
+            }
+            // 옵션3: 분단 개수
+            const numberOfPartitions = document.getElementById('number-of-partitions');
+            if (numberOfPartitions) {
+                options.numberOfPartitions = numberOfPartitions.value;
+            }
+            // 옵션4: 맞춤 구성
+            const customMode2 = document.querySelector('input[name="custom-mode-2"]:checked');
+            if (customMode2) {
+                options.customMode2 = customMode2.value;
+            }
+            // localStorage에 저장
+            localStorage.setItem('savedOptions', JSON.stringify(options));
+            this.outputModule.showSuccess('옵션 설정이 기억되었습니다.');
+        }
+        catch (error) {
+            console.error('옵션 설정 저장 중 오류:', error);
+            this.outputModule.showError('옵션 설정 저장 중 오류가 발생했습니다.');
+        }
+    }
+    /**
+     * 저장된 옵션 설정 불러오기
+     */
+    loadOptions() {
+        try {
+            const savedOptionsStr = localStorage.getItem('savedOptions');
+            if (!savedOptionsStr) {
+                return; // 저장된 설정이 없으면 기본값 유지
+            }
+            const options = JSON.parse(savedOptionsStr);
+            // 옵션1: 좌석 배치 형태
+            if (options.layoutType) {
+                const layoutTypeInput = document.querySelector(`input[name="layout-type"][value="${options.layoutType}"]`);
+                if (layoutTypeInput) {
+                    layoutTypeInput.checked = true;
+                    layoutTypeInput.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            }
+            // pair-mode는 layout-type이 pair-uniform일 때만 적용
+            if (options.pairMode && options.layoutType === 'pair-uniform') {
+                setTimeout(() => {
+                    const pairModeInput = document.querySelector(`input[name="pair-mode"][value="${options.pairMode}"]`);
+                    if (pairModeInput) {
+                        pairModeInput.checked = true;
+                        pairModeInput.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                }, 100);
+            }
+            // group-size는 layout-type이 group일 때만 적용
+            if (options.groupSize && options.layoutType === 'group') {
+                setTimeout(() => {
+                    const groupSizeInput = document.querySelector(`input[name="group-size"][value="${options.groupSize}"]`);
+                    if (groupSizeInput) {
+                        groupSizeInput.checked = true;
+                        groupSizeInput.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                    // group-gender-mix는 group-size가 선택된 후에 적용
+                    if (options.groupGenderMix !== undefined) {
+                        setTimeout(() => {
+                            const groupGenderMixInput = document.getElementById('group-gender-mix');
+                            if (groupGenderMixInput) {
+                                groupGenderMixInput.checked = options.groupGenderMix;
+                                groupGenderMixInput.dispatchEvent(new Event('change', { bubbles: true }));
+                            }
+                        }, 200);
+                    }
+                }, 100);
+            }
+            // 옵션2: 학생 자리 수
+            if (options.maleStudents !== undefined) {
+                const maleStudentsInput = document.getElementById('male-students');
+                if (maleStudentsInput) {
+                    maleStudentsInput.value = options.maleStudents;
+                    maleStudentsInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    maleStudentsInput.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            }
+            if (options.femaleStudents !== undefined) {
+                const femaleStudentsInput = document.getElementById('female-students');
+                if (femaleStudentsInput) {
+                    femaleStudentsInput.value = options.femaleStudents;
+                    femaleStudentsInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    femaleStudentsInput.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            }
+            // 옵션3: 분단 개수
+            if (options.numberOfPartitions !== undefined) {
+                const numberOfPartitionsInput = document.getElementById('number-of-partitions');
+                if (numberOfPartitionsInput) {
+                    numberOfPartitionsInput.value = options.numberOfPartitions;
+                    numberOfPartitionsInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    numberOfPartitionsInput.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            }
+            // 옵션4: 맞춤 구성
+            if (options.customMode2) {
+                const customMode2Input = document.querySelector(`input[name="custom-mode-2"][value="${options.customMode2}"]`);
+                if (customMode2Input) {
+                    customMode2Input.checked = true;
+                    customMode2Input.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            }
+        }
+        catch (error) {
+            console.error('옵션 설정 불러오기 중 오류:', error);
+            // 오류가 발생해도 기본값으로 진행
+        }
+    }
+    /**
      * 초기 캔버스에 칠판과 교탁 그리기
      */
     drawInitialCanvas() {
@@ -239,10 +395,44 @@ export class MainController {
             input.addEventListener('change', (e) => {
                 const target = e.target;
                 const layoutType = target.value;
-                // '1명 한 줄로 배치' 선택 시 4단계 비활성화
-                this.toggleCustomMode1(layoutType === 'single-uniform');
-                // '2명씩 짝꿍 배치' 선택 시 서브 메뉴 표시
-                this.togglePairSubmenu(layoutType === 'pair-uniform');
+                // '1명 한 줄로 배치' 선택 시 4단계 비활성화 및 분단 개수 제한
+                if (layoutType === 'single-uniform') {
+                    this.toggleCustomMode1(true);
+                    this.updatePartitionLimitForSingleUniform();
+                }
+                else {
+                    this.toggleCustomMode1(false);
+                }
+                // '2명씩 짝꿍 배치' 선택 시 서브 메뉴 표시 및 분단 개수 제한
+                if (layoutType === 'pair-uniform') {
+                    this.togglePairSubmenu(true);
+                    this.updatePartitionLimitForPair();
+                }
+                else {
+                    this.togglePairSubmenu(false);
+                }
+                // '모둠 배치' 선택 시 서브 메뉴 표시 및 분단 개수 제한
+                if (layoutType === 'group') {
+                    this.toggleGroupSubmenu(true);
+                    this.toggleGroupGenderMixOption(true);
+                    // 모둠 배치가 선택되면 현재 선택된 group-size에 따라 분단 개수 제한 적용
+                    const selectedGroupSize = document.querySelector('input[name="group-size"]:checked');
+                    if (selectedGroupSize) {
+                        this.updatePartitionLimitForGroup(selectedGroupSize.value);
+                    }
+                    else {
+                        // 아직 선택되지 않았으면 제한 해제
+                        this.resetPartitionLimit();
+                    }
+                }
+                else {
+                    this.toggleGroupSubmenu(false);
+                    this.toggleGroupGenderMixOption(false);
+                    // 모둠 배치가 아니고 다른 배치 형태도 아니면 분단 개수 제한 해제
+                    if (layoutType !== 'single-uniform' && layoutType !== 'pair-uniform') {
+                        this.resetPartitionLimit();
+                    }
+                }
                 // 배치 형태 변경 시 미리보기 업데이트
                 this.updatePreviewForGenderCounts();
             });
@@ -251,7 +441,13 @@ export class MainController {
         const groupSizeInputs = document.querySelectorAll('input[name="group-size"]');
         groupSizeInputs.forEach(input => {
             input.addEventListener('change', (e) => {
-                // 미리보기 기능 삭제됨
+                const target = e.target;
+                const groupSize = target.value;
+                console.log('모둠 크기 변경:', groupSize);
+                // 분단 개수 제한 적용
+                this.updatePartitionLimitForGroup(groupSize);
+                // 미리보기 업데이트
+                this.updatePreviewForGenderCounts();
             });
         });
         // 짝꿍 모드 라디오 버튼 변경 이벤트
@@ -259,10 +455,24 @@ export class MainController {
         pairModeInputs.forEach(input => {
             input.addEventListener('change', (e) => {
                 console.log('짝꿍 모드 변경:', e.target.value);
+                // 분단 개수 제한 적용 (짝꿍 배치 선택 시)
+                const layoutTypeInput = document.querySelector('input[name="layout-type"]:checked');
+                if (layoutTypeInput && layoutTypeInput.value === 'pair-uniform') {
+                    this.updatePartitionLimitForPair();
+                }
                 // 현재 학생 수 가져오기
                 this.updatePreviewForGenderCounts();
             });
         });
+        // 모둠 배치 남녀 섞기 체크박스 변경 이벤트
+        const genderMixCheckbox = document.getElementById('group-gender-mix');
+        if (genderMixCheckbox) {
+            genderMixCheckbox.addEventListener('change', () => {
+                console.log('남녀 섞기 옵션 변경:', genderMixCheckbox.checked);
+                // 미리보기 업데이트
+                this.updatePreviewForGenderCounts();
+            });
+        }
         // 인원수 설정 이벤트
         document.addEventListener('studentCountSet', (e) => {
             const customEvent = e;
@@ -290,6 +500,13 @@ export class MainController {
         }
         // 좌석 카드 드래그&드롭(스왑) 활성화
         this.enableSeatSwapDragAndDrop();
+        // 옵션 설정 저장 버튼
+        const saveOptionsBtn = document.getElementById('save-options');
+        if (saveOptionsBtn) {
+            saveOptionsBtn.addEventListener('click', () => {
+                this.saveOptions();
+            });
+        }
         // 초기화 버튼
         const resetBtn = document.getElementById('reset-app');
         if (resetBtn) {
@@ -327,8 +544,12 @@ export class MainController {
             });
             // 분단 수 변경 시 미리보기 업데이트
             partitionInput.addEventListener('change', () => {
-                console.log('분단 수 변경됨');
+                console.log('분단 수 변경:', partitionInput.value);
                 // 현재 학생 수 가져오기
+                this.updatePreviewForGenderCounts();
+            });
+            partitionInput.addEventListener('input', () => {
+                // 실시간 업데이트
                 this.updatePreviewForGenderCounts();
             });
         }
@@ -379,6 +600,33 @@ export class MainController {
                 console.log('자리 배치하기 버튼 클릭됨');
                 this.handleArrangeSeats();
             }
+            // 자리 확정 버튼 클릭
+            if (target.id === 'confirm-seats') {
+                console.log('자리 확정 버튼 클릭됨');
+                this.handleConfirmSeats();
+            }
+            // 확정된 자리 이력 드롭다운 버튼 클릭
+            const dropdown = document.getElementById('history-dropdown-content');
+            const dropdownContainer = document.getElementById('history-dropdown');
+            if (target.id === 'history-dropdown-btn' || target.closest('#history-dropdown-btn')) {
+                // 드롭다운 버튼 클릭 시 토글
+                if (dropdown) {
+                    dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+                }
+            }
+            else if (dropdown && dropdownContainer) {
+                // 드롭다운이 열려있고, 클릭된 요소가 드롭다운 내부가 아니면 닫기
+                if (dropdown.style.display === 'block' && !dropdownContainer.contains(target)) {
+                    dropdown.style.display = 'none';
+                }
+            }
+            // 이력 항목 클릭
+            if (target.classList.contains('history-item')) {
+                const historyId = target.dataset.historyId;
+                if (historyId) {
+                    this.loadHistoryItem(historyId);
+                }
+            }
             // 행 추가 버튼 클릭
             if (target.id === 'add-student-row-btn') {
                 this.handleAddStudentRow();
@@ -416,25 +664,7 @@ export class MainController {
     initializeRadioListeners() {
         // 배치 유형 라디오 버튼
         const layoutRadios = document.querySelectorAll('input[name="layout-type"]');
-        layoutRadios.forEach(radio => {
-            radio.addEventListener('change', (e) => {
-                const target = e.target;
-                if (target.id === 'radio-group') {
-                    // 모둠 배치가 선택되면 서브 메뉴 표시
-                    const groupSubmenu = document.getElementById('group-submenu');
-                    if (groupSubmenu) {
-                        groupSubmenu.style.display = 'block';
-                    }
-                }
-                else {
-                    // 다른 옵션 선택 시 서브 메뉴 숨김
-                    const groupSubmenu = document.getElementById('group-submenu');
-                    if (groupSubmenu) {
-                        groupSubmenu.style.display = 'none';
-                    }
-                }
-            });
-        });
+        // layout-type 변경 이벤트는 initializeEventListeners에서 처리하므로 여기서는 제거
         // 고정 좌석 모드 라디오 버튼
         const customModeRadios = document.querySelectorAll('input[name="custom-mode-2"]');
         customModeRadios.forEach(radio => {
@@ -595,9 +825,48 @@ export class MainController {
         // 선택된 배치 형태 확인
         const layoutTypeInput = document.querySelector('input[name="layout-type"]:checked');
         const layoutType = layoutTypeInput?.value;
+        const groupSizeInput = document.querySelector('input[name="group-size"]:checked');
+        const groupSize = groupSizeInput ? groupSizeInput.value : '';
         // 분단 수 가져오기
         const partitionInput = document.getElementById('number-of-partitions');
         const partitionCount = partitionInput ? parseInt(partitionInput.value || '1', 10) : 1;
+        // 모둠 배치인 경우
+        console.log('renderExampleCards - layoutType:', layoutType, 'groupSize:', groupSize);
+        if (layoutType === 'group' && (groupSize === 'group-3' || groupSize === 'group-4' || groupSize === 'group-5' || groupSize === 'group-6')) {
+            console.log('모둠 배치 감지됨 - groupSize:', groupSize);
+            const groupSizeNumber = groupSize === 'group-3' ? 3 : groupSize === 'group-4' ? 4 : groupSize === 'group-5' ? 5 : 6;
+            // 예시 학생 데이터 생성 (this.students가 비어있을 경우)
+            if (this.students.length === 0) {
+                const maleCount = parseInt(document.getElementById('male-students')?.value || '0', 10);
+                const femaleCount = parseInt(document.getElementById('female-students')?.value || '0', 10);
+                const totalCount = maleCount + femaleCount;
+                console.log('임시 학생 데이터 생성 - maleCount:', maleCount, 'femaleCount:', femaleCount, 'totalCount:', totalCount);
+                // 임시 학생 데이터 생성
+                const tempStudents = [];
+                for (let i = 0; i < totalCount; i++) {
+                    const gender = i < maleCount ? 'M' : 'F';
+                    tempStudents.push({
+                        id: i + 1,
+                        name: gender === 'M' ? `남학생${i + 1}` : `여학생${i - maleCount + 1}`,
+                        gender: gender
+                    });
+                }
+                this.students = tempStudents;
+                console.log('임시 학생 데이터 생성 완료 - students.length:', this.students.length);
+            }
+            // 모둠 배치로 렌더링
+            const dummySeats = this.students.map((_, index) => ({
+                id: index + 1,
+                position: { x: 0, y: 0 },
+                studentId: undefined,
+                studentName: undefined,
+                isFixed: false,
+                isActive: true
+            }));
+            console.log('renderGroupCards 호출 전 - students.length:', this.students.length, 'dummySeats.length:', dummySeats.length);
+            this.renderGroupCards(dummySeats, groupSizeNumber, seatsArea);
+            return;
+        }
         // 2명씩 짝꿍 배치인 경우
         if (layoutType === 'pair-uniform') {
             // seatsArea의 그리드 설정 먼저
@@ -1112,52 +1381,247 @@ export class MainController {
         seatsArea.innerHTML = '';
         // 좌석 번호를 1부터 시작하도록 초기화
         this.nextSeatId = 1;
-        // 학생 수에 따라 그리드 열 수 결정
-        const columnCount = this.students.length <= 20 ? 4 : 6;
-        seatsArea.style.gridTemplateColumns = `repeat(${columnCount}, 1fr)`;
-        seatsArea.style.gap = '10px';
-        seats.forEach((seat, index) => {
-            if (index >= this.students.length)
-                return;
-            const student = this.students[index];
-            const card = document.createElement('div');
-            card.className = 'student-seat-card';
-            card.setAttribute('draggable', 'true');
-            // 좌석 고유 ID 부여
-            const seatId = this.nextSeatId++;
-            card.setAttribute('data-seat-id', seatId.toString());
-            // 좌석 번호 표시 (좌측 상단)
-            const seatNumberDiv = document.createElement('div');
-            seatNumberDiv.className = 'seat-number-label';
-            seatNumberDiv.textContent = `#${seatId}`;
-            seatNumberDiv.style.cssText = `
-                position: absolute;
-                top: 5px;
-                left: 5px;
-                font-size: 0.8em;
-                font-weight: bold;
-                color: #667eea;
-                background: rgba(255, 255, 255, 0.9);
-                padding: 2px 6px;
-                border-radius: 4px;
-                z-index: 5;
-            `;
-            card.appendChild(seatNumberDiv);
-            const nameDiv = document.createElement('div');
-            nameDiv.className = 'student-name';
-            nameDiv.textContent = student.name || `학생${index + 1}`;
-            // 성별에 따라 클래스 추가
-            if (student.gender === 'M') {
-                card.classList.add('gender-m');
-            }
-            else {
-                card.classList.add('gender-f');
-            }
-            card.appendChild(nameDiv);
-            seatsArea.appendChild(card);
-        });
+        // 현재 선택된 배치 형태 확인
+        const layoutTypeInput = document.querySelector('input[name="layout-type"]:checked');
+        const layoutType = layoutTypeInput ? layoutTypeInput.value : '';
+        const groupSizeInput = document.querySelector('input[name="group-size"]:checked');
+        const groupSize = groupSizeInput ? groupSizeInput.value : '';
+        console.log('renderStudentCards - layoutType:', layoutType, 'groupSize:', groupSize);
+        // 모둠 배치인지 확인
+        const isGroupLayout = layoutType === 'group' && (groupSize === 'group-3' || groupSize === 'group-4' || groupSize === 'group-5' || groupSize === 'group-6');
+        const groupSizeNumber = groupSize === 'group-3' ? 3 : groupSize === 'group-4' ? 4 : groupSize === 'group-5' ? 5 : groupSize === 'group-6' ? 6 : 0;
+        console.log('renderStudentCards - isGroupLayout:', isGroupLayout, 'groupSizeNumber:', groupSizeNumber);
+        if (isGroupLayout && groupSizeNumber > 0) {
+            // 모둠 배치: 카드를 그룹으로 묶어서 표시
+            console.log('모둠 배치로 렌더링 시작');
+            this.renderGroupCards(seats, groupSizeNumber, seatsArea);
+        }
+        else {
+            // 일반 배치: 기존 방식대로 표시
+            console.log('일반 배치로 렌더링');
+            // 학생 수에 따라 그리드 열 수 결정
+            const columnCount = this.students.length <= 20 ? 4 : 6;
+            seatsArea.style.gridTemplateColumns = `repeat(${columnCount}, 1fr)`;
+            seatsArea.style.gap = '10px';
+            seatsArea.style.display = 'grid';
+            seats.forEach((seat, index) => {
+                if (index >= this.students.length)
+                    return;
+                const student = this.students[index];
+                const card = this.createStudentCard(student, index);
+                seatsArea.appendChild(card);
+            });
+        }
         // 렌더 후 드래그&드롭 스왑 핸들러 보장
         this.enableSeatSwapDragAndDrop();
+    }
+    /**
+     * 모둠 배치로 카드 렌더링 (그룹으로 묶어서 표시)
+     */
+    renderGroupCards(seats, groupSize, seatsArea) {
+        console.log('renderGroupCards 호출됨 - groupSize:', groupSize, 'students.length:', this.students.length);
+        // this.students가 비어있으면 임시 학생 데이터 생성
+        if (this.students.length === 0) {
+            const maleCount = parseInt(document.getElementById('male-students')?.value || '0', 10);
+            const femaleCount = parseInt(document.getElementById('female-students')?.value || '0', 10);
+            const totalCount = maleCount + femaleCount;
+            console.log('임시 학생 데이터 생성 - maleCount:', maleCount, 'femaleCount:', femaleCount, 'totalCount:', totalCount);
+            // 임시 학생 데이터 생성
+            const tempStudents = [];
+            for (let i = 0; i < totalCount; i++) {
+                const gender = i < maleCount ? 'M' : 'F';
+                tempStudents.push({
+                    id: i + 1,
+                    name: gender === 'M' ? `남학생${i + 1}` : `여학생${i - maleCount + 1}`,
+                    gender: gender
+                });
+            }
+            this.students = tempStudents;
+        }
+        // 남녀 섞기 옵션 확인
+        const genderMixCheckbox = document.getElementById('group-gender-mix');
+        const shouldMixGender = genderMixCheckbox ? genderMixCheckbox.checked : false;
+        // 남녀 섞기 옵션이 체크되어 있으면 각 모둠에 남녀가 균등하게 섞이도록 배치
+        let studentsToUse = [];
+        if (shouldMixGender) {
+            // 남학생과 여학생 분리
+            const maleStudents = this.students.filter(s => s.gender === 'M');
+            const femaleStudents = this.students.filter(s => s.gender === 'F');
+            // 각 그룹에 배치할 남녀 수 계산
+            const totalStudents = this.students.length;
+            const groupCount = Math.ceil(totalStudents / groupSize);
+            const malesPerGroup = Math.floor(maleStudents.length / groupCount);
+            const femalesPerGroup = Math.floor(femaleStudents.length / groupCount);
+            const remainingMales = maleStudents.length % groupCount;
+            const remainingFemales = femaleStudents.length % groupCount;
+            console.log('남녀 균등 섞기 - 남학생:', maleStudents.length, '여학생:', femaleStudents.length, '그룹당 남:', malesPerGroup, '그룹당 여:', femalesPerGroup);
+            // 각 그룹별로 남녀를 균등하게 배치
+            let maleIndex = 0;
+            let femaleIndex = 0;
+            for (let groupIdx = 0; groupIdx < groupCount; groupIdx++) {
+                // 현재 그룹에 배치할 남녀 수 (남은 학생들을 앞 그룹에 배치)
+                const currentMales = malesPerGroup + (groupIdx < remainingMales ? 1 : 0);
+                const currentFemales = femalesPerGroup + (groupIdx < remainingFemales ? 1 : 0);
+                // 남학생 추가
+                for (let i = 0; i < currentMales && maleIndex < maleStudents.length; i++) {
+                    studentsToUse.push(maleStudents[maleIndex++]);
+                }
+                // 여학생 추가
+                for (let i = 0; i < currentFemales && femaleIndex < femaleStudents.length; i++) {
+                    studentsToUse.push(femaleStudents[femaleIndex++]);
+                }
+            }
+            // 각 그룹 내에서 남녀를 섞기
+            for (let groupIdx = 0; groupIdx < groupCount; groupIdx++) {
+                const startIdx = groupIdx * groupSize;
+                const endIdx = Math.min(startIdx + groupSize, studentsToUse.length);
+                // 그룹 내에서만 섞기
+                for (let i = endIdx - 1; i > startIdx; i--) {
+                    const j = startIdx + Math.floor(Math.random() * (i - startIdx + 1));
+                    [studentsToUse[i], studentsToUse[j]] = [studentsToUse[j], studentsToUse[i]];
+                }
+            }
+            console.log('남녀 균등 섞기 완료');
+        }
+        else {
+            // 남녀 섞기 옵션이 체크되지 않으면 기존 순서 유지
+            studentsToUse = [...this.students];
+        }
+        // 분단 수 가져오기
+        const partitionInput = document.getElementById('number-of-partitions');
+        const partitionCount = partitionInput ? parseInt(partitionInput.value || '3', 10) : 3;
+        console.log('분단 수:', partitionCount);
+        // 그리드 레이아웃 설정 (모둠별로 배치)
+        seatsArea.style.display = 'grid';
+        seatsArea.style.gap = '20px 40px'; // 모둠 간 간격 (세로 20px, 가로 40px - 모둠 간 넓은 간격)
+        seatsArea.style.gridTemplateColumns = `repeat(${partitionCount}, 1fr)`;
+        seatsArea.style.justifyContent = 'center';
+        seatsArea.style.justifyItems = 'center'; // 각 모둠 컨테이너를 중앙 정렬
+        // 그룹 내 그리드 설정 (3명: 2x2, 4명: 2x2, 5명: 2x3, 6명: 2x3)
+        let colsPerGroup;
+        let rowsPerGroup;
+        if (groupSize === 3) {
+            colsPerGroup = 2; // 3명: 가로 2개
+            rowsPerGroup = 2; // 3명: 세로 2개
+        }
+        else if (groupSize === 4) {
+            colsPerGroup = 2; // 4명: 가로 2개
+            rowsPerGroup = 2; // 4명: 세로 2개
+        }
+        else if (groupSize === 5) {
+            colsPerGroup = 2; // 5명: 가로 2개
+            rowsPerGroup = 3; // 5명: 세로 3개
+        }
+        else { // groupSize === 6
+            colsPerGroup = 2; // 6명: 가로 2개
+            rowsPerGroup = 3; // 6명: 세로 3개
+        }
+        // 학생들을 그룹으로 나누기 (섞인 학생 배열 사용)
+        const totalStudents = studentsToUse.length;
+        const groupCount = Math.ceil(totalStudents / groupSize);
+        // 모둠별 그룹 수 계산
+        const groupsPerPartition = Math.ceil(groupCount / partitionCount);
+        console.log('그룹 생성 - totalStudents:', totalStudents, 'groupSize:', groupSize, 'groupCount:', groupCount, 'groupsPerPartition:', groupsPerPartition);
+        // 모둠별로 그룹 배치
+        for (let partitionIndex = 0; partitionIndex < partitionCount; partitionIndex++) {
+            const partitionStartGroup = partitionIndex * groupsPerPartition;
+            const partitionEndGroup = Math.min(partitionStartGroup + groupsPerPartition, groupCount);
+            // 모둠 컨테이너 생성 (레이블과 그룹들을 함께 묶음)
+            const partitionContainer = document.createElement('div');
+            partitionContainer.style.cssText = `
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 10px;
+                width: 100%;
+            `;
+            // 분단 레이블 추가 (모둠 컨테이너 내부에)
+            const label = document.createElement('div');
+            label.textContent = `${partitionIndex + 1}분단`;
+            label.style.textAlign = 'center';
+            label.style.fontWeight = 'bold';
+            label.style.color = '#667eea';
+            label.style.fontSize = '0.9em';
+            label.style.width = '100%';
+            partitionContainer.appendChild(label);
+            // 각 모둠 내의 그룹들을 담을 컨테이너
+            const groupsContainer = document.createElement('div');
+            groupsContainer.style.cssText = `
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 10px;
+                width: 100%;
+            `;
+            // 각 모둠 내의 그룹들
+            for (let groupIndex = partitionStartGroup; groupIndex < partitionEndGroup; groupIndex++) {
+                // 그룹 컨테이너 생성
+                const groupContainer = document.createElement('div');
+                groupContainer.className = 'seat-group-container';
+                // 그리드 행 수도 명시적으로 설정
+                const gridTemplateRows = groupSize === 3 ? 'repeat(2, 1fr)' :
+                    groupSize === 4 ? 'repeat(2, 1fr)' :
+                        groupSize === 5 ? 'repeat(3, 1fr)' :
+                            'repeat(3, 1fr)'; // 6명
+                groupContainer.style.cssText = `
+                    display: grid;
+                    grid-template-columns: repeat(${colsPerGroup}, 1fr);
+                    grid-template-rows: ${gridTemplateRows};
+                    gap: 0;
+                    border: 3px solid #667eea;
+                    border-radius: 12px;
+                    padding: 5px;
+                    background: #f8f9fa;
+                    width: fit-content;
+                    min-width: 250px;
+                `;
+                // 그룹 내 카드 생성
+                const startIndex = groupIndex * groupSize;
+                const endIndex = Math.min(startIndex + groupSize, totalStudents);
+                console.log(`그룹 ${groupIndex + 1} 생성 - startIndex: ${startIndex}, endIndex: ${endIndex}`);
+                for (let i = startIndex; i < endIndex; i++) {
+                    if (!studentsToUse[i]) {
+                        console.warn(`학생 데이터 없음 - index: ${i}`);
+                        continue;
+                    }
+                    const student = studentsToUse[i];
+                    const card = this.createStudentCard(student, i);
+                    // 그룹 내 카드는 gap 없이 붙여서 표시
+                    card.style.margin = '0';
+                    card.style.borderRadius = '0';
+                    card.style.width = '100%';
+                    card.style.height = '100%';
+                    card.style.minWidth = '0';
+                    card.style.maxWidth = 'none';
+                    const positionInGroup = i - startIndex;
+                    const row = Math.floor(positionInGroup / colsPerGroup);
+                    const col = positionInGroup % colsPerGroup;
+                    const isLastRow = row === rowsPerGroup - 1 || i === endIndex - 1 || (i + 1 - startIndex) > (row + 1) * colsPerGroup;
+                    const isFirstRow = row === 0;
+                    const isFirstCol = col === 0;
+                    const isLastCol = col === colsPerGroup - 1 || (i === endIndex - 1 && (i - startIndex) % colsPerGroup === (endIndex - startIndex - 1) % colsPerGroup);
+                    // 모서리 둥글게 처리
+                    if (isFirstRow && isFirstCol) {
+                        card.style.borderTopLeftRadius = '8px';
+                    }
+                    if (isFirstRow && isLastCol) {
+                        card.style.borderTopRightRadius = '8px';
+                    }
+                    if (isLastRow && isFirstCol) {
+                        card.style.borderBottomLeftRadius = '8px';
+                    }
+                    if (isLastRow && isLastCol) {
+                        card.style.borderBottomRightRadius = '8px';
+                    }
+                    groupContainer.appendChild(card);
+                }
+                groupsContainer.appendChild(groupContainer);
+            }
+            // groupsContainer를 partitionContainer에 추가
+            partitionContainer.appendChild(groupsContainer);
+            // partitionContainer를 seatsArea에 추가
+            seatsArea.appendChild(partitionContainer);
+        }
     }
     /**
      * 좌석 배치 결과를 localStorage에 저장
@@ -1394,6 +1858,16 @@ export class MainController {
         });
         leftButtonGroup.appendChild(uploadBtn);
         leftButtonGroup.appendChild(fileInput);
+        // 우리 반 이름 불러오기 버튼
+        const loadClassBtn = document.createElement('button');
+        loadClassBtn.id = 'load-class-names';
+        loadClassBtn.className = 'secondary-btn';
+        loadClassBtn.textContent = '우리 반 이름 불러오기';
+        loadClassBtn.style.flex = 'none';
+        loadClassBtn.style.width = 'auto';
+        loadClassBtn.style.whiteSpace = 'nowrap';
+        loadClassBtn.addEventListener('click', () => this.handleLoadClassNames());
+        leftButtonGroup.appendChild(loadClassBtn);
         // 오른쪽 버튼 그룹
         const rightButtonGroup = document.createElement('div');
         rightButtonGroup.style.display = 'flex';
@@ -1685,7 +2159,7 @@ export class MainController {
         `;
         actionButtons.innerHTML = `
             <button id="add-student-row-btn" style="width: auto; flex: 0 0 auto; min-width: 0;">행 추가</button>
-            <button id="save-student-table-btn" class="save-btn" style="width: auto; flex: 0 0 auto; min-width: 0; background: #28a745; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;">💾 저장</button>
+            <button id="save-student-table-btn" class="save-btn" style="width: auto; flex: 0 0 auto; min-width: 0; background: #28a745; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: 500; white-space: nowrap;">✅ 우리반 학생으로 등록하기</button>
         `;
         statsAndButtonsWrapper.appendChild(actionButtons);
         studentTableContainer.appendChild(statsAndButtonsWrapper);
@@ -2007,26 +2481,53 @@ export class MainController {
     /**
      * 학생 정보 입력 테이블 저장 처리
      * 테이블의 학생 수를 계산하여 1단계 사이드바에 반영하고 미리보기를 업데이트
+     * 그리고 localStorage에 학생 데이터를 저장
      */
     handleSaveStudentTable() {
         const outputSection = document.getElementById('output-section');
         const rows = outputSection?.querySelectorAll('.student-input-table tbody tr') || [];
         let maleCount = 0;
         let femaleCount = 0;
+        const studentData = [];
         rows.forEach((row) => {
+            const nameInput = row.querySelector('.student-name-input');
             const genderSelect = row.querySelector('.student-gender-select');
-            if (genderSelect) {
+            const fixedSeatSelect = row.querySelector('.fixed-seat-select');
+            if (nameInput && genderSelect) {
+                const name = nameInput.value.trim();
                 const gender = genderSelect.value;
-                if (gender === 'M') {
-                    maleCount++;
-                }
-                else if (gender === 'F') {
-                    femaleCount++;
+                if (name && gender) {
+                    if (gender === 'M') {
+                        maleCount++;
+                    }
+                    else if (gender === 'F') {
+                        femaleCount++;
+                    }
+                    const student = { name, gender };
+                    // 고정 좌석 정보가 있으면 추가
+                    if (fixedSeatSelect && fixedSeatSelect.value) {
+                        const fixedSeatId = parseInt(fixedSeatSelect.value, 10);
+                        if (!isNaN(fixedSeatId)) {
+                            student.fixedSeatId = fixedSeatId;
+                        }
+                    }
+                    studentData.push(student);
                 }
             }
         });
+        // localStorage에 학생 데이터 저장
+        try {
+            localStorage.setItem('classStudentData', JSON.stringify(studentData));
+            console.log('학생 데이터 저장 완료:', studentData);
+        }
+        catch (error) {
+            console.error('학생 데이터 저장 중 오류:', error);
+            alert('학생 데이터 저장 중 오류가 발생했습니다.');
+            return;
+        }
         // 테이블의 학생 수를 1단계 사이드바로 동기화
         this.syncSidebarToTable(maleCount, femaleCount);
+        alert(`우리반 학생 ${studentData.length}명이 등록되었습니다!`);
     }
     /**
      * 테이블의 숫자를 1단계 사이드바로 동기화
@@ -2057,8 +2558,200 @@ export class MainController {
             this.updateStudentTableStats();
             this.isSyncing = false; // 동기화 완료
         }, 100);
-        // 완료 메시지 표시
-        this.outputModule.showInfo(`1단계 입력 값이 테이블 기준으로 업데이트되었습니다. (남: ${tableMaleCount}명, 여: ${tableFemaleCount}명)`);
+    }
+    /**
+     * 우리 반 이름 불러오기 처리
+     * localStorage에 저장된 학생 데이터를 테이블에 로드
+     */
+    handleLoadClassNames() {
+        try {
+            const savedDataStr = localStorage.getItem('classStudentData');
+            if (!savedDataStr) {
+                alert('저장된 우리반 학생 데이터가 없습니다.');
+                return;
+            }
+            const savedData = JSON.parse(savedDataStr);
+            if (!Array.isArray(savedData) || savedData.length === 0) {
+                alert('저장된 우리반 학생 데이터가 없습니다.');
+                return;
+            }
+            // 기존 테이블이 있는지 확인
+            const outputSection = document.getElementById('output-section');
+            if (!outputSection) {
+                alert('테이블 영역을 찾을 수 없습니다.');
+                return;
+            }
+            // 기존 테이블이 없으면 생성
+            let existingTable = outputSection.querySelector('.student-input-table');
+            if (!existingTable) {
+                // 테이블이 없으면 먼저 테이블 생성
+                this.handleCreateStudentTable(savedData.length);
+                // 테이블이 생성될 때까지 잠시 대기
+                setTimeout(() => {
+                    this.loadStudentDataToTable(savedData);
+                }, 100);
+            }
+            else {
+                // 기존 테이블에 데이터 로드
+                this.loadStudentDataToTable(savedData);
+            }
+        }
+        catch (error) {
+            console.error('우리반 학생 데이터 불러오기 중 오류:', error);
+            alert('우리반 학생 데이터를 불러오는 중 오류가 발생했습니다.');
+        }
+    }
+    /**
+     * 저장된 학생 데이터를 테이블에 로드
+     */
+    loadStudentDataToTable(studentData) {
+        const outputSection = document.getElementById('output-section');
+        if (!outputSection)
+            return;
+        // 기존 테이블이 없으면 새로 생성
+        let studentTableContainer = outputSection.querySelector('.student-table-container');
+        if (!studentTableContainer) {
+            this.handleCreateStudentTable(studentData.length);
+            // 테이블이 생성될 때까지 잠시 대기
+            setTimeout(() => {
+                this.loadStudentDataToTable(studentData);
+            }, 100);
+            return;
+        }
+        // 모든 테이블의 tbody 가져오기
+        const allTbodies = outputSection.querySelectorAll('.student-input-table tbody');
+        if (allTbodies.length === 0) {
+            // 테이블이 없으면 새로 생성
+            this.handleCreateStudentTable(studentData.length);
+            setTimeout(() => {
+                this.loadStudentDataToTable(studentData);
+            }, 100);
+            return;
+        }
+        // 학생 수에 따라 10명씩 그룹화
+        const studentsPerTable = 10;
+        // 각 테이블의 tbody에 데이터 로드
+        allTbodies.forEach((tbody, tableIndex) => {
+            // 기존 행 모두 제거
+            tbody.innerHTML = '';
+            const startIndex = tableIndex * studentsPerTable;
+            const endIndex = Math.min(startIndex + studentsPerTable, studentData.length);
+            // 이 테이블에 해당하는 학생 데이터
+            for (let i = startIndex; i < endIndex; i++) {
+                const student = studentData[i];
+                const globalIndex = i + 1; // 전체 학생 번호 (1부터 시작)
+                const row = document.createElement('tr');
+                row.dataset.studentIndex = i.toString();
+                // 행 번호 셀
+                const numCell = document.createElement('td');
+                numCell.className = 'row-number';
+                numCell.textContent = globalIndex.toString();
+                numCell.style.textAlign = 'center';
+                numCell.style.padding = '10px';
+                numCell.style.background = '#f8f9fa';
+                row.appendChild(numCell);
+                // 이름 입력 셀
+                const nameCell = document.createElement('td');
+                const nameInput = document.createElement('input');
+                nameInput.type = 'text';
+                nameInput.className = 'student-name-input';
+                nameInput.id = `student-name-${globalIndex}`;
+                nameInput.value = student.name;
+                nameInput.placeholder = '학생 이름';
+                nameCell.appendChild(nameInput);
+                row.appendChild(nameCell);
+                // 성별 선택 셀
+                const genderCell = document.createElement('td');
+                const genderSelect = document.createElement('select');
+                genderSelect.className = 'student-gender-select';
+                genderSelect.id = `student-gender-${globalIndex}`;
+                genderSelect.innerHTML = `
+                    <option value="">선택</option>
+                    <option value="M" ${student.gender === 'M' ? 'selected' : ''}>남</option>
+                    <option value="F" ${student.gender === 'F' ? 'selected' : ''}>여</option>
+                `;
+                genderCell.appendChild(genderSelect);
+                row.appendChild(genderCell);
+                // 고정 좌석 선택 셀 (고정 좌석 모드인지 확인)
+                const fixedRandomMode = document.querySelector('input[name="custom-mode-2"][value="fixed-random"]:checked');
+                if (fixedRandomMode) {
+                    const fixedSeatCell = document.createElement('td');
+                    const fixedSeatSelect = document.createElement('select');
+                    fixedSeatSelect.className = 'fixed-seat-select';
+                    fixedSeatSelect.id = `fixed-seat-${globalIndex}`;
+                    fixedSeatSelect.innerHTML = '<option value="">없음</option>';
+                    // 고정된 좌석이 있으면 옵션 추가
+                    if (this.fixedSeatIds.size > 0) {
+                        this.fixedSeatIds.forEach(seatId => {
+                            const option = document.createElement('option');
+                            option.value = seatId.toString();
+                            option.textContent = `좌석 #${seatId}`;
+                            if (student.fixedSeatId === seatId) {
+                                option.selected = true;
+                            }
+                            fixedSeatSelect.appendChild(option);
+                        });
+                    }
+                    // 고정 좌석 선택 변경 이벤트
+                    fixedSeatSelect.addEventListener('change', () => {
+                        const selectedSeatId = fixedSeatSelect.value;
+                        const studentIndex = parseInt(row.dataset.studentIndex || '0', 10);
+                        // 학생 데이터에 고정 좌석 ID 저장
+                        if (this.students[studentIndex]) {
+                            if (selectedSeatId) {
+                                this.students[studentIndex].fixedSeatId = parseInt(selectedSeatId, 10);
+                            }
+                            else {
+                                delete this.students[studentIndex].fixedSeatId;
+                            }
+                        }
+                        // 번호 셀 배경색 변경
+                        if (numCell) {
+                            if (selectedSeatId) {
+                                numCell.style.background = '#667eea';
+                                numCell.style.color = 'white';
+                                numCell.style.fontWeight = 'bold';
+                            }
+                            else {
+                                numCell.style.background = '#f8f9fa';
+                                numCell.style.color = '';
+                                numCell.style.fontWeight = '';
+                            }
+                        }
+                    });
+                    // 고정 좌석이 있으면 번호 셀 배경색 설정
+                    if (student.fixedSeatId !== undefined) {
+                        numCell.style.background = '#667eea';
+                        numCell.style.color = 'white';
+                        numCell.style.fontWeight = 'bold';
+                    }
+                    fixedSeatCell.appendChild(fixedSeatSelect);
+                    row.appendChild(fixedSeatCell);
+                }
+                // 삭제 버튼 셀
+                const deleteCell = document.createElement('td');
+                deleteCell.style.textAlign = 'center';
+                deleteCell.style.padding = '8px';
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'delete-row-btn';
+                deleteBtn.innerHTML = '🗑️';
+                deleteBtn.type = 'button';
+                deleteBtn.title = '삭제';
+                deleteBtn.onclick = () => this.handleDeleteStudentRow(row);
+                deleteCell.appendChild(deleteBtn);
+                row.appendChild(deleteCell);
+                tbody.appendChild(row);
+            }
+        });
+        // 고정 좌석 드롭다운 업데이트
+        this.updateFixedSeatDropdowns();
+        // 통계 업데이트
+        this.updateStudentTableStats();
+        // 사이드바 동기화
+        const maleCount = studentData.filter(s => s.gender === 'M').length;
+        const femaleCount = studentData.filter(s => s.gender === 'F').length;
+        this.syncSidebarToTable(maleCount, femaleCount);
+        alert(`우리반 학생 ${studentData.length}명을 불러왔습니다!`);
     }
     /**
      * 1단계 사이드바 값을 테이블로 동기화
@@ -2496,6 +3189,16 @@ export class MainController {
         });
         buttonContainer.appendChild(uploadBtn);
         buttonContainer.appendChild(fileInput);
+        // 우리 반 이름 불러오기 버튼
+        const loadClassBtn3 = document.createElement('button');
+        loadClassBtn3.id = 'load-class-names-3';
+        loadClassBtn3.className = 'secondary-btn';
+        loadClassBtn3.textContent = '우리 반 이름 불러오기';
+        loadClassBtn3.style.flex = 'none';
+        loadClassBtn3.style.width = 'auto';
+        loadClassBtn3.style.whiteSpace = 'nowrap';
+        loadClassBtn3.addEventListener('click', () => this.handleLoadClassNames());
+        buttonContainer.appendChild(loadClassBtn3);
         // 자리 배치하기 버튼과 체크박스 추가
         const arrangeBtn = document.createElement('button');
         arrangeBtn.id = 'arrange-seats';
@@ -2783,7 +3486,7 @@ export class MainController {
         `;
         actionButtons.innerHTML = `
             <button id="add-student-row-btn" style="width: auto; flex: 0 0 auto; min-width: 0;">행 추가</button>
-            <button id="save-student-table-btn" class="save-btn" style="width: auto; flex: 0 0 auto; min-width: 0; background: #28a745; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;">💾 저장</button>
+            <button id="save-student-table-btn" class="save-btn" style="width: auto; flex: 0 0 auto; min-width: 0; background: #28a745; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: 500; white-space: nowrap;">✅ 우리반 학생으로 등록하기</button>
         `;
         statsAndButtonsWrapper.appendChild(actionButtons);
         studentTableContainer.appendChild(statsAndButtonsWrapper);
@@ -2901,6 +3604,144 @@ export class MainController {
         }
     }
     /**
+     * 모둠 배치 서브 메뉴 토글
+     */
+    toggleGroupSubmenu(show) {
+        const groupSubmenu = document.getElementById('group-submenu');
+        if (!groupSubmenu)
+            return;
+        if (show) {
+            groupSubmenu.style.display = 'block';
+        }
+        else {
+            groupSubmenu.style.display = 'none';
+        }
+    }
+    /**
+     * 모둠 배치 남녀 섞기 옵션 토글
+     */
+    toggleGroupGenderMixOption(show) {
+        const genderMixOption = document.getElementById('group-gender-mix-option');
+        if (!genderMixOption)
+            return;
+        if (show) {
+            genderMixOption.style.display = 'block';
+        }
+        else {
+            genderMixOption.style.display = 'none';
+        }
+    }
+    /**
+     * 모둠 배치 선택 시 분단 개수 제한 적용
+     */
+    updatePartitionLimitForGroup(groupSize) {
+        const partitionInput = document.getElementById('number-of-partitions');
+        if (!partitionInput)
+            return;
+        // 3명 모둠 배치 선택 시 3, 4, 5개 분단만 허용
+        if (groupSize === 'group-3') {
+            partitionInput.min = '3';
+            partitionInput.max = '5';
+            // 현재 값이 허용 범위를 벗어나면 조정
+            const currentValue = parseInt(partitionInput.value, 10);
+            if (currentValue < 3) {
+                partitionInput.value = '3';
+            }
+            else if (currentValue > 5) {
+                partitionInput.value = '5';
+            }
+        }
+        // 4명 모둠 배치 선택 시 3, 4개 분단만 허용
+        else if (groupSize === 'group-4') {
+            partitionInput.min = '3';
+            partitionInput.max = '4';
+            // 현재 값이 허용 범위를 벗어나면 조정
+            const currentValue = parseInt(partitionInput.value, 10);
+            if (currentValue < 3) {
+                partitionInput.value = '3';
+            }
+            else if (currentValue > 4) {
+                partitionInput.value = '4';
+            }
+        }
+        // 5명 모둠 배치 선택 시 3, 4, 5개 분단만 허용
+        else if (groupSize === 'group-5') {
+            partitionInput.min = '3';
+            partitionInput.max = '5';
+            // 현재 값이 허용 범위를 벗어나면 조정
+            const currentValue = parseInt(partitionInput.value, 10);
+            if (currentValue < 3) {
+                partitionInput.value = '3';
+            }
+            else if (currentValue > 5) {
+                partitionInput.value = '5';
+            }
+        }
+        // 6명 모둠 배치 선택 시 2, 3, 4개 분단만 허용
+        else if (groupSize === 'group-6') {
+            partitionInput.min = '2';
+            partitionInput.max = '4';
+            // 현재 값이 허용 범위를 벗어나면 조정
+            const currentValue = parseInt(partitionInput.value, 10);
+            if (currentValue < 2) {
+                partitionInput.value = '2';
+            }
+            else if (currentValue > 4) {
+                partitionInput.value = '4';
+            }
+        }
+        else {
+            // 다른 모둠 배치 옵션이면 제한 해제
+            this.resetPartitionLimit();
+        }
+    }
+    /**
+     * 1명씩 한줄로 배치 선택 시 분단 개수 제한 적용 (3, 4, 5, 6만 허용)
+     */
+    updatePartitionLimitForSingleUniform() {
+        const partitionInput = document.getElementById('number-of-partitions');
+        if (!partitionInput)
+            return;
+        partitionInput.min = '3';
+        partitionInput.max = '6';
+        // 현재 값이 허용 범위를 벗어나면 조정
+        const currentValue = parseInt(partitionInput.value, 10);
+        if (currentValue < 3) {
+            partitionInput.value = '3';
+        }
+        else if (currentValue > 6) {
+            partitionInput.value = '6';
+        }
+    }
+    /**
+     * 짝꿍 배치 선택 시 분단 개수 제한 적용 (3, 4, 5만 허용)
+     */
+    updatePartitionLimitForPair() {
+        const partitionInput = document.getElementById('number-of-partitions');
+        if (!partitionInput)
+            return;
+        partitionInput.min = '3';
+        partitionInput.max = '5';
+        // 현재 값이 허용 범위를 벗어나면 조정
+        const currentValue = parseInt(partitionInput.value, 10);
+        if (currentValue < 3) {
+            partitionInput.value = '3';
+        }
+        else if (currentValue > 5) {
+            partitionInput.value = '5';
+        }
+    }
+    /**
+     * 분단 개수 제한 해제 (기본값으로 복원)
+     */
+    resetPartitionLimit() {
+        const partitionInput = document.getElementById('number-of-partitions');
+        if (!partitionInput)
+            return;
+        partitionInput.min = '1';
+        partitionInput.max = '10';
+    }
+    /**
      * 프로그램 실행
      */
     run() {
@@ -2961,23 +3802,8 @@ export class MainController {
             // 옵션 체크박스 값 읽기
             const avoidPrevSeat = document.getElementById('avoid-prev-seat')?.checked === true;
             const avoidPrevPartner = document.getElementById('avoid-prev-partner')?.checked === true;
-            // 이전 배치 기록 불러오기
-            const lastSeatByStudent = (() => {
-                try {
-                    return JSON.parse(localStorage.getItem('lastSeatByStudent') || '{}');
-                }
-                catch {
-                    return {};
-                }
-            })();
-            const lastPartnerByStudent = (() => {
-                try {
-                    return JSON.parse(localStorage.getItem('lastPartnerByStudent') || '{}');
-                }
-                catch {
-                    return {};
-                }
-            })();
+            // 확정된 자리 이력에서 이전 좌석 및 짝꿍 정보 추출
+            const { lastSeatByStudent, lastPartnerByStudent } = this.extractHistoryConstraints(avoidPrevSeat, avoidPrevPartner);
             // 고정 좌석 모드인 경우
             if (fixedRandomMode && this.fixedSeatIds.size > 0) {
                 // 1단계: 모든 카드의 이름 초기화
@@ -3414,6 +4240,8 @@ export class MainController {
             if (actionButtons) {
                 actionButtons.style.display = 'block';
             }
+            // 확정된 자리 이력 드롭다운 업데이트 (항상 표시되므로 업데이트만)
+            this.updateHistoryDropdown();
             // 고정 좌석 모드 도움말 숨기기
             const fixedSeatHelp = document.getElementById('fixed-seat-help');
             if (fixedSeatHelp) {
@@ -3460,6 +4288,364 @@ export class MainController {
         catch (error) {
             console.error('좌석 배치 중 오류:', error);
             this.outputModule.showError('좌석 배치 중 오류가 발생했습니다.');
+        }
+    }
+    /**
+     * 자리 확정 처리
+     */
+    handleConfirmSeats() {
+        try {
+            // 현재 좌석 배치 데이터 수집
+            const seatsArea = document.getElementById('seats-area');
+            if (!seatsArea) {
+                alert('좌석 배치 데이터를 찾을 수 없습니다.');
+                return;
+            }
+            // 현재 배치 상태 저장
+            const currentLayout = [];
+            const pairInfo = []; // 짝꿍 정보
+            // 현재 배치 유형 확인
+            const layoutTypeInput = document.querySelector('input[name="layout-type"]:checked');
+            const isPairLayout = layoutTypeInput && layoutTypeInput.value === 'pair-uniform';
+            const allCards = Array.from(seatsArea.querySelectorAll('.student-seat-card'));
+            // 짝꿍 배치인 경우 짝꿍 정보 추출
+            if (isPairLayout) {
+                const pairContainers = [];
+                allCards.forEach(card => {
+                    const parent = card.parentElement;
+                    const siblings = parent ? parent.querySelectorAll('.student-seat-card') : null;
+                    if (siblings && siblings.length === 2 && pairContainers.indexOf(parent) === -1) {
+                        pairContainers.push(parent);
+                    }
+                });
+                pairContainers.forEach(container => {
+                    const cards = Array.from(container.querySelectorAll('.student-seat-card'));
+                    if (cards.length === 2) {
+                        const nameDiv1 = cards[0].querySelector('.student-name');
+                        const nameDiv2 = cards[1].querySelector('.student-name');
+                        const student1 = nameDiv1?.textContent?.trim() || '';
+                        const student2 = nameDiv2?.textContent?.trim() || '';
+                        if (student1 && student2) {
+                            pairInfo.push({ student1, student2 });
+                        }
+                    }
+                });
+            }
+            allCards.forEach(card => {
+                const seatIdStr = card.getAttribute('data-seat-id');
+                if (!seatIdStr)
+                    return;
+                const seatId = parseInt(seatIdStr, 10);
+                const nameDiv = card.querySelector('.student-name');
+                const studentName = nameDiv?.textContent?.trim() || '';
+                if (studentName) {
+                    const gender = card.classList.contains('gender-m') ? 'M' : 'F';
+                    currentLayout.push({ seatId, studentName, gender });
+                }
+            });
+            if (currentLayout.length === 0) {
+                alert('확정할 자리 배치가 없습니다.');
+                return;
+            }
+            // 날짜 생성 (yy-mm-dd 형식)
+            const now = new Date();
+            const year = now.getFullYear().toString().slice(-2);
+            const month = (now.getMonth() + 1).toString().padStart(2, '0');
+            const day = now.getDate().toString().padStart(2, '0');
+            const dateString = `${year}-${month}-${day}`;
+            // 이력 데이터 생성
+            const historyId = `history_${Date.now()}`;
+            const historyItem = {
+                id: historyId,
+                date: dateString,
+                layout: currentLayout,
+                timestamp: now.getTime()
+            };
+            // 짝꿍 정보가 있으면 추가
+            if (pairInfo.length > 0) {
+                historyItem.pairInfo = pairInfo;
+            }
+            // localStorage에 이력 저장
+            const existingHistory = this.getSeatHistory();
+            existingHistory.unshift(historyItem); // 최신 항목을 맨 앞에 추가
+            // 최대 50개까지만 저장
+            if (existingHistory.length > 50) {
+                existingHistory.splice(50);
+            }
+            localStorage.setItem('seatHistory', JSON.stringify(existingHistory));
+            // 드롭다운 메뉴 업데이트
+            this.updateHistoryDropdown();
+            alert(`자리가 확정되었습니다!\n날짜: ${dateString}`);
+        }
+        catch (error) {
+            console.error('자리 확정 중 오류:', error);
+            alert('자리 확정 중 오류가 발생했습니다.');
+        }
+    }
+    /**
+     * 좌석 이력 가져오기 (최신순으로 정렬)
+     */
+    getSeatHistory() {
+        try {
+            const historyStr = localStorage.getItem('seatHistory');
+            if (!historyStr)
+                return [];
+            const history = JSON.parse(historyStr);
+            // 최신 항목이 앞에 오도록 timestamp 기준 내림차순 정렬
+            return history.sort((a, b) => {
+                return (b.timestamp || 0) - (a.timestamp || 0);
+            });
+        }
+        catch {
+            return [];
+        }
+    }
+    /**
+     * 확정된 자리 이력에서 이전 좌석 및 짝꿍 제약 조건 추출
+     */
+    extractHistoryConstraints(avoidPrevSeat, avoidPrevPartner) {
+        const lastSeatByStudent = {};
+        const lastPartnerByStudent = {};
+        if (!avoidPrevSeat && !avoidPrevPartner) {
+            return { lastSeatByStudent, lastPartnerByStudent };
+        }
+        // 확정된 자리 이력 가져오기
+        const history = this.getSeatHistory();
+        if (history.length === 0) {
+            return { lastSeatByStudent, lastPartnerByStudent };
+        }
+        // 현재 배치 유형 확인
+        const layoutTypeInput = document.querySelector('input[name="layout-type"]:checked');
+        const isPairLayout = layoutTypeInput && layoutTypeInput.value === 'pair-uniform';
+        // 모든 이력에서 정보 추출 (최신 이력 우선)
+        history.forEach(historyItem => {
+            const layout = historyItem.layout;
+            // 이전 좌석 정보 추출
+            if (avoidPrevSeat) {
+                layout.forEach(item => {
+                    if (item.studentName && !lastSeatByStudent[item.studentName]) {
+                        lastSeatByStudent[item.studentName] = item.seatId;
+                    }
+                });
+            }
+            // 이전 짝꿍 정보 추출 (짝꿍 배치인 경우)
+            if (avoidPrevPartner && isPairLayout) {
+                // pairInfo가 있으면 사용 (더 정확함)
+                if (historyItem.pairInfo && historyItem.pairInfo.length > 0) {
+                    historyItem.pairInfo.forEach(pair => {
+                        if (pair.student1 && pair.student2) {
+                            if (!lastPartnerByStudent[pair.student1]) {
+                                lastPartnerByStudent[pair.student1] = pair.student2;
+                            }
+                            if (!lastPartnerByStudent[pair.student2]) {
+                                lastPartnerByStudent[pair.student2] = pair.student1;
+                            }
+                        }
+                    });
+                }
+                else {
+                    // pairInfo가 없으면 좌석 번호 기반으로 추론 (하위 호환성)
+                    const seatGroups = {};
+                    layout.forEach(item => {
+                        if (item.studentName) {
+                            if (!seatGroups[item.seatId]) {
+                                seatGroups[item.seatId] = [];
+                            }
+                            seatGroups[item.seatId].push(item);
+                        }
+                    });
+                    // 같은 좌석에 2명이 앉은 경우 (짝꿍 배치)
+                    Object.values(seatGroups).forEach(group => {
+                        if (group.length === 2) {
+                            const [student1, student2] = group;
+                            if (student1.studentName && student2.studentName) {
+                                if (!lastPartnerByStudent[student1.studentName]) {
+                                    lastPartnerByStudent[student1.studentName] = student2.studentName;
+                                }
+                                if (!lastPartnerByStudent[student2.studentName]) {
+                                    lastPartnerByStudent[student2.studentName] = student1.studentName;
+                                }
+                            }
+                        }
+                    });
+                    // 인접한 좌석 번호를 가진 학생들도 짝꿍으로 간주 (같은 행에 있는 경우)
+                    const sortedLayout = [...layout].sort((a, b) => a.seatId - b.seatId);
+                    for (let i = 0; i < sortedLayout.length - 1; i++) {
+                        const current = sortedLayout[i];
+                        const next = sortedLayout[i + 1];
+                        // 인접한 좌석이고 (차이가 1 또는 2), 같은 행에 있을 가능성이 높은 경우
+                        if (current.studentName && next.studentName &&
+                            (next.seatId - current.seatId <= 2)) {
+                            // 이미 다른 짝꿍이 없으면 인접 학생을 짝꿍으로 기록
+                            if (!lastPartnerByStudent[current.studentName] && !lastPartnerByStudent[next.studentName]) {
+                                lastPartnerByStudent[current.studentName] = next.studentName;
+                                lastPartnerByStudent[next.studentName] = current.studentName;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        return { lastSeatByStudent, lastPartnerByStudent };
+    }
+    /**
+     * 이력 드롭다운 메뉴 업데이트
+     */
+    updateHistoryDropdown() {
+        const historyContent = document.getElementById('history-dropdown-content');
+        if (!historyContent)
+            return;
+        const history = this.getSeatHistory();
+        // 기존 내용 제거
+        historyContent.innerHTML = '';
+        if (history.length === 0) {
+            const emptyDiv = document.createElement('div');
+            emptyDiv.className = 'history-empty';
+            emptyDiv.id = 'history-empty';
+            emptyDiv.textContent = '확정된 자리 이력이 없습니다.';
+            historyContent.appendChild(emptyDiv);
+            return;
+        }
+        // 최신 항목이 위에 오도록 timestamp 기준 내림차순 정렬
+        const sortedHistory = [...history].sort((a, b) => {
+            return (b.timestamp || 0) - (a.timestamp || 0);
+        });
+        // 같은 날짜별로 그룹화하여 번호 매기기
+        const dateGroups = {};
+        sortedHistory.forEach(item => {
+            if (!dateGroups[item.date]) {
+                dateGroups[item.date] = [];
+            }
+            dateGroups[item.date].push(item);
+        });
+        // 각 날짜별로 항목에 번호 부여 (최신 항목이 높은 번호를 받도록)
+        const itemNumberMap = {};
+        Object.keys(dateGroups).forEach(date => {
+            const items = dateGroups[date];
+            // 같은 날짜 내에서도 timestamp 기준으로 정렬 (최신이 앞)
+            items.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+            // 최신 항목부터 높은 번호 부여 (3, 2, 1 순서)
+            items.forEach((item, index) => {
+                itemNumberMap[item.id] = items.length - index;
+            });
+        });
+        // 이력 항목들 추가 (최신순으로)
+        sortedHistory.forEach(item => {
+            const historyItemContainer = document.createElement('div');
+            historyItemContainer.className = 'history-item-container';
+            historyItemContainer.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 2px 8px; border-bottom: 1px solid #eee; transition: background 0.2s; writing-mode: horizontal-tb; text-orientation: mixed;';
+            const historyItem = document.createElement('div');
+            historyItem.className = 'history-item';
+            historyItem.dataset.historyId = item.id;
+            historyItem.style.cssText = 'flex: 1; cursor: pointer; color: #333; font-size: 0.9em; writing-mode: horizontal-tb; text-orientation: mixed; white-space: nowrap;';
+            // 같은 날짜가 여러 개인 경우 번호 추가 (최신 항목이 높은 번호)
+            let displayText = `${item.date} 확정자리`;
+            const itemCount = dateGroups[item.date]?.length || 0;
+            if (itemCount > 1) {
+                const itemNumber = itemNumberMap[item.id] || 1;
+                displayText = `${item.date} 확정자리 (${itemNumber})`;
+            }
+            historyItem.textContent = displayText;
+            historyItemContainer.appendChild(historyItem);
+            // 삭제 버튼 추가
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'history-delete-btn';
+            deleteBtn.innerHTML = '🗑️';
+            deleteBtn.title = '삭제';
+            deleteBtn.style.cssText = 'background: transparent; border: none; cursor: pointer; font-size: 1em; padding: 4px 8px; color: #dc3545; opacity: 0.7; transition: opacity 0.2s; margin-left: 8px;';
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation(); // 클릭 이벤트 전파 방지
+                this.deleteHistoryItem(item.id);
+            });
+            deleteBtn.addEventListener('mouseenter', () => {
+                deleteBtn.style.opacity = '1';
+            });
+            deleteBtn.addEventListener('mouseleave', () => {
+                deleteBtn.style.opacity = '0.7';
+            });
+            historyItemContainer.appendChild(deleteBtn);
+            historyContent.appendChild(historyItemContainer);
+            // 클릭 이벤트는 historyItem에만 추가
+            historyItem.addEventListener('click', () => {
+                this.loadHistoryItem(item.id);
+            });
+            historyItem.addEventListener('mouseenter', () => {
+                historyItemContainer.style.background = '#f0f0f0';
+            });
+            historyItem.addEventListener('mouseleave', () => {
+                historyItemContainer.style.background = '';
+            });
+        });
+    }
+    /**
+     * 이력 항목 삭제
+     */
+    deleteHistoryItem(historyId) {
+        if (!confirm('이 자리 이력을 삭제하시겠습니까?')) {
+            return;
+        }
+        try {
+            const history = this.getSeatHistory();
+            const filteredHistory = history.filter(item => item.id !== historyId);
+            localStorage.setItem('seatHistory', JSON.stringify(filteredHistory));
+            // 드롭다운 메뉴 업데이트
+            this.updateHistoryDropdown();
+            // 드롭다운이 열려있으면 닫기
+            const historyContent = document.getElementById('history-dropdown-content');
+            if (historyContent) {
+                historyContent.style.display = 'none';
+            }
+        }
+        catch (error) {
+            console.error('이력 삭제 중 오류:', error);
+            alert('이력 삭제 중 오류가 발생했습니다.');
+        }
+    }
+    /**
+     * 이력 항목 불러오기
+     */
+    loadHistoryItem(historyId) {
+        try {
+            const history = this.getSeatHistory();
+            const historyItem = history.find(item => item.id === historyId);
+            if (!historyItem) {
+                alert('이력을 찾을 수 없습니다.');
+                return;
+            }
+            // 좌석 배치 복원
+            const seatsArea = document.getElementById('seats-area');
+            if (!seatsArea) {
+                alert('좌석 배치 영역을 찾을 수 없습니다.');
+                return;
+            }
+            // 모든 카드 초기화
+            const allCards = Array.from(seatsArea.querySelectorAll('.student-seat-card'));
+            allCards.forEach(card => {
+                const nameDiv = card.querySelector('.student-name');
+                if (nameDiv) {
+                    nameDiv.textContent = '';
+                }
+            });
+            // 이력 데이터로 복원
+            historyItem.layout.forEach(({ seatId, studentName }) => {
+                const card = seatsArea.querySelector(`[data-seat-id="${seatId}"]`);
+                if (card) {
+                    const nameDiv = card.querySelector('.student-name');
+                    if (nameDiv) {
+                        nameDiv.textContent = studentName;
+                    }
+                }
+            });
+            // 드롭다운 닫기
+            const dropdown = document.getElementById('history-dropdown-content');
+            if (dropdown) {
+                dropdown.style.display = 'none';
+            }
+            alert(`${historyItem.date}의 자리 배치를 불러왔습니다.`);
+        }
+        catch (error) {
+            console.error('이력 불러오기 중 오류:', error);
+            alert('이력을 불러오는 중 오류가 발생했습니다.');
         }
     }
     /**
@@ -4312,56 +5498,90 @@ export class MainController {
             <div style="line-height: 1.8; color: #444;">
                 <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">1️⃣ 기본 사용 방법</h3>
                 <ol style="padding-left: 25px; margin-bottom: 20px;">
-                    <li><strong>1단계: 학생 자리 수 입력</strong> - 남학생 수와 여학생 수를 입력하세요. 우측에 미리보기가 자동으로 표시됩니다.</li>
-                    <li><strong>2단계: 분단 개수</strong> - 교실의 분단 수를 입력하세요 (예: 2분단, 3분단, 6분단 등)</li>
-                    <li><strong>3단계: 좌석 배치 형태</strong> - 원하는 배치 유형을 선택하세요
+                    <li><strong>옵션1: 좌석 배치 형태</strong> - 원하는 배치 유형을 선택하세요
                         <ul style="padding-left: 20px; margin-top: 8px;">
-                            <li>일렬 배치: 모든 좌석을 한 줄로 배치</li>
-                            <li>모둠 배치: 모둠 단위로 좌석 배치</li>
-                            <li>페어 배치: 두 명씩 짝지어 배치</li>
+                            <li><strong>1명씩 한 줄로 배치</strong>: 개별 좌석을 분단별로 배치 (분단 수: 3~6)</li>
+                            <li><strong>2명씩 짝꿍 배치</strong>: 두 명이 나란히 앉는 형태 (분단 수: 3~5)
+                                <ul style="padding-left: 15px; margin-top: 5px;">
+                                    <li>남녀 짝꿍하기: 남학생과 여학생을 짝지어 배치</li>
+                                    <li>같은 성끼리 짝꿍하기: 같은 성별끼리 짝지어 배치</li>
+                                </ul>
+                            </li>
+                            <li><strong>모둠 배치</strong>: 모둠 단위로 좌석 배치
+                                <ul style="padding-left: 15px; margin-top: 5px;">
+                                    <li>3명 모둠 배치: 2x2 그리드 (분단 수: 3~5)</li>
+                                    <li>4명 모둠 배치: 2x2 그리드 (분단 수: 3~4)</li>
+                                    <li>5명 모둠 배치: 2x3 그리드 (분단 수: 3~5)</li>
+                                    <li>6명 모둠 배치: 2x3 그리드 (분단 수: 2~4)</li>
+                                    <li>남녀 섞기: 모둠 내에서 남녀를 균형있게 섞어 배치</li>
+                                </ul>
+                            </li>
                         </ul>
                     </li>
-                    <li><strong>4단계: 맞춤 구성</strong> - 추가 옵션을 선택하세요</li>
-                    <li><strong>5단계: 학생 정보 입력</strong> - 학생 이름과 성별을 입력하세요</li>
-                    <li><strong>자리 배치 실행하기</strong> - 버튼을 클릭하면 좌석에 학생들이 랜덤 배치됩니다</li>
+                    <li><strong>옵션2: 학생 자리 수</strong> - 남학생 수와 여학생 수를 입력하세요. 우측에 미리보기가 자동으로 표시됩니다.</li>
+                    <li><strong>옵션3: 분단 개수</strong> - 교실의 분단 수를 입력하세요 (선택한 배치 형태에 따라 가능한 범위가 다릅니다)</li>
+                    <li><strong>옵션4: 맞춤 구성</strong> - 추가 옵션을 선택하세요
+                        <ul style="padding-left: 20px; margin-top: 8px;">
+                            <li>랜덤 배치: 완전 랜덤으로 좌석 배치</li>
+                            <li>고정 좌석 지정 후 랜덤 배치: 특정 좌석을 고정하고 나머지만 랜덤 배치</li>
+                        </ul>
+                    </li>
+                    <li><strong>🪑 좌석 배치하기</strong> - "학생 이름 입력하기" 버튼을 클릭하여 학생 정보를 입력한 후, "자리 배치 실행하기" 버튼을 클릭하면 좌석에 학생들이 배치됩니다</li>
                 </ol>
 
-                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">2️⃣ 고정 좌석 기능</h3>
+                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">2️⃣ 학생 정보 입력</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
-                    <li><strong>고정 좌석 지정</strong>: "고정 좌석 지정 후 랜덤 배치" 옵션을 선택하세요</li>
+                    <li><strong>학생 이름 입력하기</strong>: 버튼을 클릭하여 학생 정보 입력 테이블을 생성하세요</li>
+                    <li><strong>학생 이름 엑셀파일에서 가져오기</strong>: 엑셀 파일을 업로드하여 학생 정보를 한 번에 입력할 수 있습니다</li>
+                    <li><strong>학생 이름 양식 다운로드</strong>: 엑셀 양식 파일을 다운로드하여 학생 정보를 작성한 후 업로드하세요</li>
+                    <li><strong>우리 반 이름 불러오기</strong>: 이전에 저장한 반 학생 정보를 불러옵니다</li>
+                    <li><strong>우리반 학생으로 등록하기</strong>: 현재 입력한 학생 정보를 저장하여 다음에 불러올 수 있습니다</li>
+                    <li><strong>행 추가</strong>: 학생 정보 입력 테이블에서 "행 추가" 버튼을 클릭하여 학생을 추가할 수 있습니다</li>
+                    <li><strong>삭제</strong>: 각 행의 삭제 아이콘(🗑️)을 클릭하여 학생을 삭제할 수 있습니다</li>
+                </ul>
+
+                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">3️⃣ 고정 좌석 기능</h3>
+                <ul style="padding-left: 25px; margin-bottom: 20px;">
+                    <li><strong>고정 좌석 지정</strong>: "옵션4: 맞춤 구성"에서 "고정 좌석 지정 후 랜덤 배치" 옵션을 선택하세요</li>
                     <li>미리보기 화면에서 원하는 좌석 카드를 클릭하면 🔒 아이콘과 빨간 테두리가 표시됩니다</li>
                     <li>학생 정보 입력 테이블의 "고정 좌석" 드롭다운에서 고정된 좌석을 선택하여 학생을 연결하세요</li>
                     <li>고정 좌석이 선택된 행의 번호 셀은 파란색 배경으로 표시됩니다</li>
                     <li>고정 좌석을 제외한 나머지 좌석에만 학생들이 랜덤 배치됩니다</li>
                 </ul>
 
-                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">3️⃣ 자리 배치 옵션</h3>
+                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">4️⃣ 자리 배치 옵션</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
-                    <li><strong>남녀 짝꿍하기</strong>: 남학생과 여학생을 짝지어 배치합니다</li>
-                    <li><strong>같은 성끼리 짝꿍하기</strong>: 같은 성별끼리 짝지어 배치합니다</li>
-                    <li><strong>이전 좌석 안 앉기</strong>: 이전에 앉았던 좌석을 피하여 배치합니다</li>
-                    <li><strong>이전 짝 금지</strong>: 이전에 같은 짝이었던 학생과 다시 짝지어지지 않도록 합니다</li>
+                    <li><strong>이전 좌석 안 앉기</strong>: "확정된 자리 이력"에 저장된 이전 배치를 참고하여 같은 좌석에 배치되지 않도록 합니다</li>
+                    <li><strong>이전 짝 금지</strong>: "확정된 자리 이력"에 저장된 이전 배치를 참고하여 이전에 같은 짝이었던 학생과 다시 짝지어지지 않도록 합니다</li>
+                    <li>두 옵션을 모두 체크하면 두 조건을 모두 만족하도록 배치됩니다</li>
                 </ul>
 
-                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">4️⃣ 자리 바꾸기</h3>
+                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">5️⃣ 확정된 자리 이력</h3>
+                <ul style="padding-left: 25px; margin-bottom: 20px;">
+                    <li><strong>자리 확정</strong>: 자리 배치가 완료된 후 "✅ 자리 확정" 버튼을 클릭하면 현재 배치가 이력에 저장됩니다</li>
+                    <li><strong>확정된 자리 이력</strong>: 상단 바의 "📋 확정된 자리 이력" 드롭다운에서 저장된 배치를 확인할 수 있습니다</li>
+                    <li>같은 날짜에 여러 개의 배치가 저장되면 번호가 표시됩니다 (예: 25-11-10 확정자리 (3), (2), (1))</li>
+                    <li>이력 항목을 클릭하면 해당 배치를 불러올 수 있습니다</li>
+                    <li>이력 항목 옆의 삭제 아이콘(🗑️)을 클릭하면 해당 이력을 삭제할 수 있습니다</li>
+                    <li>드롭다운 외부를 클릭하면 드롭다운이 자동으로 닫힙니다</li>
+                </ul>
+
+                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">6️⃣ 옵션 설정 기억하기</h3>
+                <ul style="padding-left: 25px; margin-bottom: 20px;">
+                    <li><strong>옵션 설정 기억하기</strong>: "초기화" 버튼 위의 "옵션 설정 기억하기" 버튼을 클릭하면 현재 설정(옵션1~옵션4)이 저장됩니다</li>
+                    <li>다음에 프로그램을 실행하면 저장된 설정이 자동으로 적용됩니다</li>
+                </ul>
+
+                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">7️⃣ 자리 바꾸기</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
                     <li>자리 배치가 완료된 후, 좌석 카드를 드래그하여 다른 좌석에 드롭하면 자리를 바꿀 수 있습니다</li>
                     <li>두 카드를 서로 드래그 & 드롭하면 위치가 교환됩니다</li>
                 </ul>
 
-                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">5️⃣ 학생 정보 입력</h3>
-                <ul style="padding-left: 25px; margin-bottom: 20px;">
-                    <li><strong>학생 이름 엑셀파일에서 가져오기</strong>: 엑셀 파일을 업로드하여 학생 정보를 한 번에 입력할 수 있습니다</li>
-                    <li><strong>학생 이름 양식 다운로드</strong>: 엑셀 양식 파일을 다운로드하여 학생 정보를 작성한 후 업로드하세요</li>
-                    <li><strong>행 추가</strong>: 학생 정보 입력 테이블에서 "행 추가" 버튼을 클릭하여 학생을 추가할 수 있습니다</li>
-                    <li><strong>저장</strong>: 학생 정보 입력 후 "저장" 버튼을 클릭하면 1단계 입력값이 자동으로 업데이트됩니다</li>
-                </ul>
-
-                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">6️⃣ 공유 및 저장</h3>
+                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">8️⃣ 공유 및 출력</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
                     <li><strong>공유하기</strong>: 공유 주소(URL)를 생성하여 다른 사람과 자리 배치도를 공유할 수 있습니다</li>
                     <li><strong>인쇄하기</strong>: 현재 자리 배치도를 인쇄합니다</li>
-                    <li><strong>저장하기</strong>: 자리 배치도를 브라우저에 저장합니다</li>
                 </ul>
 
                 <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">💡 유용한 팁</h3>
@@ -4369,11 +5589,13 @@ export class MainController {
                     <li>학생 정보 입력 테이블 하단의 통계를 확인하여 남학생/여학생 수와 고정 좌석 수를 확인할 수 있습니다</li>
                     <li>고정 좌석 모드에서는 미리보기 화면에서 좌석을 클릭하여 고정할 수 있습니다</li>
                     <li>자리 배치 후에는 드래그 & 드롭으로 자유롭게 자리를 조정할 수 있습니다</li>
+                    <li>모둠 배치 시 "남녀 섞기" 옵션을 사용하면 모둠 내에서 남녀를 균형있게 배치할 수 있습니다</li>
+                    <li>좌측 사이드바의 토글 버튼(◀)을 클릭하면 사이드바를 접거나 펼칠 수 있습니다</li>
                 </ul>
 
                 <div style="margin-top: 30px; padding: 15px; background: #f0f8ff; border-left: 4px solid #667eea; border-radius: 4px;">
-                    <strong style="color: #667eea;">버전 정보:</strong> Version 1.0.0<br>
-                    <strong style="color: #667eea;">제작자:</strong> 김신회 (laguyo87@gmail.com)
+                    <strong style="color: #667eea;">제작자:</strong> 김신회<br>
+                    <strong style="color: #667eea;">Copyright:</strong> Copyright (c) 2025 김신회
                 </div>
             </div>
         `;

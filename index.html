@@ -30,8 +30,13 @@
         <div class="header-content">
             <h1><span class="title-icon">🪑</span>교실 자리 배치 프로그램 <small style="font-size: 0.6em;">online</small></h1>
             <div class="header-info">
+                <div class="history-dropdown" id="history-dropdown">
+                    <button class="history-dropdown-btn" id="history-dropdown-btn">📋 확정된 자리 이력</button>
+                    <div class="history-dropdown-content" id="history-dropdown-content">
+                        <div class="history-empty" id="history-empty">확정된 자리 이력이 없습니다.</div>
+                    </div>
+                </div>
                 <button id="user-manual-btn" class="user-manual-btn" title="사용설명서">📖 사용설명서</button>
-                <p class="version">V_1.0</p>
                 <p class="visitor-count" id="visitor-count">총 방문자 수: <span id="visitor-number">-</span></p>
             </div>
         </div>
@@ -46,47 +51,9 @@
         <!-- 좌측 사이드바 (설정) -->
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-content">
-            <!-- 1단계: 학생 자리 수 입력 -->
-            <section id="input-section" class="step-section">
-                <h2>1단계: 학생 자리 수 입력</h2>
-                
-                <div class="form-group" style="display: flex; align-items: center; gap: 10px; flex-wrap: nowrap;">
-                    <div style="display: flex; align-items: center; gap: 5px;">
-                        <label for="male-students" style="white-space: nowrap; font-size: 0.95em;">남학생:</label>
-                        <input type="number" id="male-students" min="0" placeholder="0" value="12" style="width: 60px; padding: 6px 8px;" />
-                    </div>
-                    
-                    <div style="display: flex; align-items: center; gap: 5px;">
-                        <label for="female-students" style="white-space: nowrap; font-size: 0.95em;">여학생:</label>
-                        <input type="number" id="female-students" min="0" placeholder="0" value="12" style="width: 60px; padding: 6px 8px;" />
-                    </div>
-                </div>
-                
-                <p class="help-text" style="margin-top: 8px; color: #666; font-size: 0.9em;">
-                    남학생 수와 여학생 수를 입력하면 우측에 미리보기가 자동으로 표시됩니다.
-                </p>
-            </section>
-
-            <!-- 2단계: 분단 개수 -->
-            <section id="partition-section" class="step-section">
-                <h2>2단계: 분단 개수</h2>
-                
-                <div class="form-group">
-                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: nowrap;">
-                        <label for="number-of-partitions" style="margin-bottom: 0; white-space: nowrap; font-size: 0.95em;">분단 수:</label>
-                        <div class="count-input-container" style="flex: 0 0 auto;">
-                            <input type="number" id="number-of-partitions" min="1" max="10" placeholder="분단 수" value="6" style="width: 80px;" />
-                        </div>
-                    </div>
-                    <p class="help-text" style="margin-top: 8px; color: #666; font-size: 0.9em;">
-                        교실의 분단 수를 입력하세요 (예: 2분단, 3분단 등)
-                    </p>
-                </div>
-            </section>
-
-            <!-- 3단계: 좌석 배치 형태 -->
+            <!-- 옵션1: 좌석 배치 형태 -->
             <section id="layout-section" class="step-section">
-                <h2>3단계: 좌석 배치 형태</h2>
+                <h2>옵션1: 좌석 배치 형태</h2>
                 
                 <div class="form-group">
                     <div class="radio-group">
@@ -113,18 +80,34 @@
                         
                         <label class="radio-option">
                             <input type="radio" name="layout-type" value="group" data-seat-type="single" id="radio-group">
-                            <span>모둠 배치 (준비중)</span>
+                            <span>모둠 배치</span>
                         </label>
                         
                         <!-- 모둠 배치 서브 옵션 (기본 숨김) -->
-                        <div id="group-submenu" style="display: none; margin-left: 30px; margin-top: 5px; margin-bottom: 5px;">
-                            <label class="radio-option" style="border: none; padding: 8px 15px;">
+                        <div id="group-submenu" style="display: none; margin-left: 30px; margin-top: 0px; margin-bottom: 0px;">
+                            <label class="radio-option" style="border: none; padding: 2px 15px; line-height: 1.2;">
+                                <input type="radio" name="group-size" value="group-3" data-seat-type="single">
+                                <span>3명 모둠 배치</span>
+                            </label>
+                            <label class="radio-option" style="border: none; padding: 2px 15px; line-height: 1.2;">
                                 <input type="radio" name="group-size" value="group-4" data-seat-type="single">
                                 <span>4명 모둠 배치</span>
                             </label>
-                            <label class="radio-option" style="border: none; padding: 8px 15px;">
+                            <label class="radio-option" style="border: none; padding: 2px 15px; line-height: 1.2;">
+                                <input type="radio" name="group-size" value="group-5" data-seat-type="single">
+                                <span>5명 모둠 배치</span>
+                            </label>
+                            <label class="radio-option" style="border: none; padding: 2px 15px; line-height: 1.2;">
                                 <input type="radio" name="group-size" value="group-6" data-seat-type="single">
                                 <span>6명 모둠 배치</span>
+                            </label>
+                        </div>
+                        
+                        <!-- 모둠 배치 남녀 섞기 옵션 (기본 숨김) -->
+                        <div id="group-gender-mix-option" style="display: none; margin-left: 30px; margin-top: 0px; margin-bottom: 0px;">
+                            <label style="display: flex; align-items: center; padding: 2px 15px; line-height: 1.2;">
+                                <input type="checkbox" id="group-gender-mix" />
+                                <span style="margin-left: 8px;">남녀 섞기</span>
                             </label>
                         </div>
                         
@@ -141,9 +124,47 @@
                 </div>
             </section>
 
-            <!-- 4단계: 맞춤 구성 -->
+            <!-- 옵션2: 학생 자리 수 -->
+            <section id="input-section" class="step-section">
+                <h2>옵션2: 학생 자리 수</h2>
+                
+                <div class="form-group" style="display: flex; align-items: center; gap: 10px; flex-wrap: nowrap;">
+                    <div style="display: flex; align-items: center; gap: 5px;">
+                        <label for="male-students" style="white-space: nowrap; font-size: 0.95em;">남학생:</label>
+                        <input type="number" id="male-students" min="0" placeholder="0" value="12" style="width: 60px; padding: 6px 8px;" />
+                    </div>
+                    
+                    <div style="display: flex; align-items: center; gap: 5px;">
+                        <label for="female-students" style="white-space: nowrap; font-size: 0.95em;">여학생:</label>
+                        <input type="number" id="female-students" min="0" placeholder="0" value="12" style="width: 60px; padding: 6px 8px;" />
+                    </div>
+                </div>
+                
+                <p class="help-text" style="margin-top: 8px; color: #666; font-size: 0.9em;">
+                    남학생 수와 여학생 수를 입력하면 우측에 미리보기가 자동으로 표시됩니다.
+                </p>
+            </section>
+
+            <!-- 옵션3: 분단 개수 -->
+            <section id="partition-section" class="step-section">
+                <h2>옵션3: 분단 개수</h2>
+                
+                <div class="form-group">
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: nowrap;">
+                        <label for="number-of-partitions" style="margin-bottom: 0; white-space: nowrap; font-size: 0.95em;">분단 수:</label>
+                        <div class="count-input-container" style="flex: 0 0 auto;">
+                            <input type="number" id="number-of-partitions" min="1" max="10" placeholder="분단 수" value="5" style="width: 80px;" />
+                        </div>
+                    </div>
+                    <p class="help-text" style="margin-top: 8px; color: #666; font-size: 0.9em;">
+                        교실의 분단 수를 입력하세요 (예: 2분단, 3분단 등)
+                    </p>
+                </div>
+            </section>
+
+            <!-- 옵션4: 맞춤 구성 -->
             <section id="custom2-section" class="step-section">
-                <h2>4단계: 맞춤 구성</h2>
+                <h2>옵션4: 맞춤 구성</h2>
                 
                 <div class="form-group">
                     <div class="radio-group">
@@ -159,9 +180,9 @@
                 </div>
             </section>
 
-            <!-- 5단계: 좌석 배치하기 -->
+            <!-- 🪑 좌석 배치하기 -->
             <section id="main-action-section" class="step-section">
-                <h2>5단계: 좌석 배치하기</h2>
+                <h2>🪑 좌석 배치하기</h2>
                 
                 <div class="form-group">
                     <button id="create-student-table" class="primary-btn">학생 이름 입력하기</button>
@@ -171,13 +192,18 @@
                 </div>
             </section>
 
+            <!-- 옵션 설정 저장 버튼 -->
+            <div class="form-group" style="margin-top: 8px;">
+                <button id="save-options" class="secondary-btn" style="width: 100%;">옵션 설정 기억하기</button>
+            </div>
+            
             <!-- 초기화 버튼 -->
             <div class="form-group" style="margin-top: 8px;">
                 <button id="reset-app" class="secondary-btn" style="width: 100%;">초기화</button>
             </div>
 
             </div>
-            <div class="sidebar-footer">Copyright (c) 2025 김신회</div>
+            <div class="sidebar-footer">Copyright (c) 2025 김신회(laguyo87@gmail.com)</div>
         </aside>
 
         <!-- 우측 메인창 (미리보기) -->
@@ -204,9 +230,9 @@
                <!-- 자리 배치도 액션 버튼들 (초기에는 숨김) -->
                <div id="layout-action-buttons" style="display: none;">
                    <div style="display: flex; gap: 10px;">
+                       <button id="confirm-seats" class="primary-btn">✅ 자리 확정</button>
                        <button id="share-layout" class="secondary-btn">📤 공유하기</button>
                        <button id="print-layout" class="secondary-btn">🖨️ 인쇄하기</button>
-                       <button id="save-layout" class="secondary-btn">💾 저장하기</button>
                    </div>
                </div>
             </div>

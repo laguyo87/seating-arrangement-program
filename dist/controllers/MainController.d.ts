@@ -17,9 +17,21 @@ export declare class MainController {
     private isSyncing;
     constructor();
     /**
+     * 초기화 시 이력 드롭다운 업데이트
+     */
+    private initializeHistoryDropdown;
+    /**
      * 앱 초기 상태로 되돌리기
      */
     private resetApp;
+    /**
+     * 옵션 설정 저장
+     */
+    private saveOptions;
+    /**
+     * 저장된 옵션 설정 불러오기
+     */
+    private loadOptions;
     /**
      * 초기 캔버스에 칠판과 교탁 그리기
      */
@@ -90,6 +102,10 @@ export declare class MainController {
      */
     private renderStudentCards;
     /**
+     * 모둠 배치로 카드 렌더링 (그룹으로 묶어서 표시)
+     */
+    private renderGroupCards;
+    /**
      * 좌석 배치 결과를 localStorage에 저장
      */
     private saveLayoutResult;
@@ -137,6 +153,7 @@ export declare class MainController {
     /**
      * 학생 정보 입력 테이블 저장 처리
      * 테이블의 학생 수를 계산하여 1단계 사이드바에 반영하고 미리보기를 업데이트
+     * 그리고 localStorage에 학생 데이터를 저장
      */
     private handleSaveStudentTable;
     /**
@@ -144,6 +161,15 @@ export declare class MainController {
      * 테이블에 실제 입력된 학생 수를 1단계 입력 필드에 반영하고 미리보기를 업데이트
      */
     private syncSidebarToTable;
+    /**
+     * 우리 반 이름 불러오기 처리
+     * localStorage에 저장된 학생 데이터를 테이블에 로드
+     */
+    private handleLoadClassNames;
+    /**
+     * 저장된 학생 데이터를 테이블에 로드
+     */
+    private loadStudentDataToTable;
     /**
      * 1단계 사이드바 값을 테이블로 동기화
      * 1단계에 입력된 숫자에 맞춰 테이블에 행을 추가하거나 삭제
@@ -205,6 +231,30 @@ export declare class MainController {
      */
     private togglePairSubmenu;
     /**
+     * 모둠 배치 서브 메뉴 토글
+     */
+    private toggleGroupSubmenu;
+    /**
+     * 모둠 배치 남녀 섞기 옵션 토글
+     */
+    private toggleGroupGenderMixOption;
+    /**
+     * 모둠 배치 선택 시 분단 개수 제한 적용
+     */
+    private updatePartitionLimitForGroup;
+    /**
+     * 1명씩 한줄로 배치 선택 시 분단 개수 제한 적용 (3, 4, 5, 6만 허용)
+     */
+    private updatePartitionLimitForSingleUniform;
+    /**
+     * 짝꿍 배치 선택 시 분단 개수 제한 적용 (3, 4, 5만 허용)
+     */
+    private updatePartitionLimitForPair;
+    /**
+     * 분단 개수 제한 해제 (기본값으로 복원)
+     */
+    private resetPartitionLimit;
+    /**
      * 프로그램 실행
      */
     run(): void;
@@ -212,6 +262,30 @@ export declare class MainController {
      * 좌석 배치하기 처리
      */
     private handleArrangeSeats;
+    /**
+     * 자리 확정 처리
+     */
+    private handleConfirmSeats;
+    /**
+     * 좌석 이력 가져오기 (최신순으로 정렬)
+     */
+    private getSeatHistory;
+    /**
+     * 확정된 자리 이력에서 이전 좌석 및 짝꿍 제약 조건 추출
+     */
+    private extractHistoryConstraints;
+    /**
+     * 이력 드롭다운 메뉴 업데이트
+     */
+    private updateHistoryDropdown;
+    /**
+     * 이력 항목 삭제
+     */
+    private deleteHistoryItem;
+    /**
+     * 이력 항목 불러오기
+     */
+    private loadHistoryItem;
     /**
      * 남녀 짝꿍 배치 렌더링
      */
