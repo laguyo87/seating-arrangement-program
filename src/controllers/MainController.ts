@@ -668,9 +668,14 @@ export class MainController {
                 this.handleShareLayout();
             }
             
-            // 인쇄하기 버튼 클릭
+            // 출력하기 버튼 클릭
             if (target.id === 'print-layout') {
                 this.handlePrintLayout();
+            }
+            
+            // 교사용 출력 버튼 클릭
+            if (target.id === 'print-layout-teacher') {
+                this.handlePrintLayoutForTeacher();
             }
             
             // 저장하기 버튼 클릭
@@ -1006,6 +1011,7 @@ export class MainController {
             // 분단 레이블을 각 컬럼에 직접 추가 (중첩 그리드 구조 제거)
             for (let i = 1; i <= partitionCount; i++) {
                 const label = document.createElement('div');
+                label.className = 'partition-label';
                 label.textContent = `${i}분단`;
                 label.style.textAlign = 'center';
                 label.style.fontWeight = 'bold';
@@ -1163,6 +1169,7 @@ export class MainController {
             // 분단 레이블을 각 컬럼에 직접 추가 (중첩 그리드 구조 제거)
             for (let i = 1; i <= partitionCount; i++) {
                 const label = document.createElement('div');
+                label.className = 'partition-label';
                 label.textContent = `${i}분단`;
                 label.style.textAlign = 'center';
                 label.style.fontWeight = 'bold';
@@ -1767,6 +1774,7 @@ export class MainController {
             
             // 분단 레이블 추가 (모둠 컨테이너 내부에)
             const label = document.createElement('div');
+            label.className = 'partition-label';
             label.textContent = `${partitionIndex + 1}분단`;
             label.style.textAlign = 'center';
             label.style.fontWeight = 'bold';
@@ -5174,6 +5182,18 @@ export class MainController {
                 }
             });
 
+            // 인쇄 및 공유 버튼 표시
+            const actionButtons = document.getElementById('layout-action-buttons');
+            if (actionButtons) {
+                actionButtons.style.display = 'block';
+            }
+
+            // 드래그 & 드롭 안내 메시지 표시
+            const dragDropHelp = document.getElementById('drag-drop-help');
+            if (dragDropHelp) {
+                dragDropHelp.style.display = 'block';
+            }
+
             // 드롭다운 닫기
             const dropdown = document.getElementById('history-dropdown-content');
             if (dropdown) {
@@ -5545,6 +5565,253 @@ export class MainController {
         } catch (error) {
             console.error('인쇄 중 오류:', error);
             this.outputModule.showError('인쇄 중 오류가 발생했습니다.');
+        }
+    }
+
+    /**
+     * 교사용 자리 배치도 출력 처리 (이름 180도 회전)
+     */
+    private handlePrintLayoutForTeacher(): void {
+        try {
+            // 인쇄용 스타일이 포함된 새 창 열기
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) {
+                alert('팝업이 차단되었습니다. 팝업을 허용해주세요.');
+                return;
+            }
+
+            // 현재 자리 배치도 영역 가져오기
+            const seatsArea = document.getElementById('seats-area');
+            const classroomLayout = document.getElementById('classroom-layout');
+            
+            if (!seatsArea || !classroomLayout) {
+                alert('인쇄할 자리 배치도를 찾을 수 없습니다.');
+                return;
+            }
+
+            // 현재 그리드 설정 가져오기
+            const currentGridTemplateColumns = seatsArea.style.gridTemplateColumns;
+            console.log('현재 그리드 설정:', currentGridTemplateColumns);
+
+            // 현재 화면의 실제 HTML 구조를 그대로 사용
+            const seatsAreaHtml = seatsArea.innerHTML;
+
+            // 현재 날짜와 시간
+            const now = new Date();
+            const dateString = now.toLocaleDateString('ko-KR', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
+            // 인쇄용 HTML 생성 (교사용 - 이름 180도 회전)
+            const printContent = `
+                <!DOCTYPE html>
+                <html lang="ko">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>교사용 자리 배치도 - ${dateString}</title>
+                    <style>
+                        body {
+                            font-family: 'Malgun Gothic', sans-serif;
+                            margin: 0;
+                            padding: 10px;
+                            background: white;
+                            font-size: 12px;
+                        }
+                        .print-header {
+                            text-align: center;
+                            margin-bottom: 15px;
+                            border-bottom: 1px solid #333;
+                            padding-bottom: 8px;
+                        }
+                        .print-title {
+                            font-size: 18px;
+                            font-weight: bold;
+                            margin-bottom: 5px;
+                        }
+                        .print-date {
+                            font-size: 11px;
+                            color: #666;
+                        }
+                        .classroom-layout {
+                            background: #f8f9fa;
+                            border: 1px dashed #ddd;
+                            border-radius: 5px;
+                            padding: 10px;
+                            margin: 10px 0;
+                        }
+                        .blackboard-area {
+                            position: relative;
+                            top: 0;
+                            left: 50%;
+                            transform: translateX(-50%) rotate(180deg);
+                            width: 200px;
+                            height: 50px;
+                            background: #2c3e50;
+                            border: 2px solid #1a252f;
+                            border-radius: 3px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            color: white;
+                            font-weight: bold;
+                            font-size: 12px;
+                            margin-bottom: 10px;
+                        }
+                        .teacher-desk-area {
+                            position: relative;
+                            top: 0;
+                            left: 50%;
+                            transform: translateX(-50%) rotate(180deg);
+                            width: 80px;
+                            height: 25px;
+                            background: #95a5a6;
+                            border: 1px solid #7f8c8d;
+                            border-radius: 3px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            color: white;
+                            font-weight: bold;
+                            font-size: 10px;
+                            margin-bottom: 20px;
+                        }
+                        .seats-area {
+                            display: grid;
+                            gap: 5px 20px !important;
+                            justify-content: center !important;
+                            margin-top: 10px;
+                            grid-template-columns: ${currentGridTemplateColumns || 'repeat(6, 1fr)'};
+                        }
+                        .student-seat-card {
+                            min-width: 60px;
+                            height: 60px;
+                            background: white;
+                            border: 1px solid #ddd;
+                            border-radius: 4px;
+                            padding: 5px;
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            justify-content: center;
+                            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+                        }
+                        .student-seat-card.gender-m {
+                            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+                        }
+                        .student-seat-card.gender-f {
+                            background: linear-gradient(135deg, #fce4ec 0%, #f8bbd9 100%);
+                        }
+                        .student-name {
+                            text-align: center;
+                            font-size: 20px;
+                            font-weight: bold;
+                            color: #333;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            height: 100%;
+                            width: 100%;
+                            line-height: 1;
+                            white-space: nowrap;
+                            overflow: hidden;
+                            text-overflow: ellipsis;
+                            transform: rotate(180deg);
+                        }
+                        .partition-label {
+                            text-align: center;
+                            font-weight: bold;
+                            color: #667eea;
+                            font-size: 8px;
+                            margin-bottom: 3px;
+                            transform: rotate(180deg);
+                        }
+                        .labels-row {
+                            display: grid;
+                            gap: 5px 20px !important;
+                            justify-content: center !important;
+                            grid-template-columns: ${currentGridTemplateColumns || 'repeat(6, 1fr)'};
+                            margin-bottom: 5px;
+                        }
+                        .labels-row > div {
+                            text-align: center;
+                            font-weight: bold;
+                            color: #667eea;
+                            font-size: 8px;
+                            margin-bottom: 3px;
+                            transform: rotate(180deg);
+                        }
+                        @media print {
+                            body { 
+                                margin: 0; 
+                                padding: 5px;
+                                font-size: 10px;
+                            }
+                            .print-header { 
+                                page-break-after: avoid; 
+                                margin-bottom: 10px;
+                            }
+                            .classroom-layout { 
+                                page-break-inside: avoid; 
+                                margin: 5px 0;
+                                padding: 5px;
+                            }
+                            .seats-area {
+                                gap: 3px 15px !important;
+                            }
+                            .student-seat-card {
+                                min-width: 50px;
+                                height: 50px;
+                                padding: 3px;
+                            }
+                            .student-name {
+                                font-size: 18px;
+                                transform: rotate(180deg);
+                            }
+                            .blackboard-area {
+                                transform: translateX(-50%) rotate(180deg);
+                            }
+                            .teacher-desk-area {
+                                transform: translateX(-50%) rotate(180deg);
+                            }
+                            .partition-label {
+                                transform: rotate(180deg);
+                            }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="print-header">
+                        <div class="print-title">교사용 자리 배치도</div>
+                        <div class="print-date">생성일시: ${dateString}</div>
+                    </div>
+                    
+                    <div class="classroom-layout">
+                        <div class="blackboard-area">📝 칠판</div>
+                        <div class="teacher-desk-area">🖥️ 교탁</div>
+                        <div class="seats-area">
+                            ${seatsAreaHtml}
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `;
+
+            printWindow.document.write(printContent);
+            printWindow.document.close();
+            
+            // 인쇄 대화상자 열기
+            setTimeout(() => {
+                printWindow.print();
+            }, 500);
+
+        } catch (error) {
+            console.error('교사용 출력 중 오류:', error);
+            this.outputModule.showError('교사용 출력 중 오류가 발생했습니다.');
         }
     }
 
@@ -6203,7 +6470,7 @@ export class MainController {
                 <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">8️⃣ 공유 및 출력</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
                     <li><strong>공유하기</strong>: 공유 주소(URL)를 생성하여 다른 사람과 자리 배치도를 공유할 수 있습니다</li>
-                    <li><strong>인쇄하기</strong>: 현재 자리 배치도를 인쇄합니다</li>
+                    <li><strong>출력하기</strong>: 현재 자리 배치도를 출력합니다</li>
                 </ul>
 
                 <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">💡 유용한 팁</h3>

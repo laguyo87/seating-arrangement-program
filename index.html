@@ -216,7 +216,7 @@
             <!-- 폭죽 애니메이션용 컨테이너 -->
             <div id="fireworks-container" class="fireworks-container"></div>
             <div class="main-header">
-                <div style="display: flex; align-items: center; gap: 15px;">
+                <div style="display: flex; align-items: center; gap: 15px; flex: 1;">
                     <h2>자리 배치도</h2>
                     <!-- 고정 좌석 모드 도움말 (초기에는 숨김) -->
                     <div id="fixed-seat-help" class="fixed-seat-help" style="display: none;">
@@ -229,10 +229,11 @@
                 </div>
                <!-- 자리 배치도 액션 버튼들 (초기에는 숨김) -->
                <div id="layout-action-buttons" style="display: none;">
-                   <div style="display: flex; gap: 10px;">
+                   <div style="display: flex; gap: 10px; align-items: center;">
                        <button id="confirm-seats" class="primary-btn">✅ 자리 확정</button>
                        <button id="share-layout" class="secondary-btn">📤 공유하기</button>
-                       <button id="print-layout" class="secondary-btn">🖨️ 인쇄하기</button>
+                       <button id="print-layout" class="secondary-btn">🖨️ 출력하기</button>
+                       <button id="print-layout-teacher" class="secondary-btn" style="white-space: nowrap;">👨‍🏫 교사용 출력</button>
                    </div>
                </div>
             </div>

@@ -303,6 +303,10 @@ export declare class MainController {
      */
     private handlePrintLayout;
     /**
+     * 교사용 자리 배치도 출력 처리 (이름 180도 회전)
+     */
+    private handlePrintLayoutForTeacher;
+    /**
      * 자리 배치도 저장 처리
      */
     private handleSaveLayout;
