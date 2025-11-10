@@ -824,6 +824,12 @@ export class MainController {
             return;
         // 기존 카드 제거
         seatsArea.innerHTML = '';
+        // seatsArea 스타일 초기화 (초기 화면에서 정렬 문제 해결)
+        seatsArea.style.display = '';
+        seatsArea.style.gridTemplateColumns = '';
+        seatsArea.style.gap = '';
+        seatsArea.style.justifyItems = '';
+        seatsArea.style.alignItems = '';
         // 좌석 번호를 1부터 시작하도록 초기화
         this.nextSeatId = 1;
         // 선택된 배치 형태 확인
@@ -875,7 +881,7 @@ export class MainController {
         if (layoutType === 'pair-uniform') {
             // seatsArea의 그리드 설정 먼저
             seatsArea.style.gridTemplateColumns = `repeat(${partitionCount}, 1fr)`;
-            seatsArea.style.gap = '10px 40px';
+            seatsArea.style.gap = '15px 40px';
             // 분단 레이블을 각 컬럼에 직접 추가 (중첩 그리드 구조 제거)
             for (let i = 1; i <= partitionCount; i++) {
                 const label = document.createElement('div');
@@ -894,53 +900,48 @@ export class MainController {
             const pairMode = pairModeInput?.value || 'gender-pair'; // 기본값: 남녀 짝꿍
             console.log('짝꿍 모드:', pairMode);
             if (pairMode === 'same-gender-pair') {
-                // 같은 성끼리 짝꿍하기: 각 행에서 분단을 넘나들며 같은 성별끼리 짝꿍
+                // 같은 성끼리 짝꿍하기: 남학생과 여학생을 각각 짝꿍으로 만들고 분단별로 순차 배치
                 // 성별별로 학생 분류
                 const maleStudents = this.students.filter(s => s.gender === 'M');
                 const femaleStudents = this.students.filter(s => s.gender === 'F');
-                const studentsPerPartition = Math.ceil(this.students.length / partitionCount);
-                const rowsPerPartition = Math.ceil(studentsPerPartition / 2);
-                let maleIndex = 0;
-                let femaleIndex = 0;
-                // 가로로 배치 (각 행을 분단별로 채움)
-                for (let row = 0; row < rowsPerPartition; row++) {
+                // 남학생 짝꿍 생성
+                const malePairs = [];
+                for (let i = 0; i < maleStudents.length; i += 2) {
+                    malePairs.push({
+                        student1: maleStudents[i],
+                        student2: (i + 1 < maleStudents.length) ? maleStudents[i + 1] : null
+                    });
+                }
+                // 여학생 짝꿍 생성
+                const femalePairs = [];
+                for (let i = 0; i < femaleStudents.length; i += 2) {
+                    femalePairs.push({
+                        student1: femaleStudents[i],
+                        student2: (i + 1 < femaleStudents.length) ? femaleStudents[i + 1] : null
+                    });
+                }
+                // 모든 짝꿍을 합치기 (남학생 짝꿍 먼저, 그 다음 여학생 짝꿍)
+                const allPairs = [...malePairs, ...femalePairs];
+                // 분단별로 배치
+                const pairsPerPartition = Math.ceil(allPairs.length / partitionCount);
+                let pairIndex = 0;
+                for (let row = 0; row < pairsPerPartition; row++) {
                     for (let partition = 0; partition < partitionCount; partition++) {
+                        if (pairIndex >= allPairs.length)
+                            break;
+                        const pair = allPairs[pairIndex++];
                         const pairContainer = document.createElement('div');
                         pairContainer.style.display = 'flex';
                         pairContainer.style.gap = '0px';
                         pairContainer.style.width = '100%';
                         pairContainer.style.justifyContent = 'center';
-                        // 각 행마다 올바른 패턴으로 배치
-                        // 첫 번째 행: 남남 -> 여여 -> 남남
-                        // 두 번째 행: 여여 -> 남남 -> 여여  
-                        // 세 번째 행: 남남 -> 여여 -> 남남
-                        // 네 번째 행: 여여 -> 남남 -> 여여
-                        const shouldBeMale = (row + partition) % 2 === 0;
-                        if (shouldBeMale) {
-                            // 남학생 짝꿍
-                            if (maleIndex < maleStudents.length) {
-                                const card1 = this.createStudentCard(maleStudents[maleIndex], this.students.indexOf(maleStudents[maleIndex]));
-                                pairContainer.appendChild(card1);
-                                maleIndex++;
-                                if (maleIndex < maleStudents.length) {
-                                    const card2 = this.createStudentCard(maleStudents[maleIndex], this.students.indexOf(maleStudents[maleIndex]));
-                                    pairContainer.appendChild(card2);
-                                    maleIndex++;
-                                }
-                            }
-                        }
-                        else {
-                            // 여학생 짝꿍
-                            if (femaleIndex < femaleStudents.length) {
-                                const card1 = this.createStudentCard(femaleStudents[femaleIndex], this.students.indexOf(femaleStudents[femaleIndex]));
-                                pairContainer.appendChild(card1);
-                                femaleIndex++;
-                                if (femaleIndex < femaleStudents.length) {
-                                    const card2 = this.createStudentCard(femaleStudents[femaleIndex], this.students.indexOf(femaleStudents[femaleIndex]));
-                                    pairContainer.appendChild(card2);
-                                    femaleIndex++;
-                                }
-                            }
+                        // 첫 번째 학생 카드
+                        const card1 = this.createStudentCard(pair.student1, this.students.indexOf(pair.student1));
+                        pairContainer.appendChild(card1);
+                        // 두 번째 학생 카드 (있는 경우)
+                        if (pair.student2) {
+                            const card2 = this.createStudentCard(pair.student2, this.students.indexOf(pair.student2));
+                            pairContainer.appendChild(card2);
                         }
                         seatsArea.appendChild(pairContainer);
                     }
@@ -1013,45 +1014,83 @@ export class MainController {
             }
         }
         else {
-            // '1명씩 한 줄로 배치' - 각 행에서 남녀 교대로 한 줄로 배치
+            // '1명씩 한 줄로 배치' - 분단별 컨테이너 구조로 변경하여 정렬 개선
             // seatsArea의 그리드 설정 먼저
+            console.log('1명씩 한 줄로 배치 - partitionCount:', partitionCount, 'students.length:', this.students.length);
+            seatsArea.style.display = 'grid';
             seatsArea.style.gridTemplateColumns = `repeat(${partitionCount}, 1fr)`;
-            seatsArea.style.gap = '10px 40px'; // 분단 간 넓은 간격
-            // 분단 레이블을 각 컬럼에 직접 추가 (중첩 그리드 구조 제거)
-            for (let i = 1; i <= partitionCount; i++) {
+            seatsArea.style.gap = '15px 40px';
+            seatsArea.style.justifyItems = 'center'; // 각 분단 컨테이너를 중앙 정렬
+            // 남학생과 여학생 분리
+            const maleStudents = this.students.filter(s => s.gender === 'M');
+            const femaleStudents = this.students.filter(s => s.gender === 'F');
+            // 각 분단별 행 수 계산 (각 행에서 남학생과 여학생을 모두 배치하므로 전체 학생 수 기준)
+            const totalStudents = this.students.length;
+            const studentsPerPartition = Math.ceil(totalStudents / partitionCount);
+            const rowsPerPartition = Math.ceil(studentsPerPartition / 2); // 각 행에 남녀 2명씩 배치
+            // 각 분단별로 컨테이너 생성
+            for (let partition = 0; partition < partitionCount; partition++) {
+                // 분단 컨테이너 생성
+                const partitionContainer = document.createElement('div');
+                partitionContainer.style.cssText = `
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 10px;
+                    width: 100%;
+                    max-width: 100%;
+                    box-sizing: border-box;
+                `;
+                // 분단 레이블 추가
                 const label = document.createElement('div');
                 label.className = 'partition-label';
-                label.textContent = `${i}분단`;
+                label.textContent = `${partition + 1}분단`;
                 label.style.textAlign = 'center';
                 label.style.fontWeight = 'bold';
                 label.style.color = '#667eea';
                 label.style.fontSize = '0.9em';
                 label.style.marginBottom = '5px';
-                // 각 레이블이 해당 분단 컬럼에 직접 배치되도록 grid-column 지정 안함 (자동으로 배치됨)
-                seatsArea.appendChild(label);
-            }
-            // 남학생과 여학생 분리
-            const maleStudents = this.students.filter(s => s.gender === 'M');
-            const femaleStudents = this.students.filter(s => s.gender === 'F');
-            // 각 분단별 행 수 계산
-            const rowsPerPartition = Math.ceil(maleStudents.length / partitionCount);
-            // 각 행별로 배치
-            for (let row = 0; row < rowsPerPartition; row++) {
-                // 각 분단의 남학생과 여학생을 교대로 배치
-                for (let partition = 0; partition < partitionCount; partition++) {
+                label.style.width = '100%';
+                partitionContainer.appendChild(label);
+                // 카드 컨테이너 생성 (카드들을 세로로 배치)
+                const cardsContainer = document.createElement('div');
+                cardsContainer.style.cssText = `
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: flex-start;
+                    gap: 10px;
+                    width: 100%;
+                    max-width: 100%;
+                    box-sizing: border-box;
+                `;
+                // 각 행별로 배치
+                for (let row = 0; row < rowsPerPartition; row++) {
                     const maleIndex = row * partitionCount + partition;
                     const femaleIndex = row * partitionCount + partition;
                     // 남학생 카드 배치
                     if (maleIndex < maleStudents.length) {
                         const card = this.createStudentCard(maleStudents[maleIndex], this.students.indexOf(maleStudents[maleIndex]));
-                        seatsArea.appendChild(card);
+                        // '1명씩 한 줄로 배치'일 때 카드 너비를 줄여서 정렬 개선
+                        card.style.width = '100px';
+                        card.style.height = '100px';
+                        card.style.minWidth = '100px';
+                        card.style.maxWidth = '100px';
+                        cardsContainer.appendChild(card);
                     }
                     // 여학생 카드 배치
                     if (femaleIndex < femaleStudents.length) {
                         const card = this.createStudentCard(femaleStudents[femaleIndex], this.students.indexOf(femaleStudents[femaleIndex]));
-                        seatsArea.appendChild(card);
+                        // '1명씩 한 줄로 배치'일 때 카드 너비를 줄여서 정렬 개선
+                        card.style.width = '100px';
+                        card.style.height = '100px';
+                        card.style.minWidth = '100px';
+                        card.style.maxWidth = '100px';
+                        cardsContainer.appendChild(card);
                     }
                 }
+                partitionContainer.appendChild(cardsContainer);
+                seatsArea.appendChild(partitionContainer);
             }
         }
     }
@@ -1405,18 +1444,80 @@ export class MainController {
         else {
             // 일반 배치: 기존 방식대로 표시
             console.log('일반 배치로 렌더링');
-            // 학생 수에 따라 그리드 열 수 결정
-            const columnCount = this.students.length <= 20 ? 4 : 6;
-            seatsArea.style.gridTemplateColumns = `repeat(${columnCount}, 1fr)`;
-            seatsArea.style.gap = '10px';
-            seatsArea.style.display = 'grid';
-            seats.forEach((seat, index) => {
-                if (index >= this.students.length)
-                    return;
-                const student = this.students[index];
-                const card = this.createStudentCard(student, index);
-                seatsArea.appendChild(card);
-            });
+            // '1명씩 한 줄로 배치'인 경우 분단별로 정렬
+            if (layoutType === 'single-uniform') {
+                const partitionInput = document.getElementById('number-of-partitions');
+                const partitionCount = partitionInput ? parseInt(partitionInput.value || '1', 10) : 1;
+                // seatsArea의 그리드 설정
+                seatsArea.style.gridTemplateColumns = `repeat(${partitionCount}, 1fr)`;
+                seatsArea.style.gap = '15px 40px'; // 분단 간 넓은 간격
+                seatsArea.style.display = 'grid';
+                seatsArea.style.justifyItems = 'center'; // 각 분단 컨테이너를 중앙 정렬
+                // 학생들을 분단별로 배치
+                const studentsPerPartition = Math.ceil(this.students.length / partitionCount);
+                // 각 분단별로 컨테이너 생성
+                for (let partition = 0; partition < partitionCount; partition++) {
+                    // 분단 컨테이너 생성
+                    const partitionContainer = document.createElement('div');
+                    partitionContainer.style.cssText = `
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        gap: 10px;
+                        width: 100%;
+                    `;
+                    // 분단 레이블 추가
+                    const label = document.createElement('div');
+                    label.className = 'partition-label';
+                    label.textContent = `${partition + 1}분단`;
+                    label.style.textAlign = 'center';
+                    label.style.fontWeight = 'bold';
+                    label.style.color = '#667eea';
+                    label.style.fontSize = '0.9em';
+                    label.style.marginBottom = '5px';
+                    label.style.width = '100%';
+                    partitionContainer.appendChild(label);
+                    // 카드 컨테이너 생성 (카드들을 세로로 배치)
+                    const cardsContainer = document.createElement('div');
+                    cardsContainer.style.cssText = `
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        gap: 10px;
+                        width: 100%;
+                    `;
+                    // 각 분단별로 학생 카드 배치
+                    for (let i = 0; i < studentsPerPartition; i++) {
+                        const studentIndex = partition * studentsPerPartition + i;
+                        if (studentIndex < this.students.length && studentIndex < seats.length) {
+                            const student = this.students[studentIndex];
+                            const card = this.createStudentCard(student, studentIndex);
+                            // '1명씩 한 줄로 배치'일 때 카드 너비를 줄여서 정렬 개선
+                            card.style.width = '100px';
+                            card.style.height = '100px';
+                            card.style.minWidth = '100px';
+                            card.style.maxWidth = '100px';
+                            cardsContainer.appendChild(card);
+                        }
+                    }
+                    partitionContainer.appendChild(cardsContainer);
+                    seatsArea.appendChild(partitionContainer);
+                }
+            }
+            else {
+                // 다른 배치 형태: 기존 방식대로 표시
+                const columnCount = this.students.length <= 20 ? 4 : 6;
+                seatsArea.style.gridTemplateColumns = `repeat(${columnCount}, 1fr)`;
+                seatsArea.style.gap = '10px';
+                seatsArea.style.display = 'grid';
+                seats.forEach((seat, index) => {
+                    if (index >= this.students.length)
+                        return;
+                    const student = this.students[index];
+                    const card = this.createStudentCard(student, index);
+                    seatsArea.appendChild(card);
+                });
+            }
         }
         // 렌더 후 드래그&드롭 스왑 핸들러 보장
         this.enableSeatSwapDragAndDrop();

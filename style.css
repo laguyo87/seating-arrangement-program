@@ -1149,9 +1149,10 @@ button:disabled {
 
 /* 분단 사이 간격을 넓히기 위한 스타일 */
 #seats-area {
-    gap: 10px 40px !important; /* 가로 간격 40px, 세로 간격 10px */
+    gap: 15px 40px !important; /* 가로 간격 40px, 세로 간격 15px */
     justify-content: center !important; /* 가운데 정렬 */
-    align-items: start; /* 레이블과 카드의 열 정렬 안정화 */
+    align-items: center; /* 레이블과 카드의 열 정렬 안정화 */
+    justify-items: center; /* 그리드 아이템 중앙 정렬 */
 }
 
 /* 좌석 배치하기 버튼 깜박이는 애니메이션 */
