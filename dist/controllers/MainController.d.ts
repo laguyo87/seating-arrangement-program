@@ -227,8 +227,9 @@ export declare class MainController {
      */
     private toggleCustomMode1;
     /**
-     * 2명씩 짝꿍 배치 서브 메뉴 토글
+     * 1명씩 한 줄로 배치 서브 메뉴 토글
      */
+    private toggleSingleSubmenu;
     private togglePairSubmenu;
     /**
      * 모둠 배치 서브 메뉴 토글
@@ -302,10 +303,6 @@ export declare class MainController {
      * 자리 배치도 인쇄 처리
      */
     private handlePrintLayout;
-    /**
-     * 교사용 자리 배치도 출력 처리 (이름 180도 회전)
-     */
-    private handlePrintLayoutForTeacher;
     /**
      * 자리 배치도 저장 처리
      */

@@ -61,6 +61,19 @@
                             <input type="radio" name="layout-type" value="single-uniform" data-seat-type="single" checked>
                             <span>1명씩 한 줄로 배치</span>
                         </label>
+                        
+                        <!-- 1명씩 한 줄로 배치 서브 옵션 (기본 표시) -->
+                        <div id="single-submenu" style="display: block; margin-left: 30px; margin-top: 5px; margin-bottom: 5px;">
+                            <label class="radio-option" style="border: none; padding: 8px 15px;">
+                                <input type="radio" name="single-mode" value="basic-row" checked>
+                                <span>기본 1줄 배치</span>
+                            </label>
+                            <label class="radio-option" style="border: none; padding: 8px 15px;">
+                                <input type="radio" name="single-mode" value="gender-row">
+                                <span>남녀 1줄 배치</span>
+                            </label>
+                        </div>
+                        
                         <label class="radio-option">
                             <input type="radio" name="layout-type" value="pair-uniform" data-seat-type="pair">
                             <span>2명씩 짝꿍 배치</span>
@@ -216,7 +229,7 @@
             <!-- 폭죽 애니메이션용 컨테이너 -->
             <div id="fireworks-container" class="fireworks-container"></div>
             <div class="main-header">
-                <div style="display: flex; align-items: center; gap: 15px; flex: 1;">
+                <div style="display: flex; align-items: center; gap: 15px;">
                     <h2>자리 배치도</h2>
                     <!-- 고정 좌석 모드 도움말 (초기에는 숨김) -->
                     <div id="fixed-seat-help" class="fixed-seat-help" style="display: none;">
@@ -229,11 +242,10 @@
                 </div>
                <!-- 자리 배치도 액션 버튼들 (초기에는 숨김) -->
                <div id="layout-action-buttons" style="display: none;">
-                   <div style="display: flex; gap: 10px; align-items: center;">
+                   <div style="display: flex; gap: 10px;">
                        <button id="confirm-seats" class="primary-btn">✅ 자리 확정</button>
                        <button id="share-layout" class="secondary-btn">📤 공유하기</button>
-                       <button id="print-layout" class="secondary-btn">🖨️ 출력하기</button>
-                       <button id="print-layout-teacher" class="secondary-btn" style="white-space: nowrap;">👨‍🏫 교사용 출력</button>
+                       <button id="print-layout" class="secondary-btn">🖨️ 인쇄하기</button>
                    </div>
                </div>
             </div>
