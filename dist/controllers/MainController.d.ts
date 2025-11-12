@@ -14,7 +14,10 @@ export declare class MainController {
     private fixedSeatIds;
     private nextSeatId;
     private dragSourceCard;
+    private dragOverIndicator;
     private isSyncing;
+    private layoutHistory;
+    private historyIndex;
     constructor();
     /**
      * 초기화 시 이력 드롭다운 업데이트
@@ -77,6 +80,30 @@ export declare class MainController {
      * 좌석 카드 드래그&드롭 스왑 기능 활성화 (이벤트 위임)
      */
     private enableSeatSwapDragAndDrop;
+    /**
+     * 드롭 위치 삽입 인디케이터 표시
+     */
+    private showInsertIndicator;
+    /**
+     * 현재 상태를 히스토리에 저장 (통합 히스토리 시스템)
+     */
+    private saveToHistory;
+    /**
+     * 현재 자리 배치 상태를 히스토리에 저장
+     */
+    private saveLayoutToHistory;
+    /**
+     * 되돌리기 기능 실행 (모든 액션에 대해 작동)
+     */
+    private handleUndoLayout;
+    /**
+     * 되돌리기 버튼 활성화/비활성화 상태 업데이트
+     */
+    private updateUndoButtonState;
+    /**
+     * 히스토리 초기화
+     */
+    private resetHistory;
     /**
      * 고정 좌석 클릭 핸들러 설정
      */

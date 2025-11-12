@@ -118,6 +118,46 @@ body {
     border-bottom: none;
 }
 
+/* 작은 아이콘 버튼 (되돌리기) */
+.icon-btn {
+    background: rgba(255, 255, 255, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1.2em;
+    transition: all 0.3s ease;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    font-weight: 500;
+}
+
+.icon-btn:hover {
+    background: rgba(255, 255, 255, 0.35);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: scale(1.1);
+}
+
+.icon-btn:active {
+    transform: scale(0.95);
+}
+
+.icon-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.icon-btn:disabled:hover {
+    transform: none;
+    background: rgba(255, 255, 255, 0.25);
+}
+
 .user-manual-btn {
     font-size: 0.9em;
     padding: 6px 16px;
@@ -307,7 +347,7 @@ body {
 
 .form-group label {
     display: block;
-    margin-bottom: 8px;
+    margin-bottom: 3px;
     font-weight: 600;
     color: #555;
     font-size: 0.95em;
@@ -1107,6 +1147,33 @@ button:disabled {
     box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4) !important;
     transform: scale(1.05);
     transition: all 0.2s ease;
+}
+
+/* 드래그 중 빈 공간 하이라이트 */
+#seats-area.drag-over-area {
+    background-color: rgba(102, 126, 234, 0.1);
+    border: 2px dashed #667eea;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+/* 드롭 위치 삽입 인디케이터 */
+.drag-insert-indicator {
+    background: linear-gradient(90deg, transparent, #667eea, transparent);
+    border-radius: 2px;
+    box-shadow: 0 0 8px rgba(102, 126, 234, 0.6);
+    animation: pulse-indicator 1s ease-in-out infinite;
+}
+
+@keyframes pulse-indicator {
+    0%, 100% {
+        opacity: 0.6;
+        transform: scaleY(1);
+    }
+    50% {
+        opacity: 1;
+        transform: scaleY(1.2);
+    }
 }
 
 /* 모둠 배치 그룹 컨테이너 */

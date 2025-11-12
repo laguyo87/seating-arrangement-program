@@ -22,7 +22,10 @@ export class MainController {
         this.fixedSeatIds = new Set(); // 고정 좌석 ID 목록
         this.nextSeatId = 1; // 좌석 카드 고유 ID 생성기
         this.dragSourceCard = null; // 드래그 시작 카드 참조
+        this.dragOverIndicator = null; // 드롭 위치 인디케이터
         this.isSyncing = false; // 동기화 중 플래그 (무한 루프 방지)
+        this.layoutHistory = []; // 통합 히스토리 (모든 액션 추적)
+        this.historyIndex = -1; // 현재 히스토리 인덱스
         /**
          * 좌석 카드 클릭 이벤트 핸들러
          */
@@ -662,6 +665,10 @@ export class MainController {
             if (target.id === 'print-layout-teacher') {
                 this.handlePrintLayoutForTeacher();
             }
+            // 되돌리기 버튼 클릭
+            if (target.id === 'undo-layout') {
+                this.handleUndoLayout();
+            }
             // 저장하기 버튼 클릭
             if (target.id === 'save-layout') {
                 this.handleSaveLayout();
@@ -673,6 +680,21 @@ export class MainController {
             // 사이드바 토글 버튼 클릭
             if (target.id === 'sidebar-toggle-btn' || target.closest('#sidebar-toggle-btn')) {
                 this.toggleSidebar();
+            }
+        });
+        // 키보드 단축키: Ctrl+Z / Cmd+Z (되돌리기)
+        document.addEventListener('keydown', (e) => {
+            // Ctrl+Z (Windows/Linux) 또는 Cmd+Z (Mac)
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+                // 입력 필드에 포커스가 있으면 기본 동작 허용 (텍스트 입력 되돌리기)
+                const activeElement = document.activeElement;
+                if (activeElement && (activeElement.tagName === 'INPUT' ||
+                    activeElement.tagName === 'TEXTAREA' ||
+                    (activeElement.isContentEditable === true))) {
+                    return; // 기본 동작 허용
+                }
+                e.preventDefault();
+                this.handleUndoLayout();
             }
         });
     }
@@ -1447,6 +1469,15 @@ export class MainController {
         });
         // dragend - 드래그가 끝나면 dragSourceCard 초기화 (드롭되지 않은 경우 대비)
         seatsArea.addEventListener('dragend', () => {
+            // 모든 하이라이트 및 인디케이터 제거
+            seatsArea.querySelectorAll('.drag-over').forEach(el => {
+                el.classList.remove('drag-over');
+            });
+            seatsArea.classList.remove('drag-over-area');
+            if (this.dragOverIndicator) {
+                this.dragOverIndicator.remove();
+                this.dragOverIndicator = null;
+            }
             this.dragSourceCard = null;
         });
         // dragover - 빈 공간과 카드 모두에서 드롭 가능하도록
@@ -1456,37 +1487,112 @@ export class MainController {
                 e.preventDefault();
                 if (e.dataTransfer)
                     e.dataTransfer.dropEffect = 'move';
-                // 드롭 가능한 위치에 시각적 피드백 제공
-                const target = e.target;
-                const targetCard = target?.closest('.student-seat-card');
-                const targetArea = target?.closest('#seats-area');
-                // 기존 하이라이트 제거
+                // 기존 하이라이트 및 인디케이터 제거
                 seatsArea.querySelectorAll('.drag-over').forEach(el => {
                     el.classList.remove('drag-over');
                 });
-                // 타겟이 카드면 하이라이트
-                if (targetCard && targetCard !== this.dragSourceCard) {
-                    targetCard.classList.add('drag-over');
+                if (this.dragOverIndicator) {
+                    this.dragOverIndicator.remove();
+                    this.dragOverIndicator = null;
+                }
+                // 마우스 위치 기반으로 드롭 위치 계산
+                const seatsAreaRect = seatsArea.getBoundingClientRect();
+                const mouseX = e.clientX - seatsAreaRect.left;
+                const mouseY = e.clientY - seatsAreaRect.top;
+                // 모든 카드 가져오기 (분단 레이블 제외)
+                const allCards = Array.from(seatsArea.querySelectorAll('.student-seat-card'));
+                const cardsOnly = allCards.filter(card => card !== this.dragSourceCard &&
+                    !card.classList.contains('partition-label') &&
+                    !card.closest('.labels-row'));
+                // 마우스 위치에서 가장 가까운 카드 찾기
+                let closestCard = null;
+                let minDistance = Infinity;
+                let insertPosition = 'on';
+                for (const card of cardsOnly) {
+                    const cardRect = card.getBoundingClientRect();
+                    const cardX = cardRect.left - seatsAreaRect.left + cardRect.width / 2;
+                    const cardY = cardRect.top - seatsAreaRect.top + cardRect.height / 2;
+                    // 카드 영역 내부인지 확인
+                    const cardLeft = cardRect.left - seatsAreaRect.left;
+                    const cardRight = cardRect.right - seatsAreaRect.left;
+                    const cardTop = cardRect.top - seatsAreaRect.top;
+                    const cardBottom = cardRect.bottom - seatsAreaRect.top;
+                    if (mouseX >= cardLeft && mouseX <= cardRight &&
+                        mouseY >= cardTop && mouseY <= cardBottom) {
+                        // 카드 위에 마우스가 있으면 카드 하이라이트
+                        closestCard = card;
+                        insertPosition = 'on';
+                        break;
+                    }
+                    // 카드 근처 거리 계산
+                    const distance = Math.sqrt(Math.pow(mouseX - cardX, 2) + Math.pow(mouseY - cardY, 2));
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        closestCard = card;
+                        // 드롭 위치가 카드보다 위쪽이면 앞에, 아래쪽이면 뒤에
+                        if (mouseY < cardY - cardRect.height / 4) {
+                            insertPosition = 'before';
+                        }
+                        else if (mouseY > cardY + cardRect.height / 4) {
+                            insertPosition = 'after';
+                        }
+                        else {
+                            // 수평 위치로 판단
+                            if (mouseX < cardX) {
+                                insertPosition = 'before';
+                            }
+                            else {
+                                insertPosition = 'after';
+                            }
+                        }
+                    }
+                }
+                // 시각적 피드백 제공
+                if (closestCard) {
+                    if (insertPosition === 'on') {
+                        // 카드 위에 마우스가 있으면 카드 하이라이트
+                        closestCard.classList.add('drag-over');
+                    }
+                    else {
+                        // 카드 앞/뒤에 삽입 인디케이터 표시
+                        this.showInsertIndicator(closestCard, insertPosition);
+                    }
+                }
+                else {
+                    // 빈 공간에 드롭할 경우 seats-area에 하이라이트
+                    seatsArea.classList.add('drag-over-area');
                 }
             }
         });
         // dragleave - 하이라이트 제거
         seatsArea.addEventListener('dragleave', (ev) => {
             const e = ev;
-            const target = e.target;
-            const targetCard = target?.closest('.student-seat-card');
-            if (targetCard) {
-                targetCard.classList.remove('drag-over');
+            // seats-area를 완전히 벗어난 경우에만 하이라이트 제거
+            const relatedTarget = e.relatedTarget;
+            if (!relatedTarget || !seatsArea.contains(relatedTarget)) {
+                seatsArea.querySelectorAll('.drag-over').forEach(el => {
+                    el.classList.remove('drag-over');
+                });
+                seatsArea.classList.remove('drag-over-area');
+                if (this.dragOverIndicator) {
+                    this.dragOverIndicator.remove();
+                    this.dragOverIndicator = null;
+                }
             }
         });
         // drop -> 카드 교환 또는 이동
         seatsArea.addEventListener('drop', (ev) => {
             const e = ev;
             e.preventDefault();
-            // 하이라이트 제거
+            // 하이라이트 및 인디케이터 제거
             seatsArea.querySelectorAll('.drag-over').forEach(el => {
                 el.classList.remove('drag-over');
             });
+            seatsArea.classList.remove('drag-over-area');
+            if (this.dragOverIndicator) {
+                this.dragOverIndicator.remove();
+                this.dragOverIndicator = null;
+            }
             const source = this.dragSourceCard;
             this.dragSourceCard = null;
             if (!source)
@@ -1592,7 +1698,168 @@ export class MainController {
                     seatsArea.appendChild(source);
                 }
             }
+            // 드래그&드롭 완료 후 히스토리 저장 (약간의 지연을 두어 DOM 업데이트 완료 후 저장)
+            setTimeout(() => {
+                this.saveLayoutToHistory();
+            }, 50);
         });
+    }
+    /**
+     * 드롭 위치 삽입 인디케이터 표시
+     */
+    showInsertIndicator(card, position) {
+        // 기존 인디케이터 제거
+        if (this.dragOverIndicator) {
+            this.dragOverIndicator.remove();
+        }
+        const seatsArea = document.getElementById('seats-area');
+        if (!seatsArea)
+            return;
+        // 인디케이터 생성
+        const indicator = document.createElement('div');
+        indicator.className = 'drag-insert-indicator';
+        indicator.style.position = 'absolute';
+        indicator.style.pointerEvents = 'none';
+        indicator.style.zIndex = '1000';
+        const cardRect = card.getBoundingClientRect();
+        const seatsAreaRect = seatsArea.getBoundingClientRect();
+        // seats-area가 relative 포지션이 아니면 설정
+        const currentPosition = window.getComputedStyle(seatsArea).position;
+        if (currentPosition === 'static') {
+            seatsArea.style.position = 'relative';
+        }
+        if (position === 'before') {
+            // 카드 앞에 표시
+            indicator.style.top = `${cardRect.top - seatsAreaRect.top - 3}px`;
+            indicator.style.left = `${cardRect.left - seatsAreaRect.left}px`;
+            indicator.style.width = `${cardRect.width}px`;
+            indicator.style.height = '4px';
+        }
+        else {
+            // 카드 뒤에 표시
+            indicator.style.top = `${cardRect.bottom - seatsAreaRect.top + 3}px`;
+            indicator.style.left = `${cardRect.left - seatsAreaRect.left}px`;
+            indicator.style.width = `${cardRect.width}px`;
+            indicator.style.height = '4px';
+        }
+        seatsArea.appendChild(indicator);
+        this.dragOverIndicator = indicator;
+    }
+    /**
+     * 현재 상태를 히스토리에 저장 (통합 히스토리 시스템)
+     */
+    saveToHistory(type, data) {
+        // 현재 인덱스 이후의 히스토리 제거 (새로운 상태가 추가되면 이후 히스토리는 삭제)
+        if (this.historyIndex < this.layoutHistory.length - 1) {
+            this.layoutHistory = this.layoutHistory.slice(0, this.historyIndex + 1);
+        }
+        // 새 상태 추가
+        this.layoutHistory.push({ type, data });
+        // 히스토리 크기 제한 (최대 100개)
+        if (this.layoutHistory.length > 100) {
+            this.layoutHistory.shift();
+        }
+        else {
+            this.historyIndex++;
+        }
+        // 되돌리기 버튼 활성화/비활성화 업데이트
+        this.updateUndoButtonState();
+    }
+    /**
+     * 현재 자리 배치 상태를 히스토리에 저장
+     */
+    saveLayoutToHistory() {
+        const seatsArea = document.getElementById('seats-area');
+        if (!seatsArea)
+            return;
+        // 현재 상태를 HTML 문자열로 저장
+        const currentState = seatsArea.innerHTML;
+        // 학생 데이터도 함께 저장
+        const studentData = this.inputModule.getStudentData();
+        this.saveToHistory('layout', {
+            seatsAreaHTML: currentState,
+            students: JSON.parse(JSON.stringify(studentData)), // 깊은 복사
+            gridTemplateColumns: seatsArea.style.gridTemplateColumns
+        });
+    }
+    /**
+     * 되돌리기 기능 실행 (모든 액션에 대해 작동)
+     */
+    handleUndoLayout() {
+        console.log('되돌리기 시도. 히스토리 인덱스:', this.historyIndex, '히스토리 길이:', this.layoutHistory.length);
+        if (this.historyIndex <= 0 || this.layoutHistory.length === 0) {
+            // 되돌리기할 히스토리가 없음
+            this.outputModule.showError('되돌리기할 이전 상태가 없습니다.');
+            return;
+        }
+        // 이전 상태로 복원 (인덱스를 먼저 감소시켜 이전 상태를 가져옴)
+        this.historyIndex--;
+        const previousState = this.layoutHistory[this.historyIndex];
+        console.log('되돌리기 - 복원할 상태:', previousState);
+        // 상태 타입에 따라 복원
+        if (previousState && previousState.type === 'layout') {
+            const seatsArea = document.getElementById('seats-area');
+            if (seatsArea && previousState.data) {
+                // HTML 복원
+                if (previousState.data.seatsAreaHTML) {
+                    seatsArea.innerHTML = previousState.data.seatsAreaHTML;
+                }
+                // 그리드 설정 복원
+                if (previousState.data.gridTemplateColumns) {
+                    seatsArea.style.gridTemplateColumns = previousState.data.gridTemplateColumns;
+                }
+                // 학생 데이터 복원
+                if (previousState.data.students) {
+                    // 학생 데이터 복원은 나중에 구현
+                    console.log('학생 데이터 복원:', previousState.data.students);
+                }
+                // 드래그&드롭 기능 다시 활성화 (복원된 카드에 대해)
+                this.enableSeatSwapDragAndDrop();
+            }
+        }
+        else if (previousState && previousState.type === 'student-input') {
+            // 학생 입력 상태 복원
+            if (previousState.data && previousState.data.students) {
+                this.inputModule.setStudentData(previousState.data.students);
+            }
+        }
+        else if (previousState && previousState.type === 'options') {
+            // 옵션 설정 복원
+            if (previousState.data && previousState.data.options) {
+                // 옵션 복원 로직 (필요시 구현)
+                console.log('옵션 복원:', previousState.data.options);
+            }
+        }
+        // 되돌리기 버튼 상태 업데이트
+        this.updateUndoButtonState();
+        console.log('되돌리기 완료. 현재 히스토리 인덱스:', this.historyIndex);
+    }
+    /**
+     * 되돌리기 버튼 활성화/비활성화 상태 업데이트
+     */
+    updateUndoButtonState() {
+        const undoButton = document.getElementById('undo-layout');
+        if (!undoButton)
+            return;
+        // 히스토리가 있고 이전 상태가 있으면 활성화
+        if (this.historyIndex >= 0 && this.layoutHistory.length > 0) {
+            undoButton.disabled = false;
+            undoButton.style.opacity = '1';
+            undoButton.style.cursor = 'pointer';
+        }
+        else {
+            undoButton.disabled = true;
+            undoButton.style.opacity = '0.5';
+            undoButton.style.cursor = 'not-allowed';
+        }
+    }
+    /**
+     * 히스토리 초기화
+     */
+    resetHistory() {
+        this.layoutHistory = [];
+        this.historyIndex = -1;
+        this.updateUndoButtonState();
     }
     /**
      * 고정 좌석 클릭 핸들러 설정
@@ -1785,6 +2052,8 @@ export class MainController {
             return;
         // 기존 카드 제거
         seatsArea.innerHTML = '';
+        // 새로운 배치 시작 시 히스토리 초기화는 하지 않음
+        // (자리 배치 실행 후에도 히스토리를 유지하여 되돌리기 가능하도록)
         // 좌석 번호를 1부터 시작하도록 초기화
         this.nextSeatId = 1;
         // 현재 선택된 배치 형태 확인
@@ -1820,6 +2089,10 @@ export class MainController {
         }
         // 렌더 후 드래그&드롭 스왑 핸들러 보장
         this.enableSeatSwapDragAndDrop();
+        // 초기 렌더링 후 첫 번째 상태를 히스토리에 저장
+        setTimeout(() => {
+            this.saveLayoutToHistory();
+        }, 100);
     }
     /**
      * 모둠 배치로 카드 렌더링 (그룹으로 묶어서 표시)
@@ -4682,6 +4955,10 @@ export class MainController {
             setTimeout(() => {
                 this.openCurtain();
             }, 3000);
+            // 자리 배치 완료 후 히스토리 저장
+            setTimeout(() => {
+                this.saveLayoutToHistory();
+            }, 3100);
             // 배치 완료 후 화면을 맨 위로 스크롤 (스크롤 컨테이너와 윈도우 모두 시도)
             try {
                 const resultContainer = document.querySelector('.result-container');

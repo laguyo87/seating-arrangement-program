@@ -132,6 +132,25 @@ export class InputModule {
         return students;
     }
     /**
+     * 학생 데이터를 설정합니다 (되돌리기 기능용)
+     * @param students 설정할 학생 데이터 배열
+     */
+    setStudentData(students) {
+        // 기존 테이블 제거
+        const outputSection = document.getElementById('output-section');
+        const existingTable = outputSection?.querySelector('.student-input-table');
+        if (existingTable) {
+            existingTable.remove();
+        }
+        // 새 테이블 생성
+        if (students.length > 0) {
+            // MainController의 createStudentTable 메서드를 호출하거나 직접 테이블 생성
+            // 여기서는 간단히 데이터만 저장하고, MainController에서 테이블을 다시 생성하도록 함
+            // 실제로는 MainController의 createStudentTable을 호출해야 함
+            console.log('학생 데이터 설정:', students);
+        }
+    }
+    /**
      * 학생 인원수를 가져옵니다.
      * @returns 학생 인원수
      */

@@ -42,6 +42,11 @@ export declare class InputModule {
      */
     getStudentData(): StudentInputData[];
     /**
+     * 학생 데이터를 설정합니다 (되돌리기 기능용)
+     * @param students 설정할 학생 데이터 배열
+     */
+    setStudentData(students: StudentInputData[]): void;
+    /**
      * 학생 인원수를 가져옵니다.
      * @returns 학생 인원수
      */
