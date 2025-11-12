@@ -304,6 +304,10 @@ export declare class MainController {
      */
     private handlePrintLayout;
     /**
+     * 교탁용 자리 배치도 인쇄 처리 (180도 회전)
+     */
+    private handlePrintLayoutForTeacher;
+    /**
      * 자리 배치도 저장 처리
      */
     private handleSaveLayout;
@@ -316,7 +320,7 @@ export declare class MainController {
      */
     private loadSharedLayout;
     /**
-     * 간단한 공유 주소(URL) 생성
+     * 간단한 공유 주소(URL) 생성 (압축된 형식)
      */
     private generateShareUrl;
     /**
@@ -351,5 +355,9 @@ export declare class MainController {
      * 개별 폭죽 생성 및 파티클 애니메이션
      */
     private createFirework;
+    /**
+     * 자리 배치 실행 시 음향 효과 재생 (3초)
+     */
+    private playArrangementSound;
 }
 //# sourceMappingURL=MainController.d.ts.map

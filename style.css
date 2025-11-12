@@ -1100,6 +1100,15 @@ button:disabled {
     box-shadow: 0 4px 16px rgba(220, 53, 69, 0.3) !important;
 }
 
+/* 드래그 오버 시 시각적 피드백 */
+.student-seat-card.drag-over {
+    border-color: #667eea !important;
+    border-width: 3px !important;
+    box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4) !important;
+    transform: scale(1.05);
+    transition: all 0.2s ease;
+}
+
 /* 모둠 배치 그룹 컨테이너 */
 .seat-group-container {
     display: grid;

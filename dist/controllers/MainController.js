@@ -112,7 +112,8 @@ export class MainController {
             this.isInitialized = true;
             // URL 파라미터에서 공유 데이터 확인
             const urlParams = new URLSearchParams(window.location.search);
-            const shareParam = urlParams.get('share');
+            // 'share' 또는 's' 파라미터 지원 (하위 호환성)
+            const shareParam = urlParams.get('s') || urlParams.get('share');
             if (shareParam) {
                 // 공유된 배치 데이터 로드
                 this.loadSharedLayout(shareParam);
@@ -129,7 +130,7 @@ export class MainController {
                 }
                 else {
                     console.log('초기 예시 레이아웃을 표시합니다.');
-                    // 초기 예시 레이아웃 표시 (24명, 6분단)
+                    // 초기 예시 레이아웃 표시 (24명, 5분단)
                     this.renderInitialExampleLayout();
                     // 초기값으로 미리보기 자동 실행
                     setTimeout(() => {
@@ -170,7 +171,7 @@ export class MainController {
             if (femaleInput)
                 femaleInput.value = '12';
             if (partitionInput)
-                partitionInput.value = '6';
+                partitionInput.value = '5';
             // 라디오 기본값 복원
             const singleUniform = document.querySelector('input[name="layout-type"][value="single-uniform"]');
             if (singleUniform)
@@ -202,11 +203,6 @@ export class MainController {
             const actionButtons = document.getElementById('layout-action-buttons');
             if (actionButtons)
                 actionButtons.style.display = 'none';
-            // 드래그 & 드롭 안내 메시지 숨기기
-            const dragDropHelp = document.getElementById('drag-drop-help');
-            if (dragDropHelp) {
-                dragDropHelp.style.display = 'none';
-            }
             // 내부 상태 초기화
             this.students = [];
             this.seats = [];
@@ -661,6 +657,10 @@ export class MainController {
             // 인쇄하기 버튼 클릭
             if (target.id === 'print-layout') {
                 this.handlePrintLayout();
+            }
+            // 교탁용 인쇄하기 버튼 클릭
+            if (target.id === 'print-layout-teacher') {
+                this.handlePrintLayoutForTeacher();
             }
             // 저장하기 버튼 클릭
             if (target.id === 'save-layout') {
@@ -1449,43 +1449,149 @@ export class MainController {
         seatsArea.addEventListener('dragend', () => {
             this.dragSourceCard = null;
         });
-        // dragover
+        // dragover - 빈 공간과 카드 모두에서 드롭 가능하도록
         seatsArea.addEventListener('dragover', (ev) => {
             const e = ev;
             if (this.dragSourceCard) {
                 e.preventDefault();
                 if (e.dataTransfer)
                     e.dataTransfer.dropEffect = 'move';
+                // 드롭 가능한 위치에 시각적 피드백 제공
+                const target = e.target;
+                const targetCard = target?.closest('.student-seat-card');
+                const targetArea = target?.closest('#seats-area');
+                // 기존 하이라이트 제거
+                seatsArea.querySelectorAll('.drag-over').forEach(el => {
+                    el.classList.remove('drag-over');
+                });
+                // 타겟이 카드면 하이라이트
+                if (targetCard && targetCard !== this.dragSourceCard) {
+                    targetCard.classList.add('drag-over');
+                }
             }
         });
-        // drop -> 두 카드의 학생 정보/성별 클래스만 스왑 (좌석 번호/고정상태는 유지)
+        // dragleave - 하이라이트 제거
+        seatsArea.addEventListener('dragleave', (ev) => {
+            const e = ev;
+            const target = e.target;
+            const targetCard = target?.closest('.student-seat-card');
+            if (targetCard) {
+                targetCard.classList.remove('drag-over');
+            }
+        });
+        // drop -> 카드 교환 또는 이동
         seatsArea.addEventListener('drop', (ev) => {
             const e = ev;
             e.preventDefault();
-            const target = e.target?.closest('.student-seat-card');
+            // 하이라이트 제거
+            seatsArea.querySelectorAll('.drag-over').forEach(el => {
+                el.classList.remove('drag-over');
+            });
             const source = this.dragSourceCard;
             this.dragSourceCard = null;
-            if (!source || !target || source === target)
+            if (!source)
                 return;
-            if (target.classList.contains('fixed-seat') || source.classList.contains('fixed-seat'))
-                return;
-            const srcNameEl = source.querySelector('.student-name');
-            const tgtNameEl = target.querySelector('.student-name');
-            if (!srcNameEl || !tgtNameEl)
-                return;
-            // 이름 스왑
-            const tmpName = srcNameEl.textContent || '';
-            srcNameEl.textContent = tgtNameEl.textContent || '';
-            tgtNameEl.textContent = tmpName;
-            // 성별 배경 클래스 스왑
-            const srcIsM = source.classList.contains('gender-m');
-            const srcIsF = source.classList.contains('gender-f');
-            const tgtIsM = target.classList.contains('gender-m');
-            const tgtIsF = target.classList.contains('gender-f');
-            source.classList.toggle('gender-m', tgtIsM);
-            source.classList.toggle('gender-f', tgtIsF);
-            target.classList.toggle('gender-m', srcIsM);
-            target.classList.toggle('gender-f', srcIsF);
+            // 타겟이 카드인지 확인 (더 정확한 감지)
+            let targetCard = null;
+            const targetElement = e.target;
+            // target이 카드 자체이거나, 카드의 자식 요소인 경우
+            if (targetElement) {
+                if (targetElement.classList.contains('student-seat-card')) {
+                    targetCard = targetElement;
+                }
+                else {
+                    targetCard = targetElement.closest('.student-seat-card');
+                }
+            }
+            // 카드에 직접 드롭한 경우: 교환
+            if (targetCard && targetCard !== source) {
+                // 고정 좌석은 교환 불가
+                if (targetCard.classList.contains('fixed-seat') || source.classList.contains('fixed-seat'))
+                    return;
+                const srcNameEl = source.querySelector('.student-name');
+                const tgtNameEl = targetCard.querySelector('.student-name');
+                if (!srcNameEl || !tgtNameEl)
+                    return;
+                // 이름 스왑
+                const tmpName = srcNameEl.textContent || '';
+                srcNameEl.textContent = tgtNameEl.textContent || '';
+                tgtNameEl.textContent = tmpName;
+                // 성별 배경 클래스 스왑
+                const srcIsM = source.classList.contains('gender-m');
+                const srcIsF = source.classList.contains('gender-f');
+                const tgtIsM = targetCard.classList.contains('gender-m');
+                const tgtIsF = targetCard.classList.contains('gender-f');
+                source.classList.toggle('gender-m', tgtIsM);
+                source.classList.toggle('gender-f', tgtIsF);
+                targetCard.classList.toggle('gender-m', srcIsM);
+                targetCard.classList.toggle('gender-f', srcIsF);
+            }
+            else {
+                // 빈 공간에 드롭: 이동
+                // 드롭 위치 계산 (마우스 좌표 사용)
+                const seatsAreaRect = seatsArea.getBoundingClientRect();
+                const dropX = e.clientX - seatsAreaRect.left;
+                const dropY = e.clientY - seatsAreaRect.top;
+                // 모든 카드 가져오기 (분단 레이블 제외)
+                const allCards = Array.from(seatsArea.querySelectorAll('.student-seat-card'));
+                const cardsOnly = allCards.filter(card => card !== source &&
+                    !card.classList.contains('partition-label') &&
+                    !card.closest('.labels-row'));
+                if (cardsOnly.length === 0) {
+                    // 다른 카드가 없으면 그냥 추가
+                    seatsArea.appendChild(source);
+                    return;
+                }
+                // 가장 가까운 카드 찾기
+                let closestCard = null;
+                let minDistance = Infinity;
+                let insertPosition = 'after';
+                for (const card of cardsOnly) {
+                    const cardRect = card.getBoundingClientRect();
+                    const cardX = cardRect.left - seatsAreaRect.left + cardRect.width / 2;
+                    const cardY = cardRect.top - seatsAreaRect.top + cardRect.height / 2;
+                    const distance = Math.sqrt(Math.pow(dropX - cardX, 2) + Math.pow(dropY - cardY, 2));
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        closestCard = card;
+                        // 드롭 위치가 카드보다 위쪽이면 앞에, 아래쪽이면 뒤에
+                        if (dropY < cardY - cardRect.height / 4) {
+                            insertPosition = 'before';
+                        }
+                        else if (dropY > cardY + cardRect.height / 4) {
+                            insertPosition = 'after';
+                        }
+                        else {
+                            // 수평 위치로 판단
+                            if (dropX < cardX) {
+                                insertPosition = 'before';
+                            }
+                            else {
+                                insertPosition = 'after';
+                            }
+                        }
+                    }
+                }
+                // 카드 이동
+                if (closestCard) {
+                    if (insertPosition === 'before') {
+                        seatsArea.insertBefore(source, closestCard);
+                    }
+                    else {
+                        // 다음 형제가 있으면 그 앞에, 없으면 맨 끝에
+                        const nextSibling = closestCard.nextElementSibling;
+                        if (nextSibling && nextSibling.classList.contains('student-seat-card')) {
+                            seatsArea.insertBefore(source, nextSibling);
+                        }
+                        else {
+                            seatsArea.insertBefore(source, closestCard.nextSibling);
+                        }
+                    }
+                }
+                else {
+                    seatsArea.appendChild(source);
+                }
+            }
         });
     }
     /**
@@ -2090,6 +2196,7 @@ export class MainController {
         // 새 테이블 컨테이너 생성
         studentTableContainer = document.createElement('div');
         studentTableContainer.className = 'student-table-container';
+        studentTableContainer.id = 'student-table-container';
         // 가로 방향 2-3단 레이아웃을 위한 스타일 적용
         // 화면 크기에 따라 자동으로 2-3단으로 조정
         studentTableContainer.style.cssText = `
@@ -2486,6 +2593,13 @@ export class MainController {
                 attributes: false
             });
         });
+        // 테이블이 생성된 후 해당 위치로 스크롤
+        setTimeout(() => {
+            studentTableContainer.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start'
+            });
+        }, 100);
         this.outputModule.showInfo(`${count}명의 학생 명렬표가 생성되었습니다.`);
     }
     /**
@@ -4066,6 +4180,8 @@ export class MainController {
      * 좌석 배치하기 처리
      */
     handleArrangeSeats() {
+        // 3초 동안 지속하는 음향 효과 재생
+        this.playArrangementSound();
         try {
             // 커튼 애니메이션 시작
             this.startCurtainAnimation();
@@ -4557,11 +4673,6 @@ export class MainController {
             const fixedSeatHelp = document.getElementById('fixed-seat-help');
             if (fixedSeatHelp) {
                 fixedSeatHelp.style.display = 'none';
-            }
-            // 드래그 & 드롭 안내 메시지 표시
-            const dragDropHelp = document.getElementById('drag-drop-help');
-            if (dragDropHelp) {
-                dragDropHelp.style.display = 'block';
             }
             // 1초 후 폭죽 애니메이션 시작
             setTimeout(() => {
@@ -5290,6 +5401,308 @@ export class MainController {
         }
     }
     /**
+     * 교탁용 자리 배치도 인쇄 처리 (180도 회전)
+     */
+    handlePrintLayoutForTeacher() {
+        try {
+            // 인쇄용 스타일이 포함된 새 창 열기
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) {
+                alert('팝업이 차단되었습니다. 팝업을 허용해주세요.');
+                return;
+            }
+            // 현재 자리 배치도 영역 가져오기
+            const seatsArea = document.getElementById('seats-area');
+            const classroomLayout = document.getElementById('classroom-layout');
+            if (!seatsArea || !classroomLayout) {
+                alert('인쇄할 자리 배치도를 찾을 수 없습니다.');
+                return;
+            }
+            // 현재 그리드 설정 가져오기
+            const currentGridTemplateColumns = seatsArea.style.gridTemplateColumns;
+            console.log('교탁용 인쇄 - 현재 그리드 설정:', currentGridTemplateColumns);
+            // 현재 화면의 실제 HTML 구조를 그대로 사용
+            const seatsAreaHtml = seatsArea.innerHTML;
+            // 현재 날짜와 시간
+            const now = new Date();
+            const dateString = now.toLocaleDateString('ko-KR', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            // 인쇄용 HTML 생성 (180도 회전)
+            const printContent = `
+                <!DOCTYPE html>
+                <html lang="ko">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>교탁용 자리 배치도 - ${dateString}</title>
+                    <style>
+                        body {
+                            font-family: 'Malgun Gothic', sans-serif;
+                            margin: 0;
+                            padding: 10px;
+                            background: white;
+                            font-size: 12px;
+                        }
+                        .print-container {
+                            transform: rotate(180deg);
+                            transform-origin: center center;
+                            width: 100%;
+                            min-height: 100vh;
+                        }
+                        .print-header {
+                            text-align: center;
+                            margin-bottom: 15px;
+                            border-bottom: 1px solid #333;
+                            padding-bottom: 8px;
+                        }
+                        .print-title {
+                            font-size: 18px;
+                            font-weight: bold;
+                            margin-bottom: 5px;
+                            transform: rotate(180deg);
+                        }
+                        .print-date {
+                            font-size: 11px;
+                            color: #666;
+                            transform: rotate(180deg);
+                        }
+                        .classroom-layout {
+                            background: #f8f9fa;
+                            border: 1px dashed #ddd;
+                            border-radius: 5px;
+                            padding: 10px;
+                            margin: 10px 0;
+                        }
+                        .blackboard-area {
+                            position: relative;
+                            top: 0;
+                            left: 50%;
+                            transform: translateX(-50%);
+                            width: 200px;
+                            height: 50px;
+                            background: #2c3e50;
+                            border: 2px solid #1a252f;
+                            border-radius: 3px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            color: white;
+                            font-weight: bold;
+                            font-size: 12px;
+                            margin-bottom: 10px;
+                        }
+                        .blackboard-area span {
+                            transform: rotate(180deg);
+                        }
+                        .teacher-desk-area {
+                            position: relative;
+                            top: 0;
+                            left: 50%;
+                            transform: translateX(-50%);
+                            width: 80px;
+                            height: 25px;
+                            background: #95a5a6;
+                            border: 1px solid #7f8c8d;
+                            border-radius: 3px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            color: white;
+                            font-weight: bold;
+                            font-size: 10px;
+                            margin-bottom: 20px;
+                        }
+                        .teacher-desk-area span {
+                            transform: rotate(180deg);
+                        }
+                        .seats-area {
+                            display: grid;
+                            gap: 5px 20px !important;
+                            justify-content: center !important;
+                            margin-top: 10px;
+                            grid-template-columns: ${currentGridTemplateColumns || 'repeat(6, 1fr)'};
+                        }
+                        .student-seat-card {
+                            min-width: 60px;
+                            height: 60px;
+                            background: white;
+                            border: 1px solid #ddd;
+                            border-radius: 4px;
+                            padding: 5px;
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            justify-content: center;
+                            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+                        }
+                        .student-seat-card.gender-m {
+                            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+                        }
+                        .student-seat-card.gender-f {
+                            background: linear-gradient(135deg, #fce4ec 0%, #f8bbd9 100%);
+                        }
+                        .student-name {
+                            text-align: center;
+                            font-size: 20px;
+                            font-weight: bold;
+                            color: #333;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            height: 100%;
+                            width: 100%;
+                            line-height: 1;
+                            white-space: nowrap;
+                            overflow: hidden;
+                            text-overflow: ellipsis;
+                            transform: rotate(180deg);
+                        }
+                        .partition-label {
+                            text-align: center;
+                            font-weight: bold;
+                            color: #667eea;
+                            font-size: 8px;
+                            margin-bottom: 3px;
+                            transform: rotate(180deg) !important;
+                        }
+                        .labels-row {
+                            display: grid;
+                            gap: 5px 20px !important;
+                            justify-content: center !important;
+                            grid-template-columns: ${currentGridTemplateColumns || 'repeat(6, 1fr)'};
+                            margin-bottom: 5px;
+                        }
+                        .labels-row > div {
+                            text-align: center;
+                            font-weight: bold;
+                            color: #667eea;
+                            font-size: 8px;
+                            margin-bottom: 3px;
+                            transform: rotate(180deg) !important;
+                        }
+                        /* 분단 레이블 회전 (클래스 없이 직접 추가된 경우도 포함) */
+                        .seats-area > div:not(.student-seat-card):not(.labels-row):not(.student-name) {
+                            transform: rotate(180deg) !important;
+                        }
+                        @media print {
+                            @page {
+                                margin: 3mm;
+                            }
+                            body { 
+                                margin: 0; 
+                                padding: 0;
+                                font-size: 9px;
+                                display: flex;
+                                align-items: center;
+                                justify-content: center;
+                                min-height: 100vh;
+                            }
+                            .print-container {
+                                width: 100%;
+                                min-height: auto;
+                                display: flex;
+                                flex-direction: column;
+                                align-items: center;
+                                justify-content: center;
+                            }
+                            .print-header { 
+                                page-break-after: avoid; 
+                                margin-bottom: 5px;
+                                padding-bottom: 3px;
+                                border-bottom-width: 1px;
+                                width: 100%;
+                            }
+                            .print-title {
+                                font-size: 14px;
+                                margin-bottom: 2px;
+                            }
+                            .print-date {
+                                font-size: 8px;
+                            }
+                            .classroom-layout { 
+                                page-break-inside: avoid; 
+                                margin: 0 auto;
+                                padding: 3px;
+                                width: fit-content;
+                            }
+                            .blackboard-area {
+                                width: 160px;
+                                height: 40px;
+                                font-size: 10px;
+                                margin-bottom: 5px;
+                            }
+                            .teacher-desk-area {
+                                width: 60px;
+                                height: 20px;
+                                font-size: 8px;
+                                margin-bottom: 8px;
+                            }
+                            .seats-area {
+                                display: grid !important;
+                                gap: 2px 25px !important;
+                                margin-top: 5px;
+                                grid-template-columns: ${currentGridTemplateColumns || 'repeat(6, 1fr)'} !important;
+                            }
+                            .student-seat-card {
+                                min-width: 45px;
+                                height: 45px;
+                                padding: 2px;
+                            }
+                            .student-name {
+                                font-size: 16px;
+                            }
+                            .partition-label {
+                                font-size: 7px;
+                                margin-bottom: 2px;
+                            }
+                            .labels-row {
+                                display: grid !important;
+                                gap: 2px 25px !important;
+                                margin-bottom: 3px;
+                                grid-template-columns: ${currentGridTemplateColumns || 'repeat(6, 1fr)'} !important;
+                            }
+                            .labels-row > div {
+                                font-size: 7px;
+                                margin-bottom: 2px;
+                            }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="print-container">
+                        <div class="print-header">
+                            <div class="print-title">교탁용 자리 배치도</div>
+                            <div class="print-date">생성일시: ${dateString}</div>
+                        </div>
+                        <div class="classroom-layout">
+                            <div class="blackboard-area"><span>📝 칠판</span></div>
+                            <div class="teacher-desk-area"><span>🖥️ 교탁</span></div>
+                            <div class="seats-area">
+                                ${seatsAreaHtml}
+                            </div>
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `;
+            printWindow.document.write(printContent);
+            printWindow.document.close();
+            // 인쇄 대화상자 열기
+            setTimeout(() => {
+                printWindow.print();
+            }, 500);
+        }
+        catch (error) {
+            console.error('교탁용 인쇄 중 오류:', error);
+            this.outputModule.showError('교탁용 인쇄 중 오류가 발생했습니다.');
+        }
+    }
+    /**
      * 자리 배치도 저장 처리
      */
     handleSaveLayout() {
@@ -5509,23 +5922,51 @@ export class MainController {
      */
     loadSharedLayout(shareData) {
         try {
+            // URL-safe Base64 디코딩 (+, /, = 문자 복원)
+            const base64Data = shareData
+                .replace(/-/g, '+')
+                .replace(/_/g, '/');
+            // 패딩 추가 (필요한 경우)
+            const padding = base64Data.length % 4;
+            const paddedData = padding ? base64Data + '='.repeat(4 - padding) : base64Data;
             // Base64 디코딩
-            const decodedData = decodeURIComponent(escape(atob(shareData)));
+            let decodedData;
+            try {
+                decodedData = decodeURIComponent(escape(atob(paddedData)));
+            }
+            catch (e) {
+                // 이전 형식 호환성: 일반 Base64 디코딩 시도
+                decodedData = decodeURIComponent(escape(atob(shareData)));
+            }
+            // JSON 파싱
             const shareInfo = JSON.parse(decodedData);
-            if (shareInfo.type !== 'seating-arrangement') {
+            // 이전 형식과 새 형식 모두 지원
+            const type = shareInfo.t || shareInfo.type;
+            if (type !== 'sa' && type !== 'seating-arrangement') {
                 throw new Error('유효하지 않은 공유 데이터입니다.');
             }
             console.log('공유된 배치 데이터 로드:', shareInfo);
-            // 학생 정보로부터 배치 복원
-            const studentDataList = shareInfo.students || [];
-            const gridColumns = shareInfo.layout || '';
-            // 학생 데이터 생성 (이름과 성별 포함)
+            // 학생 정보로부터 배치 복원 (압축된 형식과 이전 형식 모두 지원)
+            const studentDataList = shareInfo.s || shareInfo.students || [];
+            const gridColumns = shareInfo.l || shareInfo.layout || '';
+            // 학생 데이터 생성 (압축된 형식 [이름, 성별] 또는 객체 형식 지원)
             this.students = studentDataList.map((student, index) => {
-                return {
-                    id: index + 1,
-                    name: student.name,
-                    gender: student.gender || 'M'
-                };
+                if (Array.isArray(student)) {
+                    // 압축된 형식: [이름, 성별]
+                    return {
+                        id: index + 1,
+                        name: student[0],
+                        gender: (student[1] || 'M')
+                    };
+                }
+                else {
+                    // 이전 형식: {name: string, gender: 'M' | 'F'}
+                    return {
+                        id: index + 1,
+                        name: student.name,
+                        gender: (student.gender || 'M')
+                    };
+                }
             });
             // 성별별 학생 수 계산
             let maleCount = 0;
@@ -5592,7 +6033,7 @@ export class MainController {
         }
     }
     /**
-     * 간단한 공유 주소(URL) 생성
+     * 간단한 공유 주소(URL) 생성 (압축된 형식)
      */
     generateShareUrl(seatsHtml, gridColumns, dateString) {
         // 학생 정보 추출 (이름과 성별)
@@ -5611,21 +6052,27 @@ export class MainController {
                 });
             }
         });
-        // 공유 데이터 생성
+        // 공유 데이터 생성 (최적화된 형식)
+        // 학생 데이터를 배열로 압축: [이름, 성별] 형식
+        const compressedStudents = studentData.map(s => [s.name, s.gender]);
         const shareData = {
-            type: 'seating-arrangement',
-            date: dateString,
-            students: studentData,
-            layout: gridColumns,
-            version: '1.0'
+            t: 'sa', // type: 'seating-arrangement' 축약
+            d: dateString, // date
+            s: compressedStudents, // students (압축된 형식)
+            l: gridColumns, // layout
+            v: '1.0' // version
         };
-        // Base64로 인코딩하여 짧게 만들기
+        // JSON 문자열 생성
         const jsonString = JSON.stringify(shareData);
-        const encodedData = btoa(unescape(encodeURIComponent(jsonString)));
+        // Base64 URL-safe 인코딩 (+, /, = 문자를 URL-safe 문자로 변환)
+        const encodedData = btoa(unescape(encodeURIComponent(jsonString)))
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=/g, '');
         // 현재 페이지의 기본 URL 가져오기
         const baseUrl = window.location.origin + window.location.pathname;
-        // 공유 URL 생성
-        const shareUrl = `${baseUrl}?share=${encodedData}`;
+        // 공유 URL 생성 (짧은 파라미터 이름 사용)
+        const shareUrl = `${baseUrl}?s=${encodedData}`;
         return shareUrl;
     }
     /**
@@ -6129,6 +6576,39 @@ export class MainController {
                 center.remove();
             }
         }, 1000);
+    }
+    /**
+     * 자리 배치 실행 시 음향 효과 재생 (3초)
+     */
+    playArrangementSound() {
+        try {
+            // Web Audio API를 사용하여 음향 효과 생성
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const duration = 3.0; // 3초
+            const sampleRate = audioContext.sampleRate;
+            const numSamples = duration * sampleRate;
+            const buffer = audioContext.createBuffer(1, numSamples, sampleRate);
+            const data = buffer.getChannelData(0);
+            // 상승하는 톤과 함께 부드러운 효과음 생성
+            for (let i = 0; i < numSamples; i++) {
+                const t = i / sampleRate;
+                // 주파수가 점진적으로 상승하는 톤 (200Hz에서 400Hz로)
+                const frequency = 200 + (200 * t / duration);
+                // 진폭이 점진적으로 감소하는 엔벨로프
+                const envelope = Math.exp(-t * 0.5) * (1 - t / duration);
+                // 사인파 생성
+                data[i] = Math.sin(2 * Math.PI * frequency * t) * envelope * 0.3;
+            }
+            // 오디오 소스 생성 및 재생
+            const source = audioContext.createBufferSource();
+            source.buffer = buffer;
+            source.connect(audioContext.destination);
+            source.start(0);
+        }
+        catch (error) {
+            // Web Audio API가 지원되지 않거나 오류가 발생한 경우 조용히 실패
+            console.log('음향 효과 재생 실패:', error);
+        }
     }
 }
 //# sourceMappingURL=MainController.js.map
