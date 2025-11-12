@@ -63,14 +63,22 @@
                         </label>
                         
                         <!-- 1명씩 한 줄로 배치 서브 옵션 (기본 표시) -->
-                        <div id="single-submenu" style="display: block; margin-left: 30px; margin-top: 5px; margin-bottom: 5px;">
-                            <label class="radio-option" style="border: none; padding: 8px 15px;">
+                        <div id="single-submenu" style="display: block; margin-left: 30px; margin-top: 2px; margin-bottom: 2px;">
+                            <label class="radio-option" style="border: none; padding: 2px 15px; margin: 0;">
                                 <input type="radio" name="single-mode" value="basic-row" checked>
                                 <span>기본 1줄 배치</span>
                             </label>
-                            <label class="radio-option" style="border: none; padding: 8px 15px;">
+                            <label class="radio-option" style="border: none; padding: 2px 15px; margin: 0;">
                                 <input type="radio" name="single-mode" value="gender-row">
                                 <span>남녀 1줄 배치</span>
+                            </label>
+                            <label class="radio-option" style="border: none; padding: 2px 15px; margin: 0;">
+                                <input type="radio" name="single-mode" value="gender-symmetric-row">
+                                <span>남녀 대칭 1줄 배치</span>
+                            </label>
+                            <label style="display: flex; align-items: center; padding: 2px 15px; margin: 0; margin-left: 0px;">
+                                <input type="checkbox" id="reverse-gender-order" />
+                                <span style="margin-left: 8px;">남녀 순서 바꾸기</span>
                             </label>
                         </div>
                         

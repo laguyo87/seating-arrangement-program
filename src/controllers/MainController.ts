@@ -442,6 +442,15 @@ export class MainController {
                 this.updatePreviewForGenderCounts();
             });
         });
+        
+        // '남녀 순서 바꾸기' 체크박스 이벤트 리스너
+        const reverseGenderOrderCheckbox = document.getElementById('reverse-gender-order');
+        if (reverseGenderOrderCheckbox) {
+            reverseGenderOrderCheckbox.addEventListener('change', () => {
+                // 체크박스 변경 시 미리보기 업데이트
+                this.updatePreviewForGenderCounts();
+            });
+        }
 
         // 모둠 크기 라디오 버튼 변경 이벤트
         const groupSizeInputs = document.querySelectorAll('input[name="group-size"]');
@@ -1190,9 +1199,18 @@ export class MainController {
             const singleModeInput = document.querySelector('input[name="single-mode"]:checked') as HTMLInputElement;
             const singleMode = singleModeInput ? singleModeInput.value : 'basic-row';
             
+            // '남녀 순서 바꾸기' 체크박스 상태 확인
+            const reverseGenderOrderCheckbox = document.getElementById('reverse-gender-order') as HTMLInputElement;
+            const reverseGenderOrder = reverseGenderOrderCheckbox ? reverseGenderOrderCheckbox.checked : false;
+            
             // 남학생과 여학생 분리
-            const maleStudents = this.students.filter(s => s.gender === 'M');
-            const femaleStudents = this.students.filter(s => s.gender === 'F');
+            let maleStudents = this.students.filter(s => s.gender === 'M');
+            let femaleStudents = this.students.filter(s => s.gender === 'F');
+            
+            // '남녀 순서 바꾸기'가 체크되면 남학생과 여학생 배열을 교환
+            if (reverseGenderOrder) {
+                [maleStudents, femaleStudents] = [femaleStudents, maleStudents];
+            }
             
             if (singleMode === 'basic-row') {
                 // '기본 1줄 배치' 모드
@@ -1371,6 +1389,83 @@ export class MainController {
                             });
                             femaleIndex++;
                         }
+                    }
+                }
+                
+                // 각 분단의 학생들을 세로 방향으로 배치 (행 단위로 배치)
+                // 최대 행 수 계산
+                const maxRows = Math.max(...partitionStudents.map(students => students.length));
+                
+                // 각 행별로 배치 (세로 방향)
+                for (let row = 0; row < maxRows; row++) {
+                    for (let partition = 0; partition < partitionCount; partition++) {
+                        if (row < partitionStudents[partition].length) {
+                            const {student, index} = partitionStudents[partition][row];
+                            const card = this.createStudentCard(student, index);
+                            card.style.width = '100%';
+                            card.style.maxWidth = '120px';
+                            card.style.margin = '0 auto';
+                            seatsArea.appendChild(card);
+                        }
+                    }
+                }
+            } else if (singleMode === 'gender-symmetric-row') {
+                // '남녀 대칭 1줄 배치' 모드 - 세로(열) 방향으로 배치
+                // 남학생을 먼저 앞쪽 분단부터 순차적으로 배치
+                // 남학생이 다 배치되면 여학생을 나머지 자리에 배치
+                // 예: 남학생 12명, 여학생 12명, 5분단
+                // 1분단: 남1, 남2, 남3, 남4, 남5 (5명)
+                // 2분단: 남6, 남7, 남8, 남9, 남10 (5명)
+                // 3분단: 남11, 남12, 여1, 여2, 여3 (5명)
+                // 4분단: 여4, 여5, 여6, 여7, 여8 (5명)
+                // 5분단: 여9, 여10, 여11, 여12 (4명)
+                
+                const totalStudents = maleStudents.length + femaleStudents.length;
+                const studentsPerPartition = Math.ceil(totalStudents / partitionCount);
+                
+                // 각 분단별 학생 배열을 먼저 구성
+                const partitionStudents: Array<Array<{student: Student, index: number}>> = [];
+                for (let partition = 0; partition < partitionCount; partition++) {
+                    partitionStudents.push([]);
+                }
+                
+                let maleIndex = 0;
+                let femaleIndex = 0;
+                
+                // 먼저 남학생을 앞쪽 분단부터 순차적으로 배치
+                for (let partition = 0; partition < partitionCount; partition++) {
+                    // 각 분단의 최대 용량 계산
+                    const remainingStudents = totalStudents - (maleIndex + femaleIndex);
+                    const remainingPartitions = partitionCount - partition;
+                    const maxCapacity = partition === partitionCount - 1 
+                        ? remainingStudents 
+                        : Math.min(studentsPerPartition, remainingStudents);
+                    
+                    // 남학생을 먼저 배치
+                    while (maleIndex < maleStudents.length && partitionStudents[partition].length < maxCapacity) {
+                        partitionStudents[partition].push({
+                            student: maleStudents[maleIndex],
+                            index: this.students.indexOf(maleStudents[maleIndex])
+                        });
+                        maleIndex++;
+                    }
+                }
+                
+                // 남학생이 다 배치된 후, 여학생을 나머지 자리에 배치
+                for (let partition = 0; partition < partitionCount; partition++) {
+                    const remainingStudents = totalStudents - (maleIndex + femaleIndex);
+                    const remainingPartitions = partitionCount - partition;
+                    const maxCapacity = partition === partitionCount - 1 
+                        ? remainingStudents 
+                        : Math.min(studentsPerPartition, remainingStudents);
+                    
+                    // 여학생을 나머지 자리에 배치
+                    while (femaleIndex < femaleStudents.length && partitionStudents[partition].length < maxCapacity) {
+                        partitionStudents[partition].push({
+                            student: femaleStudents[femaleIndex],
+                            index: this.students.indexOf(femaleStudents[femaleIndex])
+                        });
+                        femaleIndex++;
                     }
                 }
                 
