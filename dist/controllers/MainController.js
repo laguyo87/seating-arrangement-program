@@ -5809,32 +5809,39 @@ export class MainController {
             <div style="line-height: 1.8; color: #444;">
                 <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">1️⃣ 기본 사용 방법</h3>
                 <ol style="padding-left: 25px; margin-bottom: 20px;">
-                    <li><strong>옵션1: 좌석 배치 형태</strong> - 원하는 배치 유형을 선택하세요
+                    <li><strong>📋 옵션1: 좌석 배치 형태</strong> - 원하는 배치 유형을 선택하세요
                         <ul style="padding-left: 20px; margin-top: 8px;">
-                            <li><strong>1명씩 한 줄로 배치</strong>: 개별 좌석을 분단별로 배치 (분단 수: 3~6)</li>
-                            <li><strong>2명씩 짝꿍 배치</strong>: 두 명이 나란히 앉는 형태 (분단 수: 3~5)
+                            <li><strong>🪑 1명씩 한 줄로 배치</strong>: 개별 좌석을 분단별로 배치 (분단 수: 3~6)
                                 <ul style="padding-left: 15px; margin-top: 5px;">
-                                    <li>남녀 짝꿍하기: 남학생과 여학생을 짝지어 배치</li>
-                                    <li>같은 성끼리 짝꿍하기: 같은 성별끼리 짝지어 배치</li>
+                                    <li>📐 <strong>기본 1줄 배치</strong>: 가로(행) 방향으로 남학생과 여학생을 교대로 순차 배치</li>
+                                    <li>👥 <strong>남녀 1줄 배치</strong>: 세로(열) 방향으로 홀수 분단은 남학생, 짝수 분단은 여학생 배치</li>
+                                    <li>⚖️ <strong>남녀 대칭 1줄 배치</strong>: 세로(열) 방향으로 남학생을 먼저 앞쪽 분단부터 배치, 그 다음 여학생 배치</li>
+                                    <li>🔄 <strong>남녀 순서 바꾸기</strong>: 체크 시 여학생을 먼저 배치하고 남학생을 나중에 배치 (세 가지 옵션 모두 적용)</li>
                                 </ul>
                             </li>
-                            <li><strong>모둠 배치</strong>: 모둠 단위로 좌석 배치
+                            <li><strong>👫 2명씩 짝꿍 배치</strong>: 두 명이 나란히 앉는 형태 (분단 수: 3~5)
+                                <ul style="padding-left: 15px; margin-top: 5px;">
+                                    <li>💑 남녀 짝꿍하기: 남학생과 여학생을 짝지어 배치</li>
+                                    <li>👨‍👨‍👧‍👧 같은 성끼리 짝꿍하기: 같은 성별끼리 짝지어 배치</li>
+                                </ul>
+                            </li>
+                            <li><strong>👥 모둠 배치</strong>: 모둠 단위로 좌석 배치
                                 <ul style="padding-left: 15px; margin-top: 5px;">
                                     <li>3명 모둠 배치: 2x2 그리드 (분단 수: 3~5)</li>
                                     <li>4명 모둠 배치: 2x2 그리드 (분단 수: 3~4)</li>
                                     <li>5명 모둠 배치: 2x3 그리드 (분단 수: 3~5)</li>
                                     <li>6명 모둠 배치: 2x3 그리드 (분단 수: 2~4)</li>
-                                    <li>남녀 섞기: 모둠 내에서 남녀를 균형있게 섞어 배치</li>
+                                    <li>🔄 남녀 섞기: 모둠 내에서 남녀를 균형있게 섞어 배치</li>
                                 </ul>
                             </li>
                         </ul>
                     </li>
-                    <li><strong>옵션2: 학생 자리 수</strong> - 남학생 수와 여학생 수를 입력하세요. 우측에 미리보기가 자동으로 표시됩니다.</li>
-                    <li><strong>옵션3: 분단 개수</strong> - 교실의 분단 수를 입력하세요 (선택한 배치 형태에 따라 가능한 범위가 다릅니다)</li>
-                    <li><strong>옵션4: 맞춤 구성</strong> - 추가 옵션을 선택하세요
+                    <li><strong>👨‍🎓 옵션2: 학생 자리 수</strong> - 남학생 수와 여학생 수를 입력하세요. 우측에 미리보기가 자동으로 표시됩니다.</li>
+                    <li><strong>📏 옵션3: 분단 개수</strong> - 교실의 분단 수를 입력하세요 (선택한 배치 형태에 따라 가능한 범위가 다릅니다)</li>
+                    <li><strong>⚙️ 옵션4: 맞춤 구성</strong> - 추가 옵션을 선택하세요
                         <ul style="padding-left: 20px; margin-top: 8px;">
-                            <li>랜덤 배치: 완전 랜덤으로 좌석 배치</li>
-                            <li>고정 좌석 지정 후 랜덤 배치: 특정 좌석을 고정하고 나머지만 랜덤 배치</li>
+                            <li>🎲 랜덤 배치: 완전 랜덤으로 좌석 배치</li>
+                            <li>🔒 고정 좌석 지정 후 랜덤 배치: 특정 좌석을 고정하고 나머지만 랜덤 배치</li>
                         </ul>
                     </li>
                     <li><strong>🪑 좌석 배치하기</strong> - "학생 이름 입력하기" 버튼을 클릭하여 학생 정보를 입력한 후, "자리 배치 실행하기" 버튼을 클릭하면 좌석에 학생들이 배치됩니다</li>
@@ -5842,18 +5849,18 @@ export class MainController {
 
                 <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">2️⃣ 학생 정보 입력</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
-                    <li><strong>학생 이름 입력하기</strong>: 버튼을 클릭하여 학생 정보 입력 테이블을 생성하세요</li>
-                    <li><strong>학생 이름 엑셀파일에서 가져오기</strong>: 엑셀 파일을 업로드하여 학생 정보를 한 번에 입력할 수 있습니다</li>
-                    <li><strong>학생 이름 양식 다운로드</strong>: 엑셀 양식 파일을 다운로드하여 학생 정보를 작성한 후 업로드하세요</li>
-                    <li><strong>우리 반 이름 불러오기</strong>: 이전에 저장한 반 학생 정보를 불러옵니다</li>
-                    <li><strong>우리반 학생으로 등록하기</strong>: 현재 입력한 학생 정보를 저장하여 다음에 불러올 수 있습니다</li>
-                    <li><strong>행 추가</strong>: 학생 정보 입력 테이블에서 "행 추가" 버튼을 클릭하여 학생을 추가할 수 있습니다</li>
-                    <li><strong>삭제</strong>: 각 행의 삭제 아이콘(🗑️)을 클릭하여 학생을 삭제할 수 있습니다</li>
+                    <li><strong>📝 학생 이름 입력하기</strong>: 버튼을 클릭하여 학생 정보 입력 테이블을 생성하세요</li>
+                    <li><strong>📊 학생 이름 엑셀파일에서 가져오기</strong>: 엑셀 파일을 업로드하여 학생 정보를 한 번에 입력할 수 있습니다</li>
+                    <li><strong>📥 학생 이름 양식 다운로드</strong>: 엑셀 양식 파일을 다운로드하여 학생 정보를 작성한 후 업로드하세요</li>
+                    <li><strong>📂 우리 반 이름 불러오기</strong>: 이전에 저장한 반 학생 정보를 불러옵니다</li>
+                    <li><strong>💾 우리반 학생으로 등록하기</strong>: 현재 입력한 학생 정보를 저장하여 다음에 불러올 수 있습니다</li>
+                    <li><strong>➕ 행 추가</strong>: 학생 정보 입력 테이블에서 "행 추가" 버튼을 클릭하여 학생을 추가할 수 있습니다</li>
+                    <li><strong>🗑️ 삭제</strong>: 각 행의 삭제 아이콘(🗑️)을 클릭하여 학생을 삭제할 수 있습니다</li>
                 </ul>
 
                 <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">3️⃣ 고정 좌석 기능</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
-                    <li><strong>고정 좌석 지정</strong>: "옵션4: 맞춤 구성"에서 "고정 좌석 지정 후 랜덤 배치" 옵션을 선택하세요</li>
+                    <li><strong>🔒 고정 좌석 지정</strong>: "옵션4: 맞춤 구성"에서 "고정 좌석 지정 후 랜덤 배치" 옵션을 선택하세요</li>
                     <li>미리보기 화면에서 원하는 좌석 카드를 클릭하면 🔒 아이콘과 빨간 테두리가 표시됩니다</li>
                     <li>학생 정보 입력 테이블의 "고정 좌석" 드롭다운에서 고정된 좌석을 선택하여 학생을 연결하세요</li>
                     <li>고정 좌석이 선택된 행의 번호 셀은 파란색 배경으로 표시됩니다</li>
@@ -5862,15 +5869,15 @@ export class MainController {
 
                 <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">4️⃣ 자리 배치 옵션</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
-                    <li><strong>이전 좌석 안 앉기</strong>: "확정된 자리 이력"에 저장된 이전 배치를 참고하여 같은 좌석에 배치되지 않도록 합니다</li>
-                    <li><strong>이전 짝 금지</strong>: "확정된 자리 이력"에 저장된 이전 배치를 참고하여 이전에 같은 짝이었던 학생과 다시 짝지어지지 않도록 합니다</li>
+                    <li><strong>🚫 이전 좌석 안 앉기</strong>: "확정된 자리 이력"에 저장된 이전 배치를 참고하여 같은 좌석에 배치되지 않도록 합니다</li>
+                    <li><strong>👥 이전 짝 금지</strong>: "확정된 자리 이력"에 저장된 이전 배치를 참고하여 이전에 같은 짝이었던 학생과 다시 짝지어지지 않도록 합니다</li>
                     <li>두 옵션을 모두 체크하면 두 조건을 모두 만족하도록 배치됩니다</li>
                 </ul>
 
                 <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">5️⃣ 확정된 자리 이력</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
-                    <li><strong>자리 확정</strong>: 자리 배치가 완료된 후 "✅ 자리 확정" 버튼을 클릭하면 현재 배치가 이력에 저장됩니다</li>
-                    <li><strong>확정된 자리 이력</strong>: 상단 바의 "📋 확정된 자리 이력" 드롭다운에서 저장된 배치를 확인할 수 있습니다</li>
+                    <li><strong>✅ 자리 확정</strong>: 자리 배치가 완료된 후 "✅ 자리 확정" 버튼을 클릭하면 현재 배치가 이력에 저장됩니다</li>
+                    <li><strong>📋 확정된 자리 이력</strong>: 상단 바의 "📋 확정된 자리 이력" 드롭다운에서 저장된 배치를 확인할 수 있습니다</li>
                     <li>같은 날짜에 여러 개의 배치가 저장되면 번호가 표시됩니다 (예: 25-11-10 확정자리 (3), (2), (1))</li>
                     <li>이력 항목을 클릭하면 해당 배치를 불러올 수 있습니다</li>
                     <li>이력 항목 옆의 삭제 아이콘(🗑️)을 클릭하면 해당 이력을 삭제할 수 있습니다</li>
@@ -5879,7 +5886,7 @@ export class MainController {
 
                 <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">6️⃣ 옵션 설정 기억하기</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
-                    <li><strong>옵션 설정 기억하기</strong>: "초기화" 버튼 위의 "옵션 설정 기억하기" 버튼을 클릭하면 현재 설정(옵션1~옵션4)이 저장됩니다</li>
+                    <li><strong>💾 옵션 설정 기억하기</strong>: "초기화" 버튼 위의 "옵션 설정 기억하기" 버튼을 클릭하면 현재 설정(옵션1~옵션4)이 저장됩니다</li>
                     <li>다음에 프로그램을 실행하면 저장된 설정이 자동으로 적용됩니다</li>
                 </ul>
 
@@ -5891,17 +5898,19 @@ export class MainController {
 
                 <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">8️⃣ 공유 및 출력</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
-                    <li><strong>공유하기</strong>: 공유 주소(URL)를 생성하여 다른 사람과 자리 배치도를 공유할 수 있습니다</li>
-                    <li><strong>인쇄하기</strong>: 현재 자리 배치도를 인쇄합니다</li>
+                    <li><strong>📤 공유하기</strong>: 공유 주소(URL)를 생성하여 다른 사람과 자리 배치도를 공유할 수 있습니다</li>
+                    <li><strong>🖨️ 인쇄하기</strong>: 현재 자리 배치도를 인쇄합니다</li>
                 </ul>
 
                 <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">💡 유용한 팁</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
-                    <li>학생 정보 입력 테이블 하단의 통계를 확인하여 남학생/여학생 수와 고정 좌석 수를 확인할 수 있습니다</li>
-                    <li>고정 좌석 모드에서는 미리보기 화면에서 좌석을 클릭하여 고정할 수 있습니다</li>
-                    <li>자리 배치 후에는 드래그 & 드롭으로 자유롭게 자리를 조정할 수 있습니다</li>
-                    <li>모둠 배치 시 "남녀 섞기" 옵션을 사용하면 모둠 내에서 남녀를 균형있게 배치할 수 있습니다</li>
-                    <li>좌측 사이드바의 토글 버튼(◀)을 클릭하면 사이드바를 접거나 펼칠 수 있습니다</li>
+                    <li>📊 학생 정보 입력 테이블 하단의 통계를 확인하여 남학생/여학생 수와 고정 좌석 수를 확인할 수 있습니다</li>
+                    <li>🔒 고정 좌석 모드에서는 미리보기 화면에서 좌석을 클릭하여 고정할 수 있습니다</li>
+                    <li>🔄 자리 배치 후에는 드래그 & 드롭으로 자유롭게 자리를 조정할 수 있습니다</li>
+                    <li>👥 모둠 배치 시 "남녀 섞기" 옵션을 사용하면 모둠 내에서 남녀를 균형있게 배치할 수 있습니다</li>
+                    <li>📐 "1명씩 한 줄로 배치" 옵션에서 "남녀 순서 바꾸기" 체크박스를 사용하면 여학생을 먼저 배치할 수 있습니다</li>
+                    <li>⚖️ "남녀 대칭 1줄 배치"는 남학생을 앞쪽 분단부터 배치하고, 여학생을 나머지 자리에 배치하는 대칭적인 배치 방식입니다</li>
+                    <li>◀ 좌측 사이드바의 토글 버튼(◀)을 클릭하면 사이드바를 접거나 펼칠 수 있습니다</li>
                 </ul>
 
                 <div style="margin-top: 30px; padding: 15px; background: #f0f8ff; border-left: 4px solid #667eea; border-radius: 4px;">
