@@ -2253,6 +2253,7 @@ export class MainController {
                     background: #f8f9fa;
                     width: fit-content;
                     min-width: 250px;
+                    box-sizing: border-box;
                 `;
                 // 그룹 내 카드 생성
                 const startIndex = groupIndex * groupSize;
@@ -2272,6 +2273,8 @@ export class MainController {
                     card.style.height = '100%';
                     card.style.minWidth = '0';
                     card.style.maxWidth = 'none';
+                    card.style.boxSizing = 'border-box';
+                    card.style.position = 'relative';
                     const positionInGroup = i - startIndex;
                     const row = Math.floor(positionInGroup / colsPerGroup);
                     const col = positionInGroup % colsPerGroup;
@@ -5598,6 +5601,44 @@ export class MainController {
                             overflow: hidden;
                             text-overflow: ellipsis;
                         }
+                        /* 모둠 배치 그룹 컨테이너 스타일 */
+                        .seat-group-container {
+                            display: grid !important;
+                            gap: 0 !important;
+                            border: 3px solid #667eea !important;
+                            border-radius: 12px !important;
+                            padding: 5px !important;
+                            background: #f8f9fa !important;
+                            width: fit-content !important;
+                            min-width: 200px !important;
+                            box-sizing: border-box !important;
+                            position: relative !important;
+                            overflow: visible !important;
+                        }
+                        /* 모둠 배치 그룹 컨테이너 내부 카드가 겹치지 않도록 */
+                        .seat-group-container > * {
+                            position: relative !important;
+                            z-index: 1 !important;
+                        }
+                        .seat-group-container .student-seat-card {
+                            width: 100% !important;
+                            height: 100% !important;
+                            min-width: 0 !important;
+                            max-width: none !important;
+                            margin: 0 !important;
+                            border-radius: 0 !important;
+                            box-sizing: border-box !important;
+                            position: relative !important;
+                            overflow: hidden !important;
+                        }
+                        /* 모둠 배치 분단 컨테이너 */
+                        .seats-area > div[style*="flex-direction: column"] {
+                            display: flex !important;
+                            flex-direction: column !important;
+                            align-items: center !important;
+                            gap: 10px !important;
+                            width: 100% !important;
+                        }
                         .partition-label {
                             text-align: center;
                             font-weight: bold;
@@ -5645,6 +5686,53 @@ export class MainController {
                             }
                             .student-name {
                                 font-size: 18px; /* 실제 인쇄 페이지에서도 크게 유지 */
+                            }
+                            /* 모둠 배치 그룹 컨테이너 인쇄 스타일 */
+                            .seat-group-container {
+                                display: grid !important;
+                                gap: 0 !important;
+                                border: 3px solid #667eea !important;
+                                border-radius: 12px !important;
+                                padding: 3px !important;
+                                background: #f8f9fa !important;
+                                width: fit-content !important;
+                                min-width: 180px !important;
+                                box-sizing: border-box !important;
+                                position: relative !important;
+                                overflow: visible !important;
+                            }
+                            /* 모둠 배치 그룹 컨테이너 내부 카드가 겹치지 않도록 */
+                            .seat-group-container > * {
+                                position: relative !important;
+                                z-index: 1 !important;
+                            }
+                            .seat-group-container .student-seat-card {
+                                width: 100% !important;
+                                height: 100% !important;
+                                min-width: 0 !important;
+                                max-width: none !important;
+                                margin: 0 !important;
+                                border-radius: 0 !important;
+                                box-sizing: border-box !important;
+                                min-width: 40px !important;
+                                height: 40px !important;
+                                padding: 2px !important;
+                                position: relative !important;
+                                overflow: hidden !important;
+                                flex-shrink: 0 !important;
+                            }
+                            /* 그리드 설정이 인라인 스타일로 되어 있어도 인쇄 시 적용되도록 */
+                            .seat-group-container[style*="grid-template-columns"],
+                            .seat-group-container[style*="grid-template-rows"] {
+                                display: grid !important;
+                            }
+                            /* 모둠 배치 분단 컨테이너 인쇄 스타일 */
+                            .seats-area > div[style*="flex-direction: column"] {
+                                display: flex !important;
+                                flex-direction: column !important;
+                                align-items: center !important;
+                                gap: 8px !important;
+                                width: 100% !important;
                             }
                         }
                     </style>
@@ -5804,6 +5892,13 @@ export class MainController {
                             margin-top: 10px;
                             grid-template-columns: ${currentGridTemplateColumns || 'repeat(6, 1fr)'};
                         }
+                        /* 페어 컨테이너는 회전하지 않음 (가장 먼저 정의하여 우선순위 확보) */
+                        .seats-area > div[style*="display: flex"],
+                        .seats-area > div[style*="display:flex"],
+                        .seats-area > div[style*="display: flex;"],
+                        .seats-area > div[style*="display:flex;"] {
+                            transform: none !important;
+                        }
                         .student-seat-card {
                             min-width: 60px;
                             height: 60px;
@@ -5816,6 +5911,7 @@ export class MainController {
                             align-items: center;
                             justify-content: center;
                             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+                            transform: none !important;
                         }
                         .student-seat-card.gender-m {
                             background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
@@ -5823,7 +5919,11 @@ export class MainController {
                         .student-seat-card.gender-f {
                             background: linear-gradient(135deg, #fce4ec 0%, #f8bbd9 100%);
                         }
-                        .student-name {
+                        /* 카드 내부의 이름만 회전 (가장 구체적인 선택자로 우선순위 확보) */
+                        .student-seat-card .student-name,
+                        .seats-area .student-seat-card .student-name,
+                        div[style*="display: flex"] .student-seat-card .student-name,
+                        div[style*="display:flex"] .student-seat-card .student-name {
                             text-align: center;
                             font-size: 20px;
                             font-weight: bold;
@@ -5837,7 +5937,7 @@ export class MainController {
                             white-space: nowrap;
                             overflow: hidden;
                             text-overflow: ellipsis;
-                            transform: rotate(180deg);
+                            transform: rotate(180deg) !important;
                         }
                         .partition-label {
                             text-align: center;
@@ -5862,8 +5962,8 @@ export class MainController {
                             margin-bottom: 3px;
                             transform: rotate(180deg) !important;
                         }
-                        /* 분단 레이블 회전 (클래스 없이 직접 추가된 경우도 포함) */
-                        .seats-area > div:not(.student-seat-card):not(.labels-row):not(.student-name) {
+                        /* 분단 레이블 회전 (페어 컨테이너는 제외) */
+                        .seats-area > div:not(.student-seat-card):not(.labels-row):not(.student-name):not([style*="display: flex"]):not([style*="display:flex"]) {
                             transform: rotate(180deg) !important;
                         }
                         @media print {
@@ -5925,13 +6025,30 @@ export class MainController {
                                 margin-top: 5px;
                                 grid-template-columns: ${currentGridTemplateColumns || 'repeat(6, 1fr)'} !important;
                             }
+                            /* 페어 컨테이너는 회전하지 않음 (가장 먼저 정의하여 우선순위 확보) */
+                            .seats-area > div[style*="display: flex"],
+                            .seats-area > div[style*="display:flex"],
+                            .seats-area > div[style*="display: flex;"],
+                            .seats-area > div[style*="display:flex;"] {
+                                transform: none !important;
+                            }
                             .student-seat-card {
                                 min-width: 45px;
                                 height: 45px;
                                 padding: 2px;
+                                transform: none !important;
                             }
-                            .student-name {
+                            /* 카드 내부의 이름만 회전 (가장 구체적인 선택자로 우선순위 확보) */
+                            .student-seat-card .student-name,
+                            .seats-area .student-seat-card .student-name,
+                            div[style*="display: flex"] .student-seat-card .student-name,
+                            div[style*="display:flex"] .student-seat-card .student-name {
                                 font-size: 16px;
+                                transform: rotate(180deg) !important;
+                            }
+                            /* 분단 레이블 회전 (페어 컨테이너는 제외) */
+                            .seats-area > div:not(.student-seat-card):not(.labels-row):not(.student-name):not([style*="display: flex"]):not([style*="display:flex"]) {
+                                transform: rotate(180deg) !important;
                             }
                             .partition-label {
                                 font-size: 7px;
