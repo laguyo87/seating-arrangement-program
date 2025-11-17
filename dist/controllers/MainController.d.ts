@@ -343,11 +343,19 @@ export declare class MainController {
      */
     private handleShareLayout;
     /**
+     * 뷰어 모드 활성화 (자리 배치도만 표시)
+     */
+    private enableViewerMode;
+    /**
+     * 뷰어 모드 UI 설정 (사이드바, 헤더 버튼 숨기기)
+     */
+    private setupViewerModeUI;
+    /**
      * 공유된 배치 데이터 로드
      */
     private loadSharedLayout;
     /**
-     * 간단한 공유 주소(URL) 생성 (압축된 형식)
+     * 간단한 공유 주소(URL) 생성 (압축된 형식, 뷰어 모드)
      */
     private generateShareUrl;
     /**

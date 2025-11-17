@@ -115,10 +115,16 @@ export class MainController {
             this.isInitialized = true;
             // URL 파라미터에서 공유 데이터 확인
             const urlParams = new URLSearchParams(window.location.search);
-            // 'share' 또는 's' 파라미터 지원 (하위 호환성)
+            // 뷰어 모드 파라미터 확인 (?v=)
+            const viewParam = urlParams.get('v');
+            // 하위 호환성: 'share' 또는 's' 파라미터 지원
             const shareParam = urlParams.get('s') || urlParams.get('share');
-            if (shareParam) {
-                // 공유된 배치 데이터 로드
+            if (viewParam) {
+                // 뷰어 모드: 자리 배치도만 표시
+                this.enableViewerMode(viewParam);
+            }
+            else if (shareParam) {
+                // 공유된 배치 데이터 로드 (기존 방식)
                 this.loadSharedLayout(shareParam);
             }
             else {
@@ -5343,6 +5349,11 @@ export class MainController {
             if (dropdown) {
                 dropdown.style.display = 'none';
             }
+            // 자리 배치도 액션 버튼들 표시
+            const actionButtons = document.getElementById('layout-action-buttons');
+            if (actionButtons) {
+                actionButtons.style.display = 'block';
+            }
             alert(`${historyItem.date}의 자리 배치를 불러왔습니다.`);
         }
         catch (error) {
@@ -6312,6 +6323,190 @@ export class MainController {
         }
     }
     /**
+     * 뷰어 모드 활성화 (자리 배치도만 표시)
+     */
+    enableViewerMode(viewData) {
+        try {
+            // URL-safe Base64 디코딩
+            const base64Data = viewData
+                .replace(/-/g, '+')
+                .replace(/_/g, '/');
+            // 패딩 추가 (필요한 경우)
+            const padding = base64Data.length % 4;
+            const paddedData = padding ? base64Data + '='.repeat(4 - padding) : base64Data;
+            // Base64 디코딩
+            let decodedData;
+            try {
+                decodedData = decodeURIComponent(escape(atob(paddedData)));
+            }
+            catch (e) {
+                decodedData = decodeURIComponent(escape(atob(viewData)));
+            }
+            // JSON 파싱
+            const shareInfo = JSON.parse(decodedData);
+            const type = shareInfo.t || shareInfo.type;
+            if (type !== 'sa' && type !== 'seating-arrangement') {
+                throw new Error('유효하지 않은 공유 데이터입니다.');
+            }
+            // 학생 정보 추출
+            const studentDataList = shareInfo.s || shareInfo.students || [];
+            const gridColumns = shareInfo.l || shareInfo.layout || '';
+            // 학생 데이터 생성
+            this.students = studentDataList.map((student, index) => {
+                if (Array.isArray(student)) {
+                    return {
+                        id: index + 1,
+                        name: student[0],
+                        gender: (student[1] || 'M')
+                    };
+                }
+                else {
+                    return {
+                        id: index + 1,
+                        name: student.name,
+                        gender: (student.gender || 'M')
+                    };
+                }
+            });
+            // 뷰어 모드 UI 설정
+            this.setupViewerModeUI();
+            // 성별별 학생 수 계산
+            let maleCount = 0;
+            let femaleCount = 0;
+            this.students.forEach(student => {
+                if (student.gender === 'M') {
+                    maleCount++;
+                }
+                else {
+                    femaleCount++;
+                }
+            });
+            // 사이드바 입력 업데이트 (숨겨져 있지만 데이터는 설정)
+            const maleCountInput = document.getElementById('male-students');
+            const femaleCountInput = document.getElementById('female-students');
+            if (maleCountInput)
+                maleCountInput.value = maleCount.toString();
+            if (femaleCountInput)
+                femaleCountInput.value = femaleCount.toString();
+            // 미리보기 업데이트 (좌석 카드 생성)
+            this.updatePreviewForGenderCounts();
+            // 자리 배치 렌더링 (학생 테이블 생성 없이 직접 렌더링)
+            setTimeout(() => {
+                // 좌석 영역 가져오기
+                const seatsArea = document.getElementById('seats-area');
+                if (!seatsArea) {
+                    throw new Error('좌석 영역을 찾을 수 없습니다.');
+                }
+                // 그리드 컬럼 설정
+                if (gridColumns) {
+                    seatsArea.style.gridTemplateColumns = gridColumns;
+                }
+                // 좌석 카드가 없으면 예시 카드 렌더링
+                const existingCards = seatsArea.querySelectorAll('.student-seat-card');
+                if (existingCards.length === 0) {
+                    this.renderExampleCards();
+                }
+                // 학생들을 좌석에 배치
+                setTimeout(() => {
+                    const cards = seatsArea.querySelectorAll('.student-seat-card');
+                    let cardIndex = 0;
+                    this.students.forEach((student) => {
+                        if (cardIndex < cards.length) {
+                            const card = cards[cardIndex];
+                            const nameDiv = card.querySelector('.student-name');
+                            if (nameDiv) {
+                                nameDiv.textContent = student.name;
+                                // 성별 클래스 설정
+                                card.classList.remove('gender-m', 'gender-f');
+                                card.classList.add(`gender-${student.gender.toLowerCase()}`);
+                            }
+                            cardIndex++;
+                        }
+                    });
+                    // 빈 좌석 초기화
+                    for (let i = cardIndex; i < cards.length; i++) {
+                        const card = cards[i];
+                        const nameDiv = card.querySelector('.student-name');
+                        if (nameDiv) {
+                            nameDiv.textContent = '';
+                        }
+                    }
+                }, 100);
+            }, 300);
+        }
+        catch (error) {
+            console.error('뷰어 모드 로드 실패:', error);
+            document.body.innerHTML = '<div style="padding: 20px; text-align: center;"><h2>자리 배치도를 불러올 수 없습니다.</h2><p>공유 링크가 유효하지 않거나 만료되었을 수 있습니다.</p></div>';
+        }
+    }
+    /**
+     * 뷰어 모드 UI 설정 (사이드바, 헤더 버튼 숨기기)
+     */
+    setupViewerModeUI() {
+        // 사이드바 숨기기
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar) {
+            sidebar.style.display = 'none';
+        }
+        // 사이드바 토글 버튼 숨기기
+        const sidebarToggle = document.getElementById('sidebar-toggle-btn');
+        if (sidebarToggle) {
+            sidebarToggle.style.display = 'none';
+        }
+        // 헤더 숨기기
+        const header = document.querySelector('.top-header');
+        if (header) {
+            header.style.display = 'none';
+        }
+        // 메인 컨테이너를 전체 화면으로
+        const mainContainer = document.querySelector('.main-container');
+        if (mainContainer) {
+            mainContainer.style.margin = '0';
+            mainContainer.style.padding = '0';
+        }
+        // 메인 콘텐츠 영역 스타일 조정
+        const mainContent = document.querySelector('.main-content');
+        if (mainContent) {
+            mainContent.style.width = '100%';
+            mainContent.style.margin = '0';
+            mainContent.style.padding = '10px';
+        }
+        // 메인 헤더 숨기기 (자리 배치도 제목과 버튼들)
+        const mainHeader = document.querySelector('.main-header');
+        if (mainHeader) {
+            mainHeader.style.display = 'none';
+        }
+        // 결과 컨테이너 스타일 조정 (전체 화면)
+        const resultContainer = document.getElementById('output-section');
+        if (resultContainer) {
+            resultContainer.style.margin = '0';
+            resultContainer.style.padding = '0';
+        }
+        // 카드 레이아웃 컨테이너 스타일 조정
+        const cardLayoutContainer = document.getElementById('card-layout-container');
+        if (cardLayoutContainer) {
+            cardLayoutContainer.style.margin = '0';
+            cardLayoutContainer.style.padding = '10px';
+        }
+        // 교실 레이아웃 스타일 조정 (전체 화면)
+        const classroomLayout = document.getElementById('classroom-layout');
+        if (classroomLayout) {
+            classroomLayout.style.minHeight = 'calc(100vh - 20px)';
+            classroomLayout.style.padding = '10px';
+        }
+        // body 스타일 조정 (여백 제거)
+        document.body.style.margin = '0';
+        document.body.style.padding = '0';
+        // 뷰포트 메타 태그 확인 및 추가 (모바일 최적화)
+        let viewportMeta = document.querySelector('meta[name="viewport"]');
+        if (!viewportMeta) {
+            viewportMeta = document.createElement('meta');
+            viewportMeta.setAttribute('name', 'viewport');
+            document.head.appendChild(viewportMeta);
+        }
+        viewportMeta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
+    }
+    /**
      * 공유된 배치 데이터 로드
      */
     loadSharedLayout(shareData) {
@@ -6427,7 +6622,7 @@ export class MainController {
         }
     }
     /**
-     * 간단한 공유 주소(URL) 생성 (압축된 형식)
+     * 간단한 공유 주소(URL) 생성 (압축된 형식, 뷰어 모드)
      */
     generateShareUrl(seatsHtml, gridColumns, dateString) {
         // 학생 정보 추출 (이름과 성별)
@@ -6446,15 +6641,14 @@ export class MainController {
                 });
             }
         });
-        // 공유 데이터 생성 (최적화된 형식)
+        // 공유 데이터 생성 (최적화된 형식 - 날짜 제거하여 URL 단축)
         // 학생 데이터를 배열로 압축: [이름, 성별] 형식
         const compressedStudents = studentData.map(s => [s.name, s.gender]);
+        // 최소한의 데이터만 포함 (날짜 제거, 버전 제거)
         const shareData = {
             t: 'sa', // type: 'seating-arrangement' 축약
-            d: dateString, // date
             s: compressedStudents, // students (압축된 형식)
-            l: gridColumns, // layout
-            v: '1.0' // version
+            l: gridColumns || '' // layout (없으면 빈 문자열)
         };
         // JSON 문자열 생성
         const jsonString = JSON.stringify(shareData);
@@ -6465,8 +6659,8 @@ export class MainController {
             .replace(/=/g, '');
         // 현재 페이지의 기본 URL 가져오기
         const baseUrl = window.location.origin + window.location.pathname;
-        // 공유 URL 생성 (짧은 파라미터 이름 사용)
-        const shareUrl = `${baseUrl}?s=${encodedData}`;
+        // 공유 URL 생성 (뷰어 모드용 ?v= 파라미터 사용)
+        const shareUrl = `${baseUrl}?v=${encodedData}`;
         return shareUrl;
     }
     /**
