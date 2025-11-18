@@ -40,7 +40,12 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: |
+            .
+            !node_modules
+            !src
+            !.git
+            !.github
 
   deploy:
     environment:
