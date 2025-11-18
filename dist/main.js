@@ -17,7 +17,6 @@ import { MainController } from './controllers/MainController.js';
  * 프로그램 초기화 및 실행
  */
 function init() {
-    console.log('교실 자리 배치 프로그램 초기화 중...');
     // DOM이 로드될 때까지 대기
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => {
@@ -35,12 +34,44 @@ function startApplication() {
     try {
         const controller = new MainController();
         controller.run();
-        console.log('교실 자리 배치 프로그램이 성공적으로 시작되었습니다.');
     }
     catch (error) {
         console.error('프로그램 시작 중 오류 발생:', error);
-        alert('프로그램을 시작할 수 없습니다. 콘솔을 확인해주세요.');
+        // DOM에 에러 메시지 표시
+        showErrorInDOM('프로그램을 시작할 수 없습니다. 콘솔을 확인해주세요.');
     }
+}
+/**
+ * DOM에 에러 메시지를 표시합니다.
+ */
+function showErrorInDOM(message) {
+    const errorDiv = document.createElement('div');
+    errorDiv.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #f8d7da;
+        color: #721c24;
+        padding: 15px 20px;
+        border-radius: 5px;
+        border: 1px solid #f5c6cb;
+        font-weight: bold;
+        z-index: 10000;
+        max-width: 90%;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    `;
+    errorDiv.textContent = message;
+    errorDiv.setAttribute('role', 'alert');
+    errorDiv.setAttribute('aria-live', 'assertive');
+    document.body.appendChild(errorDiv);
+    // 10초 후 자동 제거 또는 클릭으로 제거
+    errorDiv.onclick = () => errorDiv.remove();
+    setTimeout(() => {
+        if (errorDiv.parentNode) {
+            errorDiv.remove();
+        }
+    }, 10000);
 }
 // 프로그램 시작
 init();

@@ -288,7 +288,7 @@ body {
 .sidebar-footer {
     padding: 10px 20px;
     font-size: 0.85em;
-    color: #666;
+    color: #4a4a4a; /* WCAG AA 기준: 대비 비율 4.5:1 이상 (#666 → #4a4a4a) */
     border-top: 1px solid #dee2e6;
     background: #ffffff;
 }
@@ -309,7 +309,7 @@ body {
 }
 
 .step-section h3 {
-    color: #555;
+    color: #333; /* WCAG AA 기준: 대비 비율 4.5:1 이상 (#555 → #333) */
     margin-bottom: 8px;
     font-size: 1.1em;
 }
@@ -349,7 +349,7 @@ body {
     display: block;
     margin-bottom: 3px;
     font-weight: 600;
-    color: #555;
+    color: #333; /* WCAG AA 기준: 대비 비율 4.5:1 이상 (#555 → #333) */
     font-size: 0.95em;
 }
 
@@ -925,7 +925,7 @@ button:disabled {
 }
 
 .help-text {
-    color: #666;
+    color: #4a4a4a; /* WCAG AA 기준: 대비 비율 4.5:1 이상 (#666 → #4a4a4a) */
     font-size: 0.85em;
     font-style: italic;
     margin-top: 10px;
@@ -991,6 +991,31 @@ button:disabled {
     
     button, .layout-btn {
         width: 100%;
+    }
+    
+    /* 모바일 터치 최적화 */
+    button, .student-seat-card, .radio-option, label {
+        -webkit-tap-highlight-color: rgba(102, 126, 234, 0.3);
+        touch-action: manipulation; /* 더블탭 줌 방지 */
+    }
+    
+    /* 모바일에서 버튼 터치 영역 확대 */
+    button {
+        min-height: 44px; /* 최소 터치 영역 44x44px (iOS 가이드라인) */
+        padding: 12px 20px;
+    }
+    
+    /* 모바일에서 드래그 앤 드롭 개선 */
+    .student-seat-card {
+        touch-action: pan-y; /* 세로 스크롤 허용, 가로 드래그 가능 */
+    }
+    
+    /* 모바일에서 입력 필드 크기 조정 */
+    input[type="number"],
+    input[type="text"],
+    select {
+        font-size: 16px; /* iOS 자동 줌 방지 */
+        min-height: 44px;
     }
 }
 
@@ -1141,6 +1166,28 @@ button:disabled {
 }
 
 /* 드래그 오버 시 시각적 피드백 */
+/* 접근성: 스크린 리더 전용 텍스트 */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}
+
+/* 드래그 피드백 스타일 */
+.student-seat-card.dragging {
+    opacity: 0.5;
+    transform: scale(0.95);
+    cursor: grabbing !important;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
 .student-seat-card.drag-over {
     border-color: #667eea !important;
     border-width: 3px !important;

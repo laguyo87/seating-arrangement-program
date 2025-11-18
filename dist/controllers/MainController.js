@@ -23,9 +23,14 @@ export class MainController {
         this.nextSeatId = 1; // 좌석 카드 고유 ID 생성기
         this.dragSourceCard = null; // 드래그 시작 카드 참조
         this.dragOverIndicator = null; // 드롭 위치 인디케이터
+        this.touchStartCard = null; // 터치 시작 카드 참조 (모바일)
+        this.touchStartPosition = null; // 터치 시작 위치
         this.isSyncing = false; // 동기화 중 플래그 (무한 루프 방지)
         this.layoutHistory = []; // 통합 히스토리 (모든 액션 추적)
         this.historyIndex = -1; // 현재 히스토리 인덱스
+        // 메모리 누수 방지를 위한 추적 변수
+        this.eventListeners = [];
+        this.timers = new Set(); // setTimeout ID 추적
         /**
          * 좌석 카드 클릭 이벤트 핸들러
          */
@@ -59,7 +64,6 @@ export class MainController {
                 if (lockIcon) {
                     lockIcon.remove();
                 }
-                console.log(`좌석 ${seatId} 고정 해제`);
             }
             else {
                 // 고정 설정
@@ -74,7 +78,6 @@ export class MainController {
                     lockIcon.style.cssText = 'position: absolute; top: 5px; right: 5px; font-size: 1.2em; z-index: 10; pointer-events: none;';
                     card.appendChild(lockIcon);
                 }
-                console.log(`좌석 ${seatId} 고정 설정`);
             }
             // 테이블의 고정 좌석 드롭다운 업데이트
             this.updateFixedSeatDropdowns();
@@ -130,27 +133,26 @@ export class MainController {
             else {
                 // 저장된 데이터 불러오기
                 this.loadSavedLayoutResult();
-                console.log('초기화 - seats.length:', this.seats.length, 'students.length:', this.students.length);
                 if (this.seats.length > 0 && this.students.length > 0) {
-                    console.log('저장된 배치 결과를 로드합니다.');
                     this.outputModule.showInfo('저장된 배치 결과가 로드되었습니다.');
                     // 저장된 배치 결과 렌더링
                     this.renderFinalLayout();
                 }
                 else {
-                    console.log('초기 예시 레이아웃을 표시합니다.');
                     // 초기 예시 레이아웃 표시 (24명, 5분단)
                     this.renderInitialExampleLayout();
                     // 초기값으로 미리보기 자동 실행
-                    setTimeout(() => {
+                    this.setTimeoutSafe(() => {
                         this.updatePreviewForGenderCounts();
                     }, 100);
                 }
             }
         }
         catch (error) {
-            console.error('초기화 실패:', error);
-            alert('프로그램 초기화 중 오류가 발생했습니다.');
+            if (this.isDevelopmentMode()) {
+                console.error('초기화 실패:', error);
+            }
+            this.outputModule.showError('프로그램 초기화 중 오류가 발생했습니다.');
         }
     }
     /**
@@ -221,7 +223,9 @@ export class MainController {
             this.outputModule.showInfo('초기화되었습니다. 기본 설정으로 돌아갑니다.');
         }
         catch (error) {
-            console.error('초기화 중 오류:', error);
+            if (this.isDevelopmentMode()) {
+                console.error('초기화 중 오류:', error);
+            }
             this.outputModule.showError('초기화 중 오류가 발생했습니다.');
         }
     }
@@ -268,11 +272,15 @@ export class MainController {
                 options.customMode2 = customMode2.value;
             }
             // localStorage에 저장
-            localStorage.setItem('savedOptions', JSON.stringify(options));
-            this.outputModule.showSuccess('옵션 설정이 기억되었습니다.');
+            const success = this.safeSetItem('savedOptions', JSON.stringify(options));
+            if (success) {
+                this.outputModule.showSuccess('옵션 설정이 기억되었습니다.');
+            }
         }
         catch (error) {
-            console.error('옵션 설정 저장 중 오류:', error);
+            if (this.isDevelopmentMode()) {
+                console.error('옵션 설정 저장 중 오류:', error);
+            }
             this.outputModule.showError('옵션 설정 저장 중 오류가 발생했습니다.');
         }
     }
@@ -281,11 +289,31 @@ export class MainController {
      */
     loadOptions() {
         try {
-            const savedOptionsStr = localStorage.getItem('savedOptions');
+            const savedOptionsStr = this.safeGetItem('savedOptions');
             if (!savedOptionsStr) {
                 return; // 저장된 설정이 없으면 기본값 유지
             }
-            const options = JSON.parse(savedOptionsStr);
+            // JSON 파싱 시도 (데이터 손상 처리)
+            let options;
+            try {
+                options = JSON.parse(savedOptionsStr);
+            }
+            catch (parseError) {
+                // 데이터 손상 시 저장소에서 제거하고 기본값으로 복구
+                try {
+                    localStorage.removeItem('savedOptions');
+                }
+                catch { }
+                return;
+            }
+            // 데이터 구조 검증
+            if (!options || typeof options !== 'object') {
+                try {
+                    localStorage.removeItem('savedOptions');
+                }
+                catch { }
+                return;
+            }
             // 옵션1: 좌석 배치 형태
             if (options.layoutType) {
                 const layoutTypeInput = document.querySelector(`input[name="layout-type"][value="${options.layoutType}"]`);
@@ -296,7 +324,7 @@ export class MainController {
             }
             // pair-mode는 layout-type이 pair-uniform일 때만 적용
             if (options.pairMode && options.layoutType === 'pair-uniform') {
-                setTimeout(() => {
+                this.setTimeoutSafe(() => {
                     const pairModeInput = document.querySelector(`input[name="pair-mode"][value="${options.pairMode}"]`);
                     if (pairModeInput) {
                         pairModeInput.checked = true;
@@ -306,7 +334,7 @@ export class MainController {
             }
             // group-size는 layout-type이 group일 때만 적용
             if (options.groupSize && options.layoutType === 'group') {
-                setTimeout(() => {
+                this.setTimeoutSafe(() => {
                     const groupSizeInput = document.querySelector(`input[name="group-size"][value="${options.groupSize}"]`);
                     if (groupSizeInput) {
                         groupSizeInput.checked = true;
@@ -314,7 +342,7 @@ export class MainController {
                     }
                     // group-gender-mix는 group-size가 선택된 후에 적용
                     if (options.groupGenderMix !== undefined) {
-                        setTimeout(() => {
+                        this.setTimeoutSafe(() => {
                             const groupGenderMixInput = document.getElementById('group-gender-mix');
                             if (groupGenderMixInput) {
                                 groupGenderMixInput.checked = options.groupGenderMix;
@@ -360,7 +388,9 @@ export class MainController {
             }
         }
         catch (error) {
-            console.error('옵션 설정 불러오기 중 오류:', error);
+            if (this.isDevelopmentMode()) {
+                console.error('옵션 설정 불러오기 중 오류:', error);
+            }
             // 오류가 발생해도 기본값으로 진행
         }
     }
@@ -397,7 +427,7 @@ export class MainController {
         // 라디오 버튼 변경 이벤트 직접 리스닝
         const layoutInputs = document.querySelectorAll('input[name="layout-type"]');
         layoutInputs.forEach(input => {
-            input.addEventListener('change', (e) => {
+            this.addEventListenerSafe(input, 'change', (e) => {
                 const target = e.target;
                 const layoutType = target.value;
                 // '1명 한 줄로 배치' 선택 시 4단계 비활성화 및 분단 개수 제한
@@ -447,7 +477,7 @@ export class MainController {
         // 1명씩 한 줄로 배치 모드 라디오 버튼 변경 이벤트
         const singleModeInputs = document.querySelectorAll('input[name="single-mode"]');
         singleModeInputs.forEach(input => {
-            input.addEventListener('change', () => {
+            this.addEventListenerSafe(input, 'change', () => {
                 // 배치 형태 변경 시 미리보기 업데이트
                 this.updatePreviewForGenderCounts();
             });
@@ -455,7 +485,7 @@ export class MainController {
         // '남녀 순서 바꾸기' 체크박스 이벤트 리스너
         const reverseGenderOrderCheckbox = document.getElementById('reverse-gender-order');
         if (reverseGenderOrderCheckbox) {
-            reverseGenderOrderCheckbox.addEventListener('change', () => {
+            this.addEventListenerSafe(reverseGenderOrderCheckbox, 'change', () => {
                 // 체크박스 변경 시 미리보기 업데이트
                 this.updatePreviewForGenderCounts();
             });
@@ -463,10 +493,9 @@ export class MainController {
         // 모둠 크기 라디오 버튼 변경 이벤트
         const groupSizeInputs = document.querySelectorAll('input[name="group-size"]');
         groupSizeInputs.forEach(input => {
-            input.addEventListener('change', (e) => {
+            this.addEventListenerSafe(input, 'change', (e) => {
                 const target = e.target;
                 const groupSize = target.value;
-                console.log('모둠 크기 변경:', groupSize);
                 // 분단 개수 제한 적용
                 this.updatePartitionLimitForGroup(groupSize);
                 // 미리보기 업데이트
@@ -476,8 +505,8 @@ export class MainController {
         // 짝꿍 모드 라디오 버튼 변경 이벤트
         const pairModeInputs = document.querySelectorAll('input[name="pair-mode"]');
         pairModeInputs.forEach(input => {
-            input.addEventListener('change', (e) => {
-                console.log('짝꿍 모드 변경:', e.target.value);
+            this.addEventListenerSafe(input, 'change', (e) => {
+                // 짝꿍 모드 변경됨
                 // 분단 개수 제한 적용 (짝꿍 배치 선택 시)
                 const layoutTypeInput = document.querySelector('input[name="layout-type"]:checked');
                 if (layoutTypeInput && layoutTypeInput.value === 'pair-uniform') {
@@ -490,14 +519,14 @@ export class MainController {
         // 모둠 배치 남녀 섞기 체크박스 변경 이벤트
         const genderMixCheckbox = document.getElementById('group-gender-mix');
         if (genderMixCheckbox) {
-            genderMixCheckbox.addEventListener('change', () => {
-                console.log('남녀 섞기 옵션 변경:', genderMixCheckbox.checked);
+            this.addEventListenerSafe(genderMixCheckbox, 'change', () => {
+                // 남녀 섞기 옵션 변경됨
                 // 미리보기 업데이트
                 this.updatePreviewForGenderCounts();
             });
         }
         // 인원수 설정 이벤트
-        document.addEventListener('studentCountSet', (e) => {
+        this.addEventListenerSafe(document, 'studentCountSet', (e) => {
             const customEvent = e;
             const count = customEvent.detail.count;
             this.handleCreateStudentTable(count);
@@ -507,16 +536,17 @@ export class MainController {
         // 남학생 수 입력 필드 이벤트
         const maleCountInput = document.getElementById('male-students');
         if (maleCountInput) {
-            maleCountInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
+            this.addEventListenerSafe(maleCountInput, 'keydown', (e) => {
+                const ke = e;
+                if (ke.key === 'Enter') {
                     this.updatePreviewForGenderCounts();
                 }
             });
-            maleCountInput.addEventListener('change', () => {
+            this.addEventListenerSafe(maleCountInput, 'change', () => {
                 this.updatePreviewForGenderCounts();
             });
             // 입력값이 변경될 때마다 실시간으로 업데이트
-            maleCountInput.addEventListener('input', () => {
+            this.addEventListenerSafe(maleCountInput, 'input', () => {
                 this.updatePreviewForGenderCounts();
                 this.updateStudentTableStats(); // 통계 업데이트
             });
@@ -526,25 +556,25 @@ export class MainController {
         // 옵션 설정 저장 버튼
         const saveOptionsBtn = document.getElementById('save-options');
         if (saveOptionsBtn) {
-            saveOptionsBtn.addEventListener('click', () => {
+            this.addEventListenerSafe(saveOptionsBtn, 'click', () => {
                 this.saveOptions();
             });
         }
         // 초기화 버튼
         const resetBtn = document.getElementById('reset-app');
         if (resetBtn) {
-            resetBtn.addEventListener('click', () => {
+            this.addEventListenerSafe(resetBtn, 'click', () => {
                 this.resetApp();
             });
         }
         // 여학생 수 입력 필드 이벤트
         const femaleCountInput = document.getElementById('female-students');
         if (femaleCountInput) {
-            femaleCountInput.addEventListener('change', () => {
+            this.addEventListenerSafe(femaleCountInput, 'change', () => {
                 this.updatePreviewForGenderCounts();
             });
             // 입력값이 변경될 때마다 실시간으로 업데이트
-            femaleCountInput.addEventListener('input', () => {
+            this.addEventListenerSafe(femaleCountInput, 'input', () => {
                 this.updatePreviewForGenderCounts();
                 this.updateStudentTableStats(); // 통계 업데이트
             });
@@ -552,26 +582,49 @@ export class MainController {
         // 학생 정보 입력 테이블 생성 버튼
         const createTableBtn = document.getElementById('create-student-table');
         if (createTableBtn) {
-            createTableBtn.addEventListener('click', () => {
+            this.addEventListenerSafe(createTableBtn, 'click', () => {
                 this.handleCreateStudentTable();
             });
         }
         // 분단 수 입력 필드에 엔터 키 이벤트 추가
         const partitionInput = document.getElementById('number-of-partitions');
         if (partitionInput) {
-            partitionInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
+            this.addEventListenerSafe(partitionInput, 'keydown', (e) => {
+                const ke = e;
+                if (ke.key === 'Enter') {
                     // 분단 수가 입력되면 자동으로 저장되도록 (현재는 change 이벤트만 사용)
                     partitionInput.blur(); // 포커스 제거
                 }
             });
+            // 남학생/여학생 수 입력 필드에 검증 이벤트 추가
+            const maleInput = document.getElementById('male-students');
+            const femaleInput = document.getElementById('female-students');
+            if (maleInput) {
+                this.addEventListenerSafe(maleInput, 'change', () => {
+                    this.validateAndFixStudentInput(maleInput, 'male');
+                    this.updatePreviewForGenderCounts();
+                });
+                this.addEventListenerSafe(maleInput, 'blur', () => {
+                    this.validateAndFixStudentInput(maleInput, 'male');
+                });
+            }
+            if (femaleInput) {
+                this.addEventListenerSafe(femaleInput, 'change', () => {
+                    this.validateAndFixStudentInput(femaleInput, 'female');
+                    this.updatePreviewForGenderCounts();
+                });
+                this.addEventListenerSafe(femaleInput, 'blur', () => {
+                    this.validateAndFixStudentInput(femaleInput, 'female');
+                });
+            }
             // 분단 수 변경 시 미리보기 업데이트
-            partitionInput.addEventListener('change', () => {
-                console.log('분단 수 변경:', partitionInput.value);
+            this.addEventListenerSafe(partitionInput, 'change', () => {
+                // 입력 검증
+                this.validateAndFixPartitionInput(partitionInput);
                 // 현재 학생 수 가져오기
                 this.updatePreviewForGenderCounts();
             });
-            partitionInput.addEventListener('input', () => {
+            this.addEventListenerSafe(partitionInput, 'input', () => {
                 // 실시간 업데이트
                 this.updatePreviewForGenderCounts();
             });
@@ -579,29 +632,29 @@ export class MainController {
         // 결과 내보내기 버튼
         const exportBtn = document.getElementById('export-result');
         if (exportBtn) {
-            exportBtn.addEventListener('click', () => this.handleExport());
+            this.addEventListenerSafe(exportBtn, 'click', () => this.handleExport());
         }
         // 고정 좌석 모드 버튼
         const fixedModeBtn = document.getElementById('enable-fixed-seats');
         if (fixedModeBtn) {
-            fixedModeBtn.addEventListener('click', () => {
+            this.addEventListenerSafe(fixedModeBtn, 'click', () => {
                 this.outputModule.showInfo('고정 좌석 모드: 캔버스의 좌석을 더블 클릭하여 고정/해제할 수 있습니다.');
             });
         }
         // 나머지 랜덤 배치 버튼
         const randomizeBtn = document.getElementById('randomize-remaining');
         if (randomizeBtn) {
-            randomizeBtn.addEventListener('click', () => this.handleRandomizeRemaining());
+            this.addEventListenerSafe(randomizeBtn, 'click', () => this.handleRandomizeRemaining());
         }
         // 양식 파일 다운로드 버튼
         const downloadTemplateBtn = document.getElementById('download-template');
         if (downloadTemplateBtn) {
-            downloadTemplateBtn.addEventListener('click', () => this.downloadTemplateFile());
+            this.addEventListenerSafe(downloadTemplateBtn, 'click', () => this.downloadTemplateFile());
         }
         // 엑셀 파일 업로드 버튼 (눌러서 파일 선택 트리거)
         const uploadFileBtn = document.getElementById('upload-file');
         if (uploadFileBtn) {
-            uploadFileBtn.addEventListener('click', () => {
+            this.addEventListenerSafe(uploadFileBtn, 'click', () => {
                 const fileInput = document.getElementById('upload-file-input');
                 if (fileInput) {
                     fileInput.click();
@@ -611,22 +664,26 @@ export class MainController {
         // 엑셀 파일 업로드 입력 필드
         const uploadFileInput = document.getElementById('upload-file-input');
         if (uploadFileInput) {
-            uploadFileInput.addEventListener('change', (e) => this.handleFileUpload(e));
+            this.addEventListenerSafe(uploadFileInput, 'change', (e) => this.handleFileUpload(e));
         }
         // 라디오 버튼 이벤트 리스너
         this.initializeRadioListeners();
         // 이벤트 위임을 사용하여 동적으로 생성되는 버튼들 처리
-        document.addEventListener('click', (e) => {
+        this.addEventListenerSafe(document, 'click', (e) => {
             const target = e.target;
-            // 자리 배치하기 버튼 클릭
-            if (target.id === 'arrange-seats') {
-                console.log('자리 배치하기 버튼 클릭됨');
+            // 자리 배치하기 버튼 클릭 (버튼 내부 텍스트 클릭도 처리)
+            const arrangeBtn = target.id === 'arrange-seats' ? target : target.closest('#arrange-seats');
+            if (arrangeBtn) {
+                e.preventDefault();
                 this.handleArrangeSeats();
+                return;
             }
-            // 자리 확정 버튼 클릭
-            if (target.id === 'confirm-seats') {
-                console.log('자리 확정 버튼 클릭됨');
+            // 자리 확정 버튼 클릭 (버튼 내부 텍스트 클릭도 처리)
+            const confirmBtn = target.id === 'confirm-seats' ? target : target.closest('#confirm-seats');
+            if (confirmBtn) {
+                e.preventDefault();
                 this.handleConfirmSeats();
+                return;
             }
             // 확정된 자리 이력 드롭다운 버튼 클릭
             const dropdown = document.getElementById('history-dropdown-content');
@@ -660,7 +717,6 @@ export class MainController {
             }
             // 공유하기 버튼 클릭
             if (target.id === 'share-layout') {
-                console.log('공유하기 버튼 클릭됨');
                 this.handleShareLayout();
             }
             // 인쇄하기 버튼 클릭
@@ -689,9 +745,10 @@ export class MainController {
             }
         });
         // 키보드 단축키: Ctrl+Z / Cmd+Z (되돌리기)
-        document.addEventListener('keydown', (e) => {
+        this.addEventListenerSafe(document, 'keydown', (e) => {
             // Ctrl+Z (Windows/Linux) 또는 Cmd+Z (Mac)
-            if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+            const ke = e;
+            if ((ke.ctrlKey || ke.metaKey) && ke.key === 'z' && !ke.shiftKey) {
                 // 입력 필드에 포커스가 있으면 기본 동작 허용 (텍스트 입력 되돌리기)
                 const activeElement = document.activeElement;
                 if (activeElement && (activeElement.tagName === 'INPUT' ||
@@ -714,7 +771,7 @@ export class MainController {
         // 고정 좌석 모드 라디오 버튼
         const customModeRadios = document.querySelectorAll('input[name="custom-mode-2"]');
         customModeRadios.forEach(radio => {
-            radio.addEventListener('change', (e) => {
+            this.addEventListenerSafe(radio, 'change', (e) => {
                 const target = e.target;
                 if (target.value === 'fixed-random') {
                     // 고정 좌석 지정 후 랜덤 배치 모드 활성화
@@ -732,7 +789,6 @@ export class MainController {
      * 기존 좌석 카드들에 클릭 이벤트를 다시 설정
      */
     enableFixedSeatMode() {
-        console.log('고정 좌석 모드 활성화');
         // 고정 좌석 모드 도움말 표시
         const fixedSeatHelp = document.getElementById('fixed-seat-help');
         if (fixedSeatHelp) {
@@ -742,7 +798,7 @@ export class MainController {
         const seatsArea = document.getElementById('seats-area');
         if (seatsArea) {
             seatsArea.style.cursor = 'pointer';
-            seatsArea.addEventListener('click', this.handleSeatCardClick);
+            this.addEventListenerSafe(seatsArea, 'click', this.handleSeatCardClick);
             // 기존 좌석 카드들에 스타일 및 시각적 표시 업데이트
             const cards = seatsArea.querySelectorAll('.student-seat-card');
             cards.forEach((card) => {
@@ -774,7 +830,6 @@ export class MainController {
      * 고정 좌석 모드 비활성화
      */
     disableFixedSeatMode() {
-        console.log('고정 좌석 모드 비활성화');
         // 고정 좌석 모드 도움말 숨김
         const fixedSeatHelp = document.getElementById('fixed-seat-help');
         if (fixedSeatHelp) {
@@ -801,14 +856,12 @@ export class MainController {
      * 최종 자리 배치도 렌더링
      */
     renderFinalLayout() {
-        console.log('renderFinalLayout 시작');
-        console.log('Students:', this.students);
-        console.log('Seats:', this.seats);
         // 카드 컨테이너 표시
         const cardContainer = document.getElementById('card-layout-container');
-        console.log('Card container:', cardContainer);
         if (!cardContainer) {
-            console.error('카드 컨테이너를 찾을 수 없습니다.');
+            if (this.isDevelopmentMode()) {
+                console.error('카드 컨테이너를 찾을 수 없습니다.');
+            }
             return;
         }
         cardContainer.style.display = 'block';
@@ -824,11 +877,12 @@ export class MainController {
      * 초기 예시 레이아웃 렌더링
      */
     renderInitialExampleLayout() {
-        console.log('초기 예시 레이아웃 렌더링 시작');
         // 카드 컨테이너 표시
         const cardContainer = document.getElementById('card-layout-container');
         if (!cardContainer) {
-            console.error('카드 컨테이너를 찾을 수 없습니다.');
+            if (this.isDevelopmentMode()) {
+                console.error('카드 컨테이너를 찾을 수 없습니다.');
+            }
             return;
         }
         cardContainer.style.display = 'block';
@@ -868,6 +922,17 @@ export class MainController {
         seatsArea.innerHTML = '';
         // 좌석 번호를 1부터 시작하도록 초기화
         this.nextSeatId = 1;
+        // 대용량 데이터 처리: 학생 수가 많으면 로딩 표시
+        const maleCount = parseInt(document.getElementById('male-students')?.value || '0', 10);
+        const femaleCount = parseInt(document.getElementById('female-students')?.value || '0', 10);
+        const totalCount = maleCount + femaleCount;
+        // 대용량 데이터 처리: DocumentFragment 사용 및 배치 렌더링
+        const useBatchRendering = totalCount > 100;
+        if (useBatchRendering) {
+            this.outputModule.showInfo('대량의 좌석을 렌더링하는 중입니다. 잠시만 기다려주세요...');
+        }
+        // DocumentFragment를 사용하여 DOM 조작 최소화
+        const fragment = useBatchRendering ? document.createDocumentFragment() : null;
         // 선택된 배치 형태 확인
         const layoutTypeInput = document.querySelector('input[name="layout-type"]:checked');
         const layoutType = layoutTypeInput?.value;
@@ -877,16 +942,13 @@ export class MainController {
         const partitionInput = document.getElementById('number-of-partitions');
         const partitionCount = partitionInput ? parseInt(partitionInput.value || '1', 10) : 1;
         // 모둠 배치인 경우
-        console.log('renderExampleCards - layoutType:', layoutType, 'groupSize:', groupSize);
         if (layoutType === 'group' && (groupSize === 'group-3' || groupSize === 'group-4' || groupSize === 'group-5' || groupSize === 'group-6')) {
-            console.log('모둠 배치 감지됨 - groupSize:', groupSize);
             const groupSizeNumber = groupSize === 'group-3' ? 3 : groupSize === 'group-4' ? 4 : groupSize === 'group-5' ? 5 : 6;
             // 예시 학생 데이터 생성 (this.students가 비어있을 경우)
             if (this.students.length === 0) {
                 const maleCount = parseInt(document.getElementById('male-students')?.value || '0', 10);
                 const femaleCount = parseInt(document.getElementById('female-students')?.value || '0', 10);
                 const totalCount = maleCount + femaleCount;
-                console.log('임시 학생 데이터 생성 - maleCount:', maleCount, 'femaleCount:', femaleCount, 'totalCount:', totalCount);
                 // 임시 학생 데이터 생성
                 const tempStudents = [];
                 for (let i = 0; i < totalCount; i++) {
@@ -898,7 +960,6 @@ export class MainController {
                     });
                 }
                 this.students = tempStudents;
-                console.log('임시 학생 데이터 생성 완료 - students.length:', this.students.length);
             }
             // 모둠 배치로 렌더링
             const dummySeats = this.students.map((_, index) => ({
@@ -909,7 +970,6 @@ export class MainController {
                 isFixed: false,
                 isActive: true
             }));
-            console.log('renderGroupCards 호출 전 - students.length:', this.students.length, 'dummySeats.length:', dummySeats.length);
             this.renderGroupCards(dummySeats, groupSizeNumber, seatsArea);
             return;
         }
@@ -933,7 +993,6 @@ export class MainController {
             // 선택된 짝꿍 모드 확인
             const pairModeInput = document.querySelector('input[name="pair-mode"]:checked');
             const pairMode = pairModeInput?.value || 'gender-pair'; // 기본값: 남녀 짝꿍
-            console.log('짝꿍 모드:', pairMode);
             if (pairMode === 'same-gender-pair') {
                 // 같은 성끼리 짝꿍하기: 각 행에서 분단을 넘나들며 같은 성별끼리 짝꿍
                 // 성별별로 학생 분류
@@ -1387,10 +1446,15 @@ export class MainController {
         // 좌석 고유 ID 부여
         const seatId = this.nextSeatId++;
         card.setAttribute('data-seat-id', seatId.toString());
+        // 접근성 개선: ARIA 레이블 추가
+        card.setAttribute('role', 'button');
+        card.setAttribute('aria-label', `좌석 ${seatId}: ${student.name} (${student.gender === 'M' ? '남학생' : '여학생'})`);
+        card.setAttribute('tabindex', '0');
         // 좌석 번호 표시 (좌측 상단)
         const seatNumberDiv = document.createElement('div');
         seatNumberDiv.className = 'seat-number-label';
         seatNumberDiv.textContent = `#${seatId}`;
+        seatNumberDiv.setAttribute('aria-hidden', 'true');
         seatNumberDiv.style.cssText = `
             position: absolute;
             top: 5px;
@@ -1406,12 +1470,22 @@ export class MainController {
         card.appendChild(seatNumberDiv);
         const nameDiv = document.createElement('div');
         nameDiv.className = 'student-name';
-        nameDiv.textContent = student.name;
+        // 긴 이름 처리: 20자 이상이면 말줄임표 표시 및 툴팁 추가
+        const displayName = student.name.length > 20 ? student.name.substring(0, 20) + '...' : student.name;
+        nameDiv.textContent = displayName;
+        if (student.name.length > 20) {
+            nameDiv.setAttribute('title', student.name);
+            nameDiv.setAttribute('aria-label', student.name);
+        }
         nameDiv.style.display = 'flex';
         nameDiv.style.alignItems = 'center';
         nameDiv.style.justifyContent = 'center';
         nameDiv.style.height = '100%';
         nameDiv.style.width = '100%';
+        nameDiv.style.overflow = 'hidden';
+        nameDiv.style.textOverflow = 'ellipsis';
+        nameDiv.style.whiteSpace = 'nowrap';
+        nameDiv.style.padding = '0 5px';
         // 성별에 따라 클래스 추가
         if (student.gender === 'M') {
             card.classList.add('gender-m');
@@ -1423,14 +1497,24 @@ export class MainController {
         // 이미 고정된 좌석인 경우 시각적 표시
         if (this.fixedSeatIds.has(seatId)) {
             card.classList.add('fixed-seat');
+            card.setAttribute('aria-label', `고정 좌석 ${seatId}: ${student.name} (${student.gender === 'M' ? '남학생' : '여학생'}) - 클릭하여 해제`);
             card.title = '고정 좌석 (클릭하여 해제)';
             // 🔒 아이콘 추가
             const lockIcon = document.createElement('div');
             lockIcon.className = 'fixed-seat-lock';
             lockIcon.textContent = '🔒';
+            lockIcon.setAttribute('aria-hidden', 'true');
             lockIcon.style.cssText = 'position: absolute; top: 5px; right: 5px; font-size: 1.2em; z-index: 10; pointer-events: none;';
             card.appendChild(lockIcon);
         }
+        // 키보드 네비게이션 지원
+        this.addEventListenerSafe(card, 'keydown', (e) => {
+            const ke = e;
+            if (ke.key === 'Enter' || ke.key === ' ') {
+                e.preventDefault();
+                card.click();
+            }
+        });
         // 고정 좌석 모드일 때 클릭 이벤트 추가
         this.setupFixedSeatClickHandler(card, seatId);
         return card;
@@ -1443,7 +1527,7 @@ export class MainController {
         if (!seatsArea)
             return;
         // dragstart
-        seatsArea.addEventListener('dragstart', (ev) => {
+        this.addEventListenerSafe(seatsArea, 'dragstart', (ev) => {
             const e = ev;
             const target = e.target?.closest('.student-seat-card');
             if (!target)
@@ -1466,15 +1550,40 @@ export class MainController {
                 return;
             }
             this.dragSourceCard = target;
+            // 드래그 피드백: 드래그 중인 카드 스타일 변경
+            target.style.opacity = '0.5';
+            target.style.transform = 'scale(0.95)';
+            target.style.transition = 'all 0.2s ease';
+            target.style.cursor = 'grabbing';
+            target.classList.add('dragging');
             try {
                 e.dataTransfer?.setData('text/plain', 'swap');
             }
             catch { }
-            if (e.dataTransfer)
+            if (e.dataTransfer) {
                 e.dataTransfer.effectAllowed = 'move';
+                // 드래그 이미지 설정 (투명한 이미지로 커스텀 커서 효과)
+                const dragImage = target.cloneNode(true);
+                dragImage.style.position = 'absolute';
+                dragImage.style.top = '-1000px';
+                document.body.appendChild(dragImage);
+                e.dataTransfer.setDragImage(dragImage, e.offsetX, e.offsetY);
+                this.setTimeoutSafe(() => {
+                    document.body.removeChild(dragImage);
+                }, 0);
+            }
         });
         // dragend - 드래그가 끝나면 dragSourceCard 초기화 (드롭되지 않은 경우 대비)
-        seatsArea.addEventListener('dragend', () => {
+        this.addEventListenerSafe(seatsArea, 'dragend', (ev) => {
+            const e = ev;
+            const target = e.target?.closest('.student-seat-card');
+            // 드래그 피드백 복원
+            if (target) {
+                target.style.opacity = '';
+                target.style.transform = '';
+                target.style.cursor = '';
+                target.classList.remove('dragging');
+            }
             // 모든 하이라이트 및 인디케이터 제거
             seatsArea.querySelectorAll('.drag-over').forEach(el => {
                 el.classList.remove('drag-over');
@@ -1487,7 +1596,7 @@ export class MainController {
             this.dragSourceCard = null;
         });
         // dragover - 빈 공간과 카드 모두에서 드롭 가능하도록
-        seatsArea.addEventListener('dragover', (ev) => {
+        this.addEventListenerSafe(seatsArea, 'dragover', (ev) => {
             const e = ev;
             if (this.dragSourceCard) {
                 e.preventDefault();
@@ -1571,7 +1680,7 @@ export class MainController {
             }
         });
         // dragleave - 하이라이트 제거
-        seatsArea.addEventListener('dragleave', (ev) => {
+        this.addEventListenerSafe(seatsArea, 'dragleave', (ev) => {
             const e = ev;
             // seats-area를 완전히 벗어난 경우에만 하이라이트 제거
             const relatedTarget = e.relatedTarget;
@@ -1587,7 +1696,7 @@ export class MainController {
             }
         });
         // drop -> 카드 교환 또는 이동
-        seatsArea.addEventListener('drop', (ev) => {
+        this.addEventListenerSafe(seatsArea, 'drop', (ev) => {
             const e = ev;
             e.preventDefault();
             // 하이라이트 및 인디케이터 제거
@@ -1705,10 +1814,105 @@ export class MainController {
                 }
             }
             // 드래그&드롭 완료 후 히스토리 저장 (약간의 지연을 두어 DOM 업데이트 완료 후 저장)
-            setTimeout(() => {
+            this.setTimeoutSafe(() => {
                 this.saveLayoutToHistory();
             }, 50);
         });
+        // 모바일 터치 이벤트 지원
+        this.enableTouchDragAndDrop(seatsArea);
+    }
+    /**
+     * 모바일 터치 드래그&드롭 지원
+     */
+    enableTouchDragAndDrop(seatsArea) {
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchMoved = false;
+        this.addEventListenerSafe(seatsArea, 'touchstart', (e) => {
+            const te = e;
+            const target = te.target?.closest('.student-seat-card');
+            if (!target)
+                return;
+            // 자리 배치가 완료되었는지 확인
+            const actionButtons = document.getElementById('layout-action-buttons');
+            const isLayoutComplete = actionButtons && actionButtons.style.display !== 'none';
+            if (!isLayoutComplete) {
+                const fixedRandomMode = document.querySelector('input[name="custom-mode-2"][value="fixed-random"]:checked');
+                if (fixedRandomMode)
+                    return;
+            }
+            // 고정 좌석은 드래그 불가
+            if (target.classList.contains('fixed-seat'))
+                return;
+            this.touchStartCard = target;
+            touchMoved = false;
+            const touch = te.touches[0];
+            touchStartX = touch.clientX;
+            touchStartY = touch.clientY;
+            this.touchStartPosition = { x: touchStartX, y: touchStartY };
+            // 시각적 피드백
+            target.style.opacity = '0.6';
+            target.style.transform = 'scale(1.05)';
+        }, { passive: true });
+        this.addEventListenerSafe(seatsArea, 'touchmove', (e) => {
+            const te = e;
+            if (!this.touchStartCard)
+                return;
+            const touch = te.touches[0];
+            const deltaX = Math.abs(touch.clientX - touchStartX);
+            const deltaY = Math.abs(touch.clientY - touchStartY);
+            // 최소 이동 거리 체크 (10px)
+            if (deltaX > 10 || deltaY > 10) {
+                touchMoved = true;
+                te.preventDefault(); // 스크롤 방지
+            }
+        }, { passive: false });
+        this.addEventListenerSafe(seatsArea, 'touchend', (e) => {
+            const te = e;
+            if (!this.touchStartCard || !this.touchStartPosition) {
+                this.touchStartCard = null;
+                this.touchStartPosition = null;
+                return;
+            }
+            const touch = te.changedTouches[0];
+            const endX = touch.clientX;
+            const endY = touch.clientY;
+            // 원래 스타일 복원
+            this.touchStartCard.style.opacity = '';
+            this.touchStartCard.style.transform = '';
+            // 이동 거리가 충분하면 드롭 처리
+            if (touchMoved) {
+                const elementBelow = document.elementFromPoint(endX, endY);
+                const targetCard = elementBelow?.closest('.student-seat-card');
+                if (targetCard && targetCard !== this.touchStartCard && !targetCard.classList.contains('fixed-seat')) {
+                    // 카드 교환
+                    const srcNameEl = this.touchStartCard.querySelector('.student-name');
+                    const tgtNameEl = targetCard.querySelector('.student-name');
+                    if (srcNameEl && tgtNameEl) {
+                        // 이름 스왑
+                        const tmpName = srcNameEl.textContent || '';
+                        srcNameEl.textContent = tgtNameEl.textContent || '';
+                        tgtNameEl.textContent = tmpName;
+                        // 성별 배경 클래스 스왑
+                        const srcIsM = this.touchStartCard.classList.contains('gender-m');
+                        const srcIsF = this.touchStartCard.classList.contains('gender-f');
+                        const tgtIsM = targetCard.classList.contains('gender-m');
+                        const tgtIsF = targetCard.classList.contains('gender-f');
+                        this.touchStartCard.classList.toggle('gender-m', tgtIsM);
+                        this.touchStartCard.classList.toggle('gender-f', tgtIsF);
+                        targetCard.classList.toggle('gender-m', srcIsM);
+                        targetCard.classList.toggle('gender-f', srcIsF);
+                        // 히스토리 저장
+                        this.setTimeoutSafe(() => {
+                            this.saveLayoutToHistory();
+                        }, 50);
+                    }
+                }
+            }
+            this.touchStartCard = null;
+            this.touchStartPosition = null;
+            touchMoved = false;
+        }, { passive: true });
     }
     /**
      * 드롭 위치 삽입 인디케이터 표시
@@ -1792,7 +1996,6 @@ export class MainController {
      * 되돌리기 기능 실행 (모든 액션에 대해 작동)
      */
     handleUndoLayout() {
-        console.log('되돌리기 시도. 히스토리 인덱스:', this.historyIndex, '히스토리 길이:', this.layoutHistory.length);
         if (this.historyIndex <= 0 || this.layoutHistory.length === 0) {
             // 되돌리기할 히스토리가 없음
             this.outputModule.showError('되돌리기할 이전 상태가 없습니다.');
@@ -1801,7 +2004,6 @@ export class MainController {
         // 이전 상태로 복원 (인덱스를 먼저 감소시켜 이전 상태를 가져옴)
         this.historyIndex--;
         const previousState = this.layoutHistory[this.historyIndex];
-        console.log('되돌리기 - 복원할 상태:', previousState);
         // 상태 타입에 따라 복원
         if (previousState && previousState.type === 'layout') {
             const seatsArea = document.getElementById('seats-area');
@@ -1817,7 +2019,6 @@ export class MainController {
                 // 학생 데이터 복원
                 if (previousState.data.students) {
                     // 학생 데이터 복원은 나중에 구현
-                    console.log('학생 데이터 복원:', previousState.data.students);
                 }
                 // 드래그&드롭 기능 다시 활성화 (복원된 카드에 대해)
                 this.enableSeatSwapDragAndDrop();
@@ -1833,12 +2034,10 @@ export class MainController {
             // 옵션 설정 복원
             if (previousState.data && previousState.data.options) {
                 // 옵션 복원 로직 (필요시 구현)
-                console.log('옵션 복원:', previousState.data.options);
             }
         }
         // 되돌리기 버튼 상태 업데이트
         this.updateUndoButtonState();
-        console.log('되돌리기 완료. 현재 히스토리 인덱스:', this.historyIndex);
     }
     /**
      * 되돌리기 버튼 활성화/비활성화 상태 업데이트
@@ -1923,7 +2122,7 @@ export class MainController {
         }
         // 테이블의 드롭다운 업데이트
         this.updateFixedSeatDropdowns();
-        console.log(`고정 좌석 ${seatId} ${this.fixedSeatIds.has(seatId) ? '설정' : '해제'}`);
+        // 고정 좌석 설정/해제됨
     }
     /**
      * 테이블의 고정 좌석 드롭다운 업데이트
@@ -1976,14 +2175,77 @@ export class MainController {
         });
     }
     /**
+     * 입력 값 검증 및 수정 (음수, 0, 큰 숫자 처리)
+     */
+    validateAndFixStudentInput(input, inputType) {
+        let value = parseInt(input.value || '0', 10);
+        // NaN 체크
+        if (isNaN(value)) {
+            value = 0;
+        }
+        // 음수 처리: 0으로 설정
+        if (value < 0) {
+            value = 0;
+        }
+        // 최대값 제한: 100
+        if (value > 100) {
+            value = 100;
+            this.outputModule.showInfo(`${inputType === 'male' ? '남학생' : '여학생'} 수는 최대 100명까지 입력 가능합니다.`);
+        }
+        // 값이 변경되었으면 입력 필드 업데이트
+        if (parseInt(input.value || '0', 10) !== value) {
+            input.value = value.toString();
+        }
+    }
+    /**
+     * 분단 수 입력 값 검증 및 수정
+     */
+    validateAndFixPartitionInput(input) {
+        let value = parseInt(input.value || '1', 10);
+        // NaN 체크
+        if (isNaN(value)) {
+            value = 1;
+        }
+        // 최소값: 1
+        if (value < 1) {
+            value = 1;
+        }
+        // 최대값: 10
+        if (value > 10) {
+            value = 10;
+            this.outputModule.showInfo('분단 수는 최대 10개까지 입력 가능합니다.');
+        }
+        // 값이 변경되었으면 입력 필드 업데이트
+        if (parseInt(input.value || '1', 10) !== value) {
+            input.value = value.toString();
+        }
+    }
+    /**
      * 성별별 학생 수에 따라 미리보기 업데이트
      */
     updatePreviewForGenderCounts() {
         const maleCountInput = document.getElementById('male-students');
         const femaleCountInput = document.getElementById('female-students');
+        // 입력 검증
+        if (maleCountInput) {
+            this.validateAndFixStudentInput(maleCountInput, 'male');
+        }
+        if (femaleCountInput) {
+            this.validateAndFixStudentInput(femaleCountInput, 'female');
+        }
         const maleCount = maleCountInput ? parseInt(maleCountInput.value || '0', 10) : 0;
         const femaleCount = femaleCountInput ? parseInt(femaleCountInput.value || '0', 10) : 0;
-        console.log('성별별 미리보기 업데이트:', { maleCount, femaleCount });
+        // 0명 체크
+        if (maleCount === 0 && femaleCount === 0) {
+            // 0명인 경우 빈 레이아웃 표시
+            const seatsArea = document.getElementById('seats-area');
+            if (seatsArea) {
+                seatsArea.innerHTML = '';
+            }
+            this.students = [];
+            this.seats = [];
+            return;
+        }
         // 학생 및 좌석 배열 초기화
         this.students = [];
         this.seats = [];
@@ -2027,7 +2289,6 @@ export class MainController {
      * 학생 수에 따라 미리보기 업데이트
      */
     updatePreviewForStudentCount(count) {
-        console.log('미리보기 업데이트:', count);
         // 학생 및 좌석 배열 초기화
         this.students = [];
         this.seats = [];
@@ -2067,19 +2328,15 @@ export class MainController {
         const layoutType = layoutTypeInput ? layoutTypeInput.value : '';
         const groupSizeInput = document.querySelector('input[name="group-size"]:checked');
         const groupSize = groupSizeInput ? groupSizeInput.value : '';
-        console.log('renderStudentCards - layoutType:', layoutType, 'groupSize:', groupSize);
         // 모둠 배치인지 확인
         const isGroupLayout = layoutType === 'group' && (groupSize === 'group-3' || groupSize === 'group-4' || groupSize === 'group-5' || groupSize === 'group-6');
         const groupSizeNumber = groupSize === 'group-3' ? 3 : groupSize === 'group-4' ? 4 : groupSize === 'group-5' ? 5 : groupSize === 'group-6' ? 6 : 0;
-        console.log('renderStudentCards - isGroupLayout:', isGroupLayout, 'groupSizeNumber:', groupSizeNumber);
         if (isGroupLayout && groupSizeNumber > 0) {
             // 모둠 배치: 카드를 그룹으로 묶어서 표시
-            console.log('모둠 배치로 렌더링 시작');
             this.renderGroupCards(seats, groupSizeNumber, seatsArea);
         }
         else {
             // 일반 배치: 기존 방식대로 표시
-            console.log('일반 배치로 렌더링');
             // 학생 수에 따라 그리드 열 수 결정
             const columnCount = this.students.length <= 20 ? 4 : 6;
             seatsArea.style.gridTemplateColumns = `repeat(${columnCount}, 1fr)`;
@@ -2096,7 +2353,7 @@ export class MainController {
         // 렌더 후 드래그&드롭 스왑 핸들러 보장
         this.enableSeatSwapDragAndDrop();
         // 초기 렌더링 후 첫 번째 상태를 히스토리에 저장
-        setTimeout(() => {
+        this.setTimeoutSafe(() => {
             this.saveLayoutToHistory();
         }, 100);
     }
@@ -2104,13 +2361,11 @@ export class MainController {
      * 모둠 배치로 카드 렌더링 (그룹으로 묶어서 표시)
      */
     renderGroupCards(seats, groupSize, seatsArea) {
-        console.log('renderGroupCards 호출됨 - groupSize:', groupSize, 'students.length:', this.students.length);
         // this.students가 비어있으면 임시 학생 데이터 생성
         if (this.students.length === 0) {
             const maleCount = parseInt(document.getElementById('male-students')?.value || '0', 10);
             const femaleCount = parseInt(document.getElementById('female-students')?.value || '0', 10);
             const totalCount = maleCount + femaleCount;
-            console.log('임시 학생 데이터 생성 - maleCount:', maleCount, 'femaleCount:', femaleCount, 'totalCount:', totalCount);
             // 임시 학생 데이터 생성
             const tempStudents = [];
             for (let i = 0; i < totalCount; i++) {
@@ -2139,7 +2394,6 @@ export class MainController {
             const femalesPerGroup = Math.floor(femaleStudents.length / groupCount);
             const remainingMales = maleStudents.length % groupCount;
             const remainingFemales = femaleStudents.length % groupCount;
-            console.log('남녀 균등 섞기 - 남학생:', maleStudents.length, '여학생:', femaleStudents.length, '그룹당 남:', malesPerGroup, '그룹당 여:', femalesPerGroup);
             // 각 그룹별로 남녀를 균등하게 배치
             let maleIndex = 0;
             let femaleIndex = 0;
@@ -2166,7 +2420,6 @@ export class MainController {
                     [studentsToUse[i], studentsToUse[j]] = [studentsToUse[j], studentsToUse[i]];
                 }
             }
-            console.log('남녀 균등 섞기 완료');
         }
         else {
             // 남녀 섞기 옵션이 체크되지 않으면 기존 순서 유지
@@ -2175,7 +2428,6 @@ export class MainController {
         // 분단 수 가져오기
         const partitionInput = document.getElementById('number-of-partitions');
         const partitionCount = partitionInput ? parseInt(partitionInput.value || '3', 10) : 3;
-        console.log('분단 수:', partitionCount);
         // 그리드 레이아웃 설정 (모둠별로 배치)
         seatsArea.style.display = 'grid';
         seatsArea.style.gap = '20px 40px'; // 모둠 간 간격 (세로 20px, 가로 40px - 모둠 간 넓은 간격)
@@ -2206,7 +2458,6 @@ export class MainController {
         const groupCount = Math.ceil(totalStudents / groupSize);
         // 모둠별 그룹 수 계산
         const groupsPerPartition = Math.ceil(groupCount / partitionCount);
-        console.log('그룹 생성 - totalStudents:', totalStudents, 'groupSize:', groupSize, 'groupCount:', groupCount, 'groupsPerPartition:', groupsPerPartition);
         // 모둠별로 그룹 배치
         for (let partitionIndex = 0; partitionIndex < partitionCount; partitionIndex++) {
             const partitionStartGroup = partitionIndex * groupsPerPartition;
@@ -2264,7 +2515,6 @@ export class MainController {
                 // 그룹 내 카드 생성
                 const startIndex = groupIndex * groupSize;
                 const endIndex = Math.min(startIndex + groupSize, totalStudents);
-                console.log(`그룹 ${groupIndex + 1} 생성 - startIndex: ${startIndex}, endIndex: ${endIndex}`);
                 for (let i = startIndex; i < endIndex; i++) {
                     if (!studentsToUse[i]) {
                         console.warn(`학생 데이터 없음 - index: ${i}`);
@@ -2312,6 +2562,63 @@ export class MainController {
         }
     }
     /**
+     * localStorage 사용 가능 여부 확인
+     */
+    isLocalStorageAvailable() {
+        try {
+            const test = '__localStorage_test__';
+            localStorage.setItem(test, test);
+            localStorage.removeItem(test);
+            return true;
+        }
+        catch {
+            return false;
+        }
+    }
+    /**
+     * 안전한 localStorage 저장
+     */
+    safeSetItem(key, value) {
+        if (!this.isLocalStorageAvailable()) {
+            this.outputModule.showError('브라우저의 저장소 기능이 비활성화되어 있습니다. 설정에서 쿠키 및 사이트 데이터를 허용해주세요.');
+            return false;
+        }
+        try {
+            localStorage.setItem(key, value);
+            return true;
+        }
+        catch (error) {
+            if (error instanceof DOMException && error.code === 22) {
+                // 저장소 용량 초과
+                this.outputModule.showError('저장소 용량이 부족합니다. 브라우저 설정에서 저장된 데이터를 삭제해주세요.');
+            }
+            else {
+                this.outputModule.showError('데이터 저장에 실패했습니다. 브라우저 설정을 확인해주세요.');
+            }
+            if (this.isDevelopmentMode()) {
+                console.error('localStorage 저장 실패:', error);
+            }
+            return false;
+        }
+    }
+    /**
+     * 안전한 localStorage 읽기
+     */
+    safeGetItem(key) {
+        if (!this.isLocalStorageAvailable()) {
+            return null;
+        }
+        try {
+            return localStorage.getItem(key);
+        }
+        catch (error) {
+            if (this.isDevelopmentMode()) {
+                console.error('localStorage 읽기 실패:', error);
+            }
+            return null;
+        }
+    }
+    /**
      * 좌석 배치 결과를 localStorage에 저장
      */
     saveLayoutResult() {
@@ -2321,11 +2628,16 @@ export class MainController {
                 students: this.students,
                 timestamp: new Date().toISOString()
             };
-            localStorage.setItem('layoutResult', JSON.stringify(layoutData));
-            console.log('좌석 배치 결과가 브라우저에 저장되었습니다.');
+            const success = this.safeSetItem('layoutResult', JSON.stringify(layoutData));
+            if (!success) {
+                // 저장 실패 시 사용자에게 알림 (이미 safeSetItem에서 표시됨)
+            }
         }
         catch (error) {
-            console.error('배치 결과 저장 중 오류:', error);
+            if (this.isDevelopmentMode()) {
+                console.error('배치 결과 저장 중 오류:', error);
+            }
+            this.outputModule.showError('배치 결과 저장 중 오류가 발생했습니다.');
         }
     }
     /**
@@ -2333,22 +2645,57 @@ export class MainController {
      */
     loadSavedLayoutResult() {
         try {
-            const layoutDataStr = localStorage.getItem('layoutResult');
+            const layoutDataStr = this.safeGetItem('layoutResult');
             if (!layoutDataStr) {
                 return;
             }
-            const layoutData = JSON.parse(layoutDataStr);
-            if (layoutData.seats && layoutData.students) {
+            // JSON 파싱 시도 (데이터 손상 처리)
+            let layoutData;
+            try {
+                layoutData = JSON.parse(layoutDataStr);
+            }
+            catch (parseError) {
+                // 데이터 손상 시 저장소에서 제거하고 기본값으로 복구
+                try {
+                    localStorage.removeItem('layoutResult');
+                }
+                catch { }
+                this.outputModule.showInfo('저장된 데이터가 손상되어 초기화되었습니다.');
+                return;
+            }
+            // 데이터 구조 검증
+            if (!layoutData || typeof layoutData !== 'object') {
+                try {
+                    localStorage.removeItem('layoutResult');
+                }
+                catch { }
+                return;
+            }
+            if (layoutData.seats && Array.isArray(layoutData.seats) &&
+                layoutData.students && Array.isArray(layoutData.students)) {
                 this.seats = layoutData.seats;
                 this.students = layoutData.students;
                 if (this.canvasModule) {
                     this.canvasModule.setData(this.seats, this.students);
                 }
-                console.log('저장된 배치 결과를 불러왔습니다.');
+            }
+            else {
+                // 데이터 구조가 올바르지 않으면 제거
+                try {
+                    localStorage.removeItem('layoutResult');
+                }
+                catch { }
             }
         }
         catch (error) {
-            console.error('배치 결과 불러오기 중 오류:', error);
+            if (this.isDevelopmentMode()) {
+                console.error('배치 결과 불러오기 중 오류:', error);
+            }
+            // 에러 발생 시 저장소 정리 시도
+            try {
+                localStorage.removeItem('layoutResult');
+            }
+            catch { }
         }
     }
     /**
@@ -2372,7 +2719,9 @@ export class MainController {
             this.outputModule.showSuccess(`나머지 ${unassignedStudents.length}명의 학생이 랜덤으로 배치되었습니다.`);
         }
         catch (error) {
-            console.error('랜덤 배치 중 오류:', error);
+            if (this.isDevelopmentMode()) {
+                console.error('랜덤 배치 중 오류:', error);
+            }
             this.outputModule.showError('랜덤 배치 중 오류가 발생했습니다.');
         }
     }
@@ -2392,7 +2741,9 @@ export class MainController {
             this.outputModule.showSuccess('결과가 다운로드되었습니다.');
         }
         catch (error) {
-            console.error('내보내기 중 오류:', error);
+            if (this.isDevelopmentMode()) {
+                console.error('내보내기 중 오류:', error);
+            }
             this.outputModule.showError('내보내기 중 오류가 발생했습니다.');
         }
     }
@@ -2461,7 +2812,7 @@ export class MainController {
             count = maleCount + femaleCount;
         }
         if (count <= 0) {
-            alert('학생 수를 입력해주세요.');
+            this.outputModule.showError('학생 수를 입력해주세요.');
             return;
         }
         // 기존 캔버스 숨기기
@@ -2525,7 +2876,7 @@ export class MainController {
         downloadBtn.style.flex = 'none';
         downloadBtn.style.width = 'auto';
         downloadBtn.style.whiteSpace = 'nowrap';
-        downloadBtn.addEventListener('click', () => this.downloadTemplateFile());
+        this.addEventListenerSafe(downloadBtn, 'click', () => this.downloadTemplateFile());
         leftButtonGroup.appendChild(downloadBtn);
         // 파일 업로드 버튼
         const uploadBtn = document.createElement('button');
@@ -2541,8 +2892,8 @@ export class MainController {
         fileInput.type = 'file';
         fileInput.accept = '.csv,.xlsx,.xls';
         fileInput.style.display = 'none';
-        fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
-        uploadBtn.addEventListener('click', () => {
+        this.addEventListenerSafe(fileInput, 'change', (e) => this.handleFileUpload(e));
+        this.addEventListenerSafe(uploadBtn, 'click', () => {
             fileInput.click();
         });
         leftButtonGroup.appendChild(uploadBtn);
@@ -2555,7 +2906,7 @@ export class MainController {
         loadClassBtn.style.flex = 'none';
         loadClassBtn.style.width = 'auto';
         loadClassBtn.style.whiteSpace = 'nowrap';
-        loadClassBtn.addEventListener('click', () => this.handleLoadClassNames());
+        this.addEventListenerSafe(loadClassBtn, 'click', () => this.handleLoadClassNames());
         leftButtonGroup.appendChild(loadClassBtn);
         // 오른쪽 버튼 그룹
         const rightButtonGroup = document.createElement('div');
@@ -2724,7 +3075,7 @@ export class MainController {
                         }
                     }
                     // 고정 좌석 선택 변경 이벤트
-                    fixedSeatSelect.addEventListener('change', () => {
+                    this.addEventListenerSafe(fixedSeatSelect, 'change', () => {
                         const selectedSeatId = fixedSeatSelect.value;
                         const studentIndex = parseInt(row.dataset.studentIndex || '0', 10);
                         // 학생 데이터에 고정 좌석 ID 저장
@@ -2752,7 +3103,6 @@ export class MainController {
                                 numCell.style.fontWeight = '';
                             }
                         }
-                        console.log(`학생 ${studentIndex}의 고정 좌석: ${selectedSeatId || '없음'}`);
                     });
                     fixedSeatCell.appendChild(fixedSeatSelect);
                 }
@@ -2768,20 +3118,22 @@ export class MainController {
                 deleteBtn.onclick = () => this.handleDeleteStudentRow(row);
                 actionCell.appendChild(deleteBtn);
                 // 키보드 이벤트 추가 (이름 입력 필드)
-                nameInput.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter') {
+                this.addEventListenerSafe(nameInput, 'keydown', (e) => {
+                    const ke = e;
+                    if (ke.key === 'Enter') {
                         genderSelect.focus();
                     }
-                    else if (e.key === 'ArrowDown') {
+                    else if (ke.key === 'ArrowDown') {
                         this.moveToCell(tbody, localIndex, 'name', 'down');
                     }
-                    else if (e.key === 'ArrowUp') {
+                    else if (ke.key === 'ArrowUp') {
                         this.moveToCell(tbody, localIndex, 'name', 'up');
                     }
                 });
                 // 키보드 이벤트 추가 (성별 선택 필드)
-                genderSelect.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter' || e.key === 'Tab') {
+                this.addEventListenerSafe(genderSelect, 'keydown', (e) => {
+                    const ke = e;
+                    if (ke.key === 'Enter' || ke.key === 'Tab') {
                         const nextRow = tbody.querySelector(`tr:nth-child(${Math.min(localIndex + 1, studentsInThisTable)})`);
                         const nextNameInput = nextRow?.querySelector('.student-name-input');
                         if (nextNameInput) {
@@ -2789,10 +3141,10 @@ export class MainController {
                             nextNameInput.select();
                         }
                     }
-                    else if (e.key === 'ArrowDown') {
+                    else if (ke.key === 'ArrowDown') {
                         this.moveToCell(tbody, localIndex, 'gender', 'down');
                     }
-                    else if (e.key === 'ArrowUp') {
+                    else if (ke.key === 'ArrowUp') {
                         this.moveToCell(tbody, localIndex, 'gender', 'up');
                     }
                 });
@@ -2859,10 +3211,10 @@ export class MainController {
         // 모든 테이블의 tbody에 이벤트 리스너 추가
         const allTbodies = studentTableContainer.querySelectorAll('tbody');
         allTbodies.forEach(tbody => {
-            tbody.addEventListener('input', () => {
+            this.addEventListenerSafe(tbody, 'input', () => {
                 this.updateStudentTableStats();
             });
-            tbody.addEventListener('change', () => {
+            this.addEventListenerSafe(tbody, 'change', () => {
                 this.updateStudentTableStats();
             });
             // 테이블이 동적으로 변경될 때를 대비한 MutationObserver 추가
@@ -2876,7 +3228,7 @@ export class MainController {
             });
         });
         // 테이블이 생성된 후 해당 위치로 스크롤
-        setTimeout(() => {
+        this.setTimeoutSafe(() => {
             studentTableContainer.scrollIntoView({
                 behavior: 'smooth',
                 block: 'start'
@@ -3040,7 +3392,7 @@ export class MainController {
                 });
             }
             // 고정 좌석 선택 변경 이벤트
-            fixedSeatSelect.addEventListener('change', () => {
+            this.addEventListenerSafe(fixedSeatSelect, 'change', () => {
                 const selectedSeatId = fixedSeatSelect.value;
                 const studentIndex = parseInt(row.dataset.studentIndex || '0', 10);
                 // 학생 데이터에 고정 좌석 ID 저장
@@ -3081,13 +3433,15 @@ export class MainController {
         deleteBtn.onclick = () => this.handleDeleteStudentRow(row);
         actionCell.appendChild(deleteBtn);
         // 키보드 이벤트 추가
-        nameInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
+        this.addEventListenerSafe(nameInput, 'keydown', (e) => {
+            const ke = e;
+            if (ke.key === 'Enter') {
                 genderSelect.focus();
             }
         });
-        genderSelect.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === 'Tab') {
+        this.addEventListenerSafe(genderSelect, 'keydown', (e) => {
+            const ke = e;
+            if (ke.key === 'Enter' || ke.key === 'Tab') {
                 const nextRow = targetTbody.querySelector(`tr:nth-child(${targetTbody.querySelectorAll('tr').length + 1})`);
                 const nextNameInput = nextRow?.querySelector('.student-name-input');
                 if (nextNameInput) {
@@ -3111,20 +3465,20 @@ export class MainController {
         this.updateStudentTableStats();
         // 새 행에 이벤트 리스너 추가
         if (nameInput) {
-            nameInput.addEventListener('input', () => this.updateStudentTableStats());
+            this.addEventListenerSafe(nameInput, 'input', () => this.updateStudentTableStats());
         }
         if (genderSelect) {
-            genderSelect.addEventListener('change', () => this.updateStudentTableStats());
+            this.addEventListenerSafe(genderSelect, 'change', () => this.updateStudentTableStats());
         }
         // 고정 좌석 셀에서 select 요소 찾기
         if (fixedSeatCell) {
             const fixedSeatSelectInCell = fixedSeatCell.querySelector('.fixed-seat-select');
             if (fixedSeatSelectInCell) {
-                fixedSeatSelectInCell.addEventListener('change', () => this.updateStudentTableStats());
+                this.addEventListenerSafe(fixedSeatSelectInCell, 'change', () => this.updateStudentTableStats());
             }
         }
         // 새로 추가된 입력 필드에 포커스
-        setTimeout(() => {
+        this.setTimeoutSafe(() => {
             nameInput.focus();
         }, 100);
     }
@@ -3213,17 +3567,18 @@ export class MainController {
         });
         // localStorage에 학생 데이터 저장
         try {
-            localStorage.setItem('classStudentData', JSON.stringify(studentData));
-            console.log('학생 데이터 저장 완료:', studentData);
+            this.safeSetItem('classStudentData', JSON.stringify(studentData));
         }
         catch (error) {
-            console.error('학생 데이터 저장 중 오류:', error);
-            alert('학생 데이터 저장 중 오류가 발생했습니다.');
+            if (this.isDevelopmentMode()) {
+                console.error('학생 데이터 저장 중 오류:', error);
+            }
+            this.outputModule.showError('학생 데이터 저장 중 오류가 발생했습니다.');
             return;
         }
         // 테이블의 학생 수를 1단계 사이드바로 동기화
         this.syncSidebarToTable(maleCount, femaleCount);
-        alert(`우리반 학생 ${studentData.length}명이 등록되었습니다!`);
+        this.outputModule.showSuccess(`우리반 학생 ${studentData.length}명이 등록되었습니다!`);
     }
     /**
      * 테이블의 숫자를 1단계 사이드바로 동기화
@@ -3234,7 +3589,7 @@ export class MainController {
         const maleCountInput = document.getElementById('male-students');
         const femaleCountInput = document.getElementById('female-students');
         if (!maleCountInput || !femaleCountInput) {
-            alert('입력 필드를 찾을 수 없습니다.');
+            this.outputModule.showError('입력 필드를 찾을 수 없습니다.');
             this.isSyncing = false;
             return;
         }
@@ -3250,7 +3605,7 @@ export class MainController {
         // 미리보기 업데이트 (카드 재생성) - 명시적으로 호출
         this.updatePreviewForGenderCounts();
         // 통계 업데이트 (경고 메시지 제거) - 동기화 플래그를 해제하기 전에
-        setTimeout(() => {
+        this.setTimeoutSafe(() => {
             this.updateStudentTableStats();
             this.isSyncing = false; // 동기화 완료
         }, 100);
@@ -3261,20 +3616,36 @@ export class MainController {
      */
     handleLoadClassNames() {
         try {
-            const savedDataStr = localStorage.getItem('classStudentData');
+            const savedDataStr = this.safeGetItem('classStudentData');
             if (!savedDataStr) {
-                alert('저장된 우리반 학생 데이터가 없습니다.');
+                this.outputModule.showInfo('저장된 우리반 학생 데이터가 없습니다.');
                 return;
             }
-            const savedData = JSON.parse(savedDataStr);
+            // JSON 파싱 시도 (데이터 손상 처리)
+            let savedData;
+            try {
+                savedData = JSON.parse(savedDataStr);
+                if (!Array.isArray(savedData)) {
+                    throw new Error('Invalid data format');
+                }
+            }
+            catch (parseError) {
+                // 데이터 손상 시 저장소에서 제거하고 에러 메시지 표시
+                try {
+                    localStorage.removeItem('classStudentData');
+                }
+                catch { }
+                this.outputModule.showError('저장된 데이터가 손상되어 불러올 수 없습니다.');
+                return;
+            }
             if (!Array.isArray(savedData) || savedData.length === 0) {
-                alert('저장된 우리반 학생 데이터가 없습니다.');
+                this.outputModule.showInfo('저장된 우리반 학생 데이터가 없습니다.');
                 return;
             }
             // 기존 테이블이 있는지 확인
             const outputSection = document.getElementById('output-section');
             if (!outputSection) {
-                alert('테이블 영역을 찾을 수 없습니다.');
+                this.outputModule.showError('테이블 영역을 찾을 수 없습니다.');
                 return;
             }
             // 기존 테이블이 없으면 생성
@@ -3283,7 +3654,7 @@ export class MainController {
                 // 테이블이 없으면 먼저 테이블 생성
                 this.handleCreateStudentTable(savedData.length);
                 // 테이블이 생성될 때까지 잠시 대기
-                setTimeout(() => {
+                this.setTimeoutSafe(() => {
                     this.loadStudentDataToTable(savedData);
                 }, 100);
             }
@@ -3293,8 +3664,10 @@ export class MainController {
             }
         }
         catch (error) {
-            console.error('우리반 학생 데이터 불러오기 중 오류:', error);
-            alert('우리반 학생 데이터를 불러오는 중 오류가 발생했습니다.');
+            if (this.isDevelopmentMode()) {
+                console.error('우리반 학생 데이터 불러오기 중 오류:', error);
+            }
+            this.outputModule.showError('우리반 학생 데이터를 불러오는 중 오류가 발생했습니다.');
         }
     }
     /**
@@ -3309,7 +3682,7 @@ export class MainController {
         if (!studentTableContainer) {
             this.handleCreateStudentTable(studentData.length);
             // 테이블이 생성될 때까지 잠시 대기
-            setTimeout(() => {
+            this.setTimeoutSafe(() => {
                 this.loadStudentDataToTable(studentData);
             }, 100);
             return;
@@ -3319,7 +3692,7 @@ export class MainController {
         if (allTbodies.length === 0) {
             // 테이블이 없으면 새로 생성
             this.handleCreateStudentTable(studentData.length);
-            setTimeout(() => {
+            this.setTimeoutSafe(() => {
                 this.loadStudentDataToTable(studentData);
             }, 100);
             return;
@@ -3389,7 +3762,7 @@ export class MainController {
                         });
                     }
                     // 고정 좌석 선택 변경 이벤트
-                    fixedSeatSelect.addEventListener('change', () => {
+                    this.addEventListenerSafe(fixedSeatSelect, 'change', () => {
                         const selectedSeatId = fixedSeatSelect.value;
                         const studentIndex = parseInt(row.dataset.studentIndex || '0', 10);
                         // 학생 데이터에 고정 좌석 ID 저장
@@ -3447,7 +3820,7 @@ export class MainController {
         const maleCount = studentData.filter(s => s.gender === 'M').length;
         const femaleCount = studentData.filter(s => s.gender === 'F').length;
         this.syncSidebarToTable(maleCount, femaleCount);
-        alert(`우리반 학생 ${studentData.length}명을 불러왔습니다!`);
+        this.outputModule.showSuccess(`우리반 학생 ${studentData.length}명을 불러왔습니다!`);
     }
     /**
      * 1단계 사이드바 값을 테이블로 동기화
@@ -3457,7 +3830,7 @@ export class MainController {
         const outputSection = document.getElementById('output-section');
         const tbody = outputSection?.querySelector('.student-input-table tbody');
         if (!tbody) {
-            alert('테이블을 찾을 수 없습니다.');
+            this.outputModule.showError('테이블을 찾을 수 없습니다.');
             return;
         }
         const rows = Array.from(tbody.querySelectorAll('tr'));
@@ -3761,7 +4134,9 @@ export class MainController {
                     this.parseCsvFile(text);
                 }
                 catch (error) {
-                    console.error('파일 읽기 오류:', error);
+                    if (this.isDevelopmentMode()) {
+                        console.error('파일 읽기 오류:', error);
+                    }
                     this.outputModule.showError('파일을 읽는 중 오류가 발생했습니다.');
                 }
             };
@@ -3777,49 +4152,134 @@ export class MainController {
      * @param csvText CSV 파일 내용
      */
     parseCsvFile(csvText) {
-        // BOM 제거
-        csvText = csvText.replace(/^\uFEFF/, '');
-        // 줄바꿈 정리
-        csvText = csvText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-        const lines = csvText.split('\n');
-        const students = [];
-        // 첫 번째 줄(헤더) 제외하고 파싱
-        for (let i = 1; i < lines.length; i++) {
-            const line = lines[i].trim();
-            if (!line)
-                continue;
-            // CSV 파싱 (쉼표로 구분)
-            const columns = line.split(',');
-            if (columns.length >= 3) {
-                const name = columns[1].trim();
-                const gender = columns[2].trim();
-                if (name && (gender === '남' || gender === '여' || gender === 'M' || gender === 'F')) {
-                    const normalizedGender = (gender === '남' || gender === 'M') ? 'M' : 'F';
-                    students.push({ name, gender: normalizedGender });
+        try {
+            // 파일 크기 검증 (최대 1MB)
+            if (csvText.length > 1024 * 1024) {
+                this.outputModule.showError('파일 크기가 너무 큽니다. 최대 1MB까지 지원됩니다.');
+                return;
+            }
+            // BOM 제거
+            csvText = csvText.replace(/^\uFEFF/, '');
+            // 줄바꿈 정리
+            csvText = csvText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            const lines = csvText.split('\n').filter(line => line.trim().length > 0);
+            // 최소 2줄 필요 (헤더 + 데이터 1줄)
+            if (lines.length < 2) {
+                this.outputModule.showError('CSV 파일 형식이 올바르지 않습니다. 최소한 헤더와 데이터 1줄이 필요합니다.');
+                return;
+            }
+            // 헤더 검증
+            const headerLine = lines[0].trim();
+            const headerColumns = headerLine.split(',').map(col => col.trim());
+            if (headerColumns.length < 3) {
+                this.outputModule.showError('CSV 파일의 헤더 형식이 올바르지 않습니다. "번호,이름,성별" 형식이어야 합니다.');
+                return;
+            }
+            const students = [];
+            const errors = [];
+            // 첫 번째 줄(헤더) 제외하고 파싱
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line)
+                    continue;
+                // CSV 파싱 (쉼표로 구분, 따옴표 처리)
+                const columns = this.parseCsvLine(line);
+                if (columns.length < 3) {
+                    errors.push(`${i + 1}번째 줄: 열 수가 부족합니다.`);
+                    continue;
                 }
+                const name = columns[1]?.trim() || '';
+                const gender = columns[2]?.trim() || '';
+                // 이름 검증
+                if (!name || name.length === 0) {
+                    errors.push(`${i + 1}번째 줄: 이름이 비어있습니다.`);
+                    continue;
+                }
+                if (name.length > 20) {
+                    errors.push(`${i + 1}번째 줄: 이름이 너무 깁니다 (최대 20자).`);
+                    continue;
+                }
+                // 성별 검증
+                if (!gender || (gender !== '남' && gender !== '여' && gender !== 'M' && gender !== 'F')) {
+                    errors.push(`${i + 1}번째 줄: 성별이 올바르지 않습니다 (남/여 또는 M/F).`);
+                    continue;
+                }
+                const normalizedGender = (gender === '남' || gender === 'M') ? 'M' : 'F';
+                students.push({ name, gender: normalizedGender });
+            }
+            // 에러가 있으면 일부만 표시
+            if (errors.length > 0) {
+                const errorMsg = errors.slice(0, 5).join('\n') + (errors.length > 5 ? `\n... 외 ${errors.length - 5}개 오류` : '');
+                this.outputModule.showError(`CSV 파일에 오류가 있습니다:\n${errorMsg}`);
+            }
+            if (students.length === 0) {
+                this.outputModule.showError('파일에서 유효한 학생 정보를 읽을 수 없습니다. 양식을 확인해주세요.');
+                return;
+            }
+            // 중복 이름 체크
+            const names = students.map(s => s.name.toLowerCase());
+            const uniqueNames = new Set(names);
+            if (names.length !== uniqueNames.size) {
+                this.outputModule.showError('CSV 파일에 중복된 이름이 있습니다. 모든 이름은 고유해야 합니다.');
+                return;
+            }
+            // 테이블 생성 및 데이터 입력
+            this.createTableWithStudents(students);
+            this.outputModule.showSuccess(`${students.length}명의 학생 정보가 업로드되었습니다.`);
+            // 인원수 입력 필드 업데이트 (남학생/여학생 수로 분리)
+            const maleCountInput = document.getElementById('male-students');
+            const femaleCountInput = document.getElementById('female-students');
+            if (maleCountInput && femaleCountInput) {
+                const maleStudents = students.filter(s => s.gender === 'M').length;
+                const femaleStudents = students.filter(s => s.gender === 'F').length;
+                maleCountInput.value = maleStudents.toString();
+                femaleCountInput.value = femaleStudents.toString();
+            }
+            // 파일 input 초기화
+            const uploadInput = document.getElementById('upload-file');
+            if (uploadInput) {
+                uploadInput.value = '';
             }
         }
-        if (students.length === 0) {
-            this.outputModule.showError('파일에서 학생 정보를 읽을 수 없습니다. 양식을 확인해주세요.');
-            return;
+        catch (error) {
+            if (this.isDevelopmentMode()) {
+                console.error('CSV 파싱 오류:', error);
+            }
+            this.outputModule.showError('CSV 파일을 읽는 중 오류가 발생했습니다. 파일 형식을 확인해주세요.');
         }
-        // 테이블 생성 및 데이터 입력
-        this.createTableWithStudents(students);
-        this.outputModule.showSuccess(`${students.length}명의 학생 정보가 업로드되었습니다.`);
-        // 인원수 입력 필드 업데이트 (남학생/여학생 수로 분리)
-        const maleCountInput = document.getElementById('male-students');
-        const femaleCountInput = document.getElementById('female-students');
-        if (maleCountInput && femaleCountInput) {
-            const maleStudents = students.filter(s => s.gender === 'M').length;
-            const femaleStudents = students.filter(s => s.gender === 'F').length;
-            maleCountInput.value = maleStudents.toString();
-            femaleCountInput.value = femaleStudents.toString();
+    }
+    /**
+     * CSV 라인 파싱 (따옴표 처리)
+     */
+    parseCsvLine(line) {
+        const result = [];
+        let current = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            if (char === '"') {
+                if (inQuotes && line[i + 1] === '"') {
+                    // 이스케이프된 따옴표
+                    current += '"';
+                    i++;
+                }
+                else {
+                    // 따옴표 시작/끝
+                    inQuotes = !inQuotes;
+                }
+            }
+            else if (char === ',' && !inQuotes) {
+                // 쉼표로 구분
+                result.push(current);
+                current = '';
+            }
+            else {
+                current += char;
+            }
         }
-        // 파일 input 초기화
-        const uploadInput = document.getElementById('upload-file');
-        if (uploadInput) {
-            uploadInput.value = '';
-        }
+        // 마지막 열 추가
+        result.push(current);
+        return result;
     }
     /**
      * 학생 데이터로 테이블 생성
@@ -3863,7 +4323,7 @@ export class MainController {
         downloadBtn.style.flex = 'none';
         downloadBtn.style.width = 'auto';
         downloadBtn.style.whiteSpace = 'nowrap';
-        downloadBtn.addEventListener('click', () => this.downloadTemplateFile());
+        this.addEventListenerSafe(downloadBtn, 'click', () => this.downloadTemplateFile());
         buttonContainer.appendChild(downloadBtn);
         // 파일 업로드 버튼
         const uploadBtn = document.createElement('button');
@@ -3879,8 +4339,8 @@ export class MainController {
         fileInput.type = 'file';
         fileInput.accept = '.csv,.xlsx,.xls';
         fileInput.style.display = 'none';
-        fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
-        uploadBtn.addEventListener('click', () => {
+        this.addEventListenerSafe(fileInput, 'change', (e) => this.handleFileUpload(e));
+        this.addEventListenerSafe(uploadBtn, 'click', () => {
             fileInput.click();
         });
         buttonContainer.appendChild(uploadBtn);
@@ -3893,7 +4353,7 @@ export class MainController {
         loadClassBtn3.style.flex = 'none';
         loadClassBtn3.style.width = 'auto';
         loadClassBtn3.style.whiteSpace = 'nowrap';
-        loadClassBtn3.addEventListener('click', () => this.handleLoadClassNames());
+        this.addEventListenerSafe(loadClassBtn3, 'click', () => this.handleLoadClassNames());
         buttonContainer.appendChild(loadClassBtn3);
         // 자리 배치하기 버튼과 체크박스 추가
         const arrangeBtn = document.createElement('button');
@@ -4058,7 +4518,7 @@ export class MainController {
                         }
                     }
                     // 고정 좌석 선택 변경 이벤트
-                    fixedSeatSelect.addEventListener('change', () => {
+                    this.addEventListenerSafe(fixedSeatSelect, 'change', () => {
                         const selectedSeatId = fixedSeatSelect.value;
                         const studentIndex = parseInt(row.dataset.studentIndex || '0', 10);
                         // 학생 데이터에 고정 좌석 ID 저장
@@ -4086,7 +4546,6 @@ export class MainController {
                                 numCell.style.fontWeight = '';
                             }
                         }
-                        console.log(`학생 ${studentIndex}의 고정 좌석: ${selectedSeatId || '없음'}`);
                     });
                     fixedSeatCell.appendChild(fixedSeatSelect);
                 }
@@ -4102,20 +4561,22 @@ export class MainController {
                 deleteBtn.onclick = () => this.handleDeleteStudentRow(row);
                 actionCell.appendChild(deleteBtn);
                 // 키보드 이벤트 추가 (이름 입력 필드)
-                nameInput.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter') {
+                this.addEventListenerSafe(nameInput, 'keydown', (e) => {
+                    const ke = e;
+                    if (ke.key === 'Enter') {
                         genderSelect.focus();
                     }
-                    else if (e.key === 'ArrowDown') {
+                    else if (ke.key === 'ArrowDown') {
                         this.moveToCell(tbody, localIndex, 'name', 'down');
                     }
-                    else if (e.key === 'ArrowUp') {
+                    else if (ke.key === 'ArrowUp') {
                         this.moveToCell(tbody, localIndex, 'name', 'up');
                     }
                 });
                 // 키보드 이벤트 추가 (성별 선택 필드)
-                genderSelect.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter' || e.key === 'Tab') {
+                this.addEventListenerSafe(genderSelect, 'keydown', (e) => {
+                    const ke = e;
+                    if (ke.key === 'Enter' || ke.key === 'Tab') {
                         const nextRow = tbody.querySelector(`tr:nth-child(${Math.min(localIndex + 1, studentsInThisTable)})`);
                         const nextNameInput = nextRow?.querySelector('.student-name-input');
                         if (nextNameInput) {
@@ -4123,10 +4584,10 @@ export class MainController {
                             nextNameInput.select();
                         }
                     }
-                    else if (e.key === 'ArrowDown') {
+                    else if (ke.key === 'ArrowDown') {
                         this.moveToCell(tbody, localIndex, 'gender', 'down');
                     }
-                    else if (e.key === 'ArrowUp') {
+                    else if (ke.key === 'ArrowUp') {
                         this.moveToCell(tbody, localIndex, 'gender', 'up');
                     }
                 });
@@ -4193,10 +4654,10 @@ export class MainController {
         // 모든 테이블의 tbody에 이벤트 리스너 추가
         const allTbodies = studentTableContainer.querySelectorAll('tbody');
         allTbodies.forEach(tbody => {
-            tbody.addEventListener('input', () => {
+            this.addEventListenerSafe(tbody, 'input', () => {
                 this.updateStudentTableStats();
             });
-            tbody.addEventListener('change', () => {
+            this.addEventListenerSafe(tbody, 'change', () => {
                 this.updateStudentTableStats();
             });
             // 테이블이 동적으로 변경될 때를 대비한 MutationObserver 추가
@@ -4453,15 +4914,124 @@ export class MainController {
      */
     run() {
         if (!this.isInitialized) {
-            console.error('컨트롤러가 초기화되지 않았습니다.');
+            // 개발 모드에서만 에러 로깅
+            if (this.isDevelopmentMode()) {
+                console.error('컨트롤러가 초기화되지 않았습니다.');
+            }
             return;
         }
-        console.log('교실 자리 배치 프로그램이 시작되었습니다.');
+    }
+    /**
+     * 개발 모드 확인 (로컬호스트 또는 개발 환경)
+     */
+    isDevelopmentMode() {
+        return window.location.hostname === 'localhost' ||
+            window.location.hostname === '127.0.0.1' ||
+            window.location.hostname.includes('dev');
+    }
+    /**
+     * 안전한 클립보드 복사 (브라우저 호환성 개선)
+     */
+    async copyToClipboard(text) {
+        try {
+            // 최신 Clipboard API 시도
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(text);
+                return true;
+            }
+        }
+        catch (err) {
+            // Clipboard API 실패 시 폴백 사용
+        }
+        // 폴백: document.execCommand 사용
+        try {
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.left = '-999999px';
+            textarea.style.top = '-999999px';
+            document.body.appendChild(textarea);
+            textarea.focus();
+            textarea.select();
+            const successful = document.execCommand('copy');
+            document.body.removeChild(textarea);
+            return successful;
+        }
+        catch (err) {
+            if (this.isDevelopmentMode()) {
+                console.error('클립보드 복사 실패:', err);
+            }
+            return false;
+        }
+    }
+    /**
+     * HTML 이스케이프 (XSS 방지)
+     * 향후 사용자 입력이 포함된 HTML 생성 시 사용
+     */
+    escapeHtml(_text) {
+        const div = document.createElement('div');
+        div.textContent = _text;
+        return div.innerHTML;
+    }
+    /**
+     * 안전한 innerHTML 설정 (XSS 방지)
+     * 향후 사용자 입력이 포함된 HTML 생성 시 사용
+     */
+    setSafeInnerHTML(_element, _html) {
+        // 사용자 입력이 포함된 경우 이스케이프 처리
+        // 단순 템플릿 리터럴은 그대로 사용 (성능 고려)
+        // _element.innerHTML = _html;
+    }
+    /**
+     * 안전한 이벤트 리스너 추가 (메모리 누수 방지)
+     * 향후 사용 예정
+     */
+    addEventListenerSafe(element, event, handler, options) {
+        element.addEventListener(event, handler, options);
+        this.eventListeners.push({ element, event, handler: handler });
+    }
+    /**
+     * 안전한 setTimeout (메모리 누수 방지)
+     */
+    setTimeoutSafe(callback, delay) {
+        const timerId = window.setTimeout(() => {
+            this.timers.delete(timerId);
+            callback();
+        }, delay);
+        this.timers.add(timerId);
+        return timerId;
+    }
+    /**
+     * 모든 타이머 정리
+     */
+    clearAllTimers() {
+        this.timers.forEach(timerId => {
+            clearTimeout(timerId);
+        });
+        this.timers.clear();
+    }
+    /**
+     * 모든 이벤트 리스너 정리
+     */
+    removeAllEventListeners() {
+        this.eventListeners.forEach(({ element, event, handler }) => {
+            element.removeEventListener(event, handler);
+        });
+        this.eventListeners = [];
+    }
+    /**
+     * 정리 메서드 (컨트롤러 종료 시 호출)
+     */
+    cleanup() {
+        this.clearAllTimers();
+        this.removeAllEventListeners();
     }
     /**
      * 좌석 배치하기 처리
      */
     handleArrangeSeats() {
+        // 로딩 상태 표시
+        this.outputModule.showLoading();
         // 3초 동안 지속하는 음향 효과 재생
         this.playArrangementSound();
         try {
@@ -4470,11 +5040,34 @@ export class MainController {
             // 테이블에서 학생 데이터 가져오기
             const studentData = this.inputModule.getStudentData();
             if (studentData.length === 0) {
-                alert('학생 정보를 먼저 입력해주세요.');
+                this.outputModule.showError('학생 정보를 먼저 입력해주세요.');
                 this.stopCurtainAnimation();
                 return;
             }
-            console.log('학생 데이터:', studentData);
+            // 대용량 데이터 처리 시 지연 렌더링
+            if (studentData.length > 50) {
+                // 비동기 처리로 UI 블로킹 방지
+                this.setTimeoutSafe(() => {
+                    this.processArrangeSeats(studentData);
+                }, 50);
+            }
+            else {
+                this.processArrangeSeats(studentData);
+            }
+        }
+        catch (error) {
+            if (this.isDevelopmentMode()) {
+                console.error('좌석 배치 중 오류:', error);
+            }
+            this.outputModule.showError('좌석 배치 중 오류가 발생했습니다.');
+            this.stopCurtainAnimation();
+        }
+    }
+    /**
+     * 좌석 배치 처리 (내부 메서드)
+     */
+    processArrangeSeats(studentData) {
+        try {
             // 학생 데이터를 Student 객체로 변환
             this.students = StudentModel.createMultiple(studentData);
             // 고정 좌석 모드인지 확인
@@ -4488,7 +5081,6 @@ export class MainController {
                         const seatId = parseInt(seatIdStr, 10);
                         if (!isNaN(seatId)) {
                             this.students[index].fixedSeatId = seatId;
-                            console.log(`학생 ${this.students[index].name} → 고정 좌석 ${seatIdStr}`);
                         }
                     }
                 });
@@ -4496,17 +5088,23 @@ export class MainController {
             // 남학생과 여학생 분리
             const maleStudents = this.students.filter(s => s.gender === 'M');
             const femaleStudents = this.students.filter(s => s.gender === 'F');
-            console.log('남학생 수:', maleStudents.length, '여학생 수:', femaleStudents.length);
             // 기존 카드들에서 이름만 변경 (카드 위치는 고정)
             const seatsArea = document.getElementById('seats-area');
             if (!seatsArea)
                 return;
             // 기존 카드들 가져오기 (분단 레이블 제외)
-            const existingCards = seatsArea.querySelectorAll('.student-seat-card');
-            console.log('기존 카드 수:', existingCards.length);
+            let existingCards = seatsArea.querySelectorAll('.student-seat-card');
+            // 좌석 카드가 없으면 자동으로 생성
             if (existingCards.length === 0) {
-                alert('먼저 좌석 배치 형태를 설정해주세요.');
-                return;
+                this.renderExampleCards();
+                // renderExampleCards() 후 다시 카드 가져오기
+                existingCards = seatsArea.querySelectorAll('.student-seat-card');
+                if (existingCards.length === 0) {
+                    this.outputModule.showError('좌석 배치 형태를 설정하고 학생 수를 입력해주세요.');
+                    this.outputModule.clear();
+                    this.stopCurtainAnimation();
+                    return;
+                }
             }
             // 옵션 체크박스 값 읽기
             const avoidPrevSeat = document.getElementById('avoid-prev-seat')?.checked === true;
@@ -4538,7 +5136,6 @@ export class MainController {
                             const nameDiv = cardElement.querySelector('.student-name');
                             if (nameDiv) {
                                 nameDiv.textContent = fixedStudent.name;
-                                console.log(`고정 좌석 ${seatId}에 ${fixedStudent.name} 배치`);
                             }
                         }
                     }
@@ -4557,8 +5154,6 @@ export class MainController {
                     const seatId = parseInt(seatIdStr, 10);
                     return !this.fixedSeatIds.has(seatId);
                 });
-                console.log(`고정 좌석 제외: 총 ${existingCards.length}개 좌석 중 ${nonFixedCards.length}개 좌석만 랜덤 배치 대상`);
-                console.log(`고정 학생 제외: 남학생 ${allRemainingMales.length}명, 여학생 ${allRemainingFemales.length}명만 랜덤 배치 대상`);
                 // 페어 컨테이너 우선 처리 (짝 제약 고려)
                 const seatsAreaEl = document.getElementById('seats-area');
                 const pairContainers = [];
@@ -4767,8 +5362,6 @@ export class MainController {
                 // 일반 랜덤 배치 모드
                 let shuffledMales = [...maleStudents].sort(() => Math.random() - 0.5);
                 let shuffledFemales = [...femaleStudents].sort(() => Math.random() - 0.5);
-                console.log('섞인 남학생:', shuffledMales.map(s => s.name));
-                console.log('섞인 여학생:', shuffledFemales.map(s => s.name));
                 // 페어 컨테이너 우선 처리
                 const seatsAreaEl = document.getElementById('seats-area');
                 const pairContainers = [];
@@ -4939,8 +5532,8 @@ export class MainController {
                 }
             });
             try {
-                localStorage.setItem('lastSeatByStudent', JSON.stringify(newLastSeatByStudent));
-                localStorage.setItem('lastPartnerByStudent', JSON.stringify(newLastPartnerByStudent));
+                this.safeSetItem('lastSeatByStudent', JSON.stringify(newLastSeatByStudent));
+                this.safeSetItem('lastPartnerByStudent', JSON.stringify(newLastPartnerByStudent));
             }
             catch { }
             this.outputModule.showSuccess('좌석 배치가 완료되었습니다!');
@@ -4957,15 +5550,15 @@ export class MainController {
                 fixedSeatHelp.style.display = 'none';
             }
             // 1초 후 폭죽 애니메이션 시작
-            setTimeout(() => {
+            this.setTimeoutSafe(() => {
                 this.startFireworks();
             }, 1000);
             // 3초 후 커튼 열기
-            setTimeout(() => {
+            this.setTimeoutSafe(() => {
                 this.openCurtain();
             }, 3000);
             // 자리 배치 완료 후 히스토리 저장
-            setTimeout(() => {
+            this.setTimeoutSafe(() => {
                 this.saveLayoutToHistory();
             }, 3100);
             // 배치 완료 후 화면을 맨 위로 스크롤 (스크롤 컨테이너와 윈도우 모두 시도)
@@ -4994,7 +5587,9 @@ export class MainController {
             catch { }
         }
         catch (error) {
-            console.error('좌석 배치 중 오류:', error);
+            if (this.isDevelopmentMode()) {
+                console.error('좌석 배치 중 오류:', error);
+            }
             this.outputModule.showError('좌석 배치 중 오류가 발생했습니다.');
         }
     }
@@ -5006,7 +5601,7 @@ export class MainController {
             // 현재 좌석 배치 데이터 수집
             const seatsArea = document.getElementById('seats-area');
             if (!seatsArea) {
-                alert('좌석 배치 데이터를 찾을 수 없습니다.');
+                this.outputModule.showError('좌석 배치 데이터를 찾을 수 없습니다.');
                 return;
             }
             // 현재 배치 상태 저장
@@ -5052,7 +5647,7 @@ export class MainController {
                 }
             });
             if (currentLayout.length === 0) {
-                alert('확정할 자리 배치가 없습니다.');
+                this.outputModule.showError('확정할 자리 배치가 없습니다.');
                 return;
             }
             // 날짜 생성 (yy-mm-dd 형식)
@@ -5080,14 +5675,16 @@ export class MainController {
             if (existingHistory.length > 50) {
                 existingHistory.splice(50);
             }
-            localStorage.setItem('seatHistory', JSON.stringify(existingHistory));
+            this.safeSetItem('seatHistory', JSON.stringify(existingHistory));
             // 드롭다운 메뉴 업데이트
             this.updateHistoryDropdown();
-            alert(`자리가 확정되었습니다!\n날짜: ${dateString}`);
+            this.outputModule.showSuccess(`자리가 확정되었습니다! 날짜: ${dateString}`);
         }
         catch (error) {
-            console.error('자리 확정 중 오류:', error);
-            alert('자리 확정 중 오류가 발생했습니다.');
+            if (this.isDevelopmentMode()) {
+                console.error('자리 확정 중 오류:', error);
+            }
+            this.outputModule.showError('자리 확정 중 오류가 발생했습니다.');
         }
     }
     /**
@@ -5095,10 +5692,25 @@ export class MainController {
      */
     getSeatHistory() {
         try {
-            const historyStr = localStorage.getItem('seatHistory');
+            const historyStr = this.safeGetItem('seatHistory');
             if (!historyStr)
                 return [];
-            const history = JSON.parse(historyStr);
+            // JSON 파싱 시도 (데이터 손상 처리)
+            let history;
+            try {
+                history = JSON.parse(historyStr);
+                if (!Array.isArray(history)) {
+                    return [];
+                }
+            }
+            catch (parseError) {
+                // 데이터 손상 시 저장소에서 제거하고 빈 배열 반환
+                try {
+                    localStorage.removeItem('seatHistory');
+                }
+                catch { }
+                return [];
+            }
             // 최신 항목이 앞에 오도록 timestamp 기준 내림차순 정렬
             return history.sort((a, b) => {
                 return (b.timestamp || 0) - (a.timestamp || 0);
@@ -5261,26 +5873,26 @@ export class MainController {
             deleteBtn.innerHTML = '🗑️';
             deleteBtn.title = '삭제';
             deleteBtn.style.cssText = 'background: transparent; border: none; cursor: pointer; font-size: 1em; padding: 4px 8px; color: #dc3545; opacity: 0.7; transition: opacity 0.2s; margin-left: 8px;';
-            deleteBtn.addEventListener('click', (e) => {
+            this.addEventListenerSafe(deleteBtn, 'click', (e) => {
                 e.stopPropagation(); // 클릭 이벤트 전파 방지
                 this.deleteHistoryItem(item.id);
             });
-            deleteBtn.addEventListener('mouseenter', () => {
+            this.addEventListenerSafe(deleteBtn, 'mouseenter', () => {
                 deleteBtn.style.opacity = '1';
             });
-            deleteBtn.addEventListener('mouseleave', () => {
+            this.addEventListenerSafe(deleteBtn, 'mouseleave', () => {
                 deleteBtn.style.opacity = '0.7';
             });
             historyItemContainer.appendChild(deleteBtn);
             historyContent.appendChild(historyItemContainer);
             // 클릭 이벤트는 historyItem에만 추가
-            historyItem.addEventListener('click', () => {
+            this.addEventListenerSafe(historyItem, 'click', () => {
                 this.loadHistoryItem(item.id);
             });
-            historyItem.addEventListener('mouseenter', () => {
+            this.addEventListenerSafe(historyItem, 'mouseenter', () => {
                 historyItemContainer.style.background = '#f0f0f0';
             });
-            historyItem.addEventListener('mouseleave', () => {
+            this.addEventListenerSafe(historyItem, 'mouseleave', () => {
                 historyItemContainer.style.background = '';
             });
         });
@@ -5295,7 +5907,7 @@ export class MainController {
         try {
             const history = this.getSeatHistory();
             const filteredHistory = history.filter(item => item.id !== historyId);
-            localStorage.setItem('seatHistory', JSON.stringify(filteredHistory));
+            this.safeSetItem('seatHistory', JSON.stringify(filteredHistory));
             // 드롭다운 메뉴 업데이트
             this.updateHistoryDropdown();
             // 드롭다운이 열려있으면 닫기
@@ -5305,8 +5917,10 @@ export class MainController {
             }
         }
         catch (error) {
-            console.error('이력 삭제 중 오류:', error);
-            alert('이력 삭제 중 오류가 발생했습니다.');
+            if (this.isDevelopmentMode()) {
+                console.error('이력 삭제 중 오류:', error);
+            }
+            this.outputModule.showError('이력 삭제 중 오류가 발생했습니다.');
         }
     }
     /**
@@ -5317,13 +5931,13 @@ export class MainController {
             const history = this.getSeatHistory();
             const historyItem = history.find(item => item.id === historyId);
             if (!historyItem) {
-                alert('이력을 찾을 수 없습니다.');
+                this.outputModule.showError('이력을 찾을 수 없습니다.');
                 return;
             }
             // 좌석 배치 복원
             const seatsArea = document.getElementById('seats-area');
             if (!seatsArea) {
-                alert('좌석 배치 영역을 찾을 수 없습니다.');
+                this.outputModule.showError('좌석 배치 영역을 찾을 수 없습니다.');
                 return;
             }
             // 모든 카드 초기화
@@ -5354,11 +5968,13 @@ export class MainController {
             if (actionButtons) {
                 actionButtons.style.display = 'block';
             }
-            alert(`${historyItem.date}의 자리 배치를 불러왔습니다.`);
+            this.outputModule.showSuccess(`${historyItem.date}의 자리 배치를 불러왔습니다.`);
         }
         catch (error) {
-            console.error('이력 불러오기 중 오류:', error);
-            alert('이력을 불러오는 중 오류가 발생했습니다.');
+            if (this.isDevelopmentMode()) {
+                console.error('이력 불러오기 중 오류:', error);
+            }
+            this.outputModule.showError('이력을 불러오는 중 오류가 발생했습니다.');
         }
     }
     /**
@@ -5473,19 +6089,18 @@ export class MainController {
             // 인쇄용 스타일이 포함된 새 창 열기
             const printWindow = window.open('', '_blank');
             if (!printWindow) {
-                alert('팝업이 차단되었습니다. 팝업을 허용해주세요.');
+                this.outputModule.showError('팝업이 차단되었습니다. 팝업을 허용해주세요.');
                 return;
             }
             // 현재 자리 배치도 영역 가져오기
             const seatsArea = document.getElementById('seats-area');
             const classroomLayout = document.getElementById('classroom-layout');
             if (!seatsArea || !classroomLayout) {
-                alert('인쇄할 자리 배치도를 찾을 수 없습니다.');
+                this.outputModule.showError('인쇄할 자리 배치도를 찾을 수 없습니다.');
                 return;
             }
             // 현재 그리드 설정 가져오기
             const currentGridTemplateColumns = seatsArea.style.gridTemplateColumns;
-            console.log('현재 그리드 설정:', currentGridTemplateColumns);
             // 현재 화면의 실제 HTML 구조를 그대로 사용
             const seatsAreaHtml = seatsArea.innerHTML;
             // 현재 날짜와 시간
@@ -5767,12 +6382,14 @@ export class MainController {
             printWindow.document.write(printContent);
             printWindow.document.close();
             // 인쇄 대화상자 열기
-            setTimeout(() => {
+            this.setTimeoutSafe(() => {
                 printWindow.print();
             }, 500);
         }
         catch (error) {
-            console.error('인쇄 중 오류:', error);
+            if (this.isDevelopmentMode()) {
+                console.error('인쇄 중 오류:', error);
+            }
             this.outputModule.showError('인쇄 중 오류가 발생했습니다.');
         }
     }
@@ -5784,19 +6401,18 @@ export class MainController {
             // 인쇄용 스타일이 포함된 새 창 열기
             const printWindow = window.open('', '_blank');
             if (!printWindow) {
-                alert('팝업이 차단되었습니다. 팝업을 허용해주세요.');
+                this.outputModule.showError('팝업이 차단되었습니다. 팝업을 허용해주세요.');
                 return;
             }
             // 현재 자리 배치도 영역 가져오기
             const seatsArea = document.getElementById('seats-area');
             const classroomLayout = document.getElementById('classroom-layout');
             if (!seatsArea || !classroomLayout) {
-                alert('인쇄할 자리 배치도를 찾을 수 없습니다.');
+                this.outputModule.showError('인쇄할 자리 배치도를 찾을 수 없습니다.');
                 return;
             }
             // 현재 그리드 설정 가져오기
             const currentGridTemplateColumns = seatsArea.style.gridTemplateColumns;
-            console.log('교탁용 인쇄 - 현재 그리드 설정:', currentGridTemplateColumns);
             // 현재 화면의 실제 HTML 구조를 그대로 사용
             const seatsAreaHtml = seatsArea.innerHTML;
             // 현재 날짜와 시간
@@ -6098,12 +6714,14 @@ export class MainController {
             printWindow.document.write(printContent);
             printWindow.document.close();
             // 인쇄 대화상자 열기
-            setTimeout(() => {
+            this.setTimeoutSafe(() => {
                 printWindow.print();
             }, 500);
         }
         catch (error) {
-            console.error('교탁용 인쇄 중 오류:', error);
+            if (this.isDevelopmentMode()) {
+                console.error('교탁용 인쇄 중 오류:', error);
+            }
             this.outputModule.showError('교탁용 인쇄 중 오류가 발생했습니다.');
         }
     }
@@ -6116,12 +6734,11 @@ export class MainController {
             const seatsArea = document.getElementById('seats-area');
             const classroomLayout = document.getElementById('classroom-layout');
             if (!seatsArea || !classroomLayout) {
-                alert('저장할 자리 배치도를 찾을 수 없습니다.');
+                this.outputModule.showError('저장할 자리 배치도를 찾을 수 없습니다.');
                 return;
             }
             // 현재 그리드 설정 가져오기
             const currentGridTemplateColumns = seatsArea.style.gridTemplateColumns;
-            console.log('저장용 현재 그리드 설정:', currentGridTemplateColumns);
             // 현재 화면의 실제 HTML 구조를 그대로 사용
             const seatsAreaHtml = seatsArea.innerHTML;
             // 현재 날짜와 시간
@@ -6282,7 +6899,9 @@ export class MainController {
             this.outputModule.showSuccess(`자리 배치도가 "${fileName}"으로 저장되었습니다.`);
         }
         catch (error) {
-            console.error('저장 중 오류:', error);
+            if (this.isDevelopmentMode()) {
+                console.error('저장 중 오류:', error);
+            }
             this.outputModule.showError('저장 중 오류가 발생했습니다.');
         }
     }
@@ -6290,15 +6909,11 @@ export class MainController {
      * 자리 배치도 공유하기
      */
     handleShareLayout() {
-        console.log('handleShareLayout 메서드 시작');
         try {
             const seatsArea = document.getElementById('seats-area');
             const classroomLayout = document.getElementById('classroom-layout');
-            console.log('seatsArea:', seatsArea);
-            console.log('classroomLayout:', classroomLayout);
             if (!seatsArea || !classroomLayout) {
-                console.log('자리 배치도 요소를 찾을 수 없음');
-                alert('공유할 자리 배치도를 찾을 수 없습니다.');
+                this.outputModule.showError('공유할 자리 배치도를 찾을 수 없습니다.');
                 return;
             }
             const currentGridTemplateColumns = seatsArea.style.gridTemplateColumns;
@@ -6314,11 +6929,12 @@ export class MainController {
             // 공유 주소(URL) 생성
             const shareUrl = this.generateShareUrl(seatsAreaHtml, currentGridTemplateColumns, dateString);
             // 모달 창으로 공유하기
-            console.log('모달 창으로 공유하기 실행');
             this.showShareModal(shareUrl);
         }
         catch (error) {
-            console.error('공유 중 오류:', error);
+            if (this.isDevelopmentMode()) {
+                console.error('공유 중 오류:', error);
+            }
             this.outputModule.showError('공유 중 오류가 발생했습니다.');
         }
     }
@@ -6327,6 +6943,10 @@ export class MainController {
      */
     enableViewerMode(viewData) {
         try {
+            // 입력 데이터 길이 검증 (보안)
+            if (!viewData || viewData.length > 10000) {
+                throw new Error('공유 데이터가 유효하지 않습니다.');
+            }
             // URL-safe Base64 디코딩
             const base64Data = viewData
                 .replace(/-/g, '+')
@@ -6340,13 +6960,24 @@ export class MainController {
                 decodedData = decodeURIComponent(escape(atob(paddedData)));
             }
             catch (e) {
-                decodedData = decodeURIComponent(escape(atob(viewData)));
+                try {
+                    decodedData = decodeURIComponent(escape(atob(viewData)));
+                }
+                catch (e2) {
+                    throw new Error('공유 데이터 디코딩에 실패했습니다.');
+                }
             }
             // JSON 파싱
-            const shareInfo = JSON.parse(decodedData);
-            const type = shareInfo.t || shareInfo.type;
-            if (type !== 'sa' && type !== 'seating-arrangement') {
-                throw new Error('유효하지 않은 공유 데이터입니다.');
+            let shareInfo;
+            try {
+                shareInfo = JSON.parse(decodedData);
+            }
+            catch (e) {
+                throw new Error('공유 데이터 형식이 올바르지 않습니다.');
+            }
+            // 데이터 검증
+            if (!this.validateSharedData(shareInfo)) {
+                throw new Error('공유 데이터 검증에 실패했습니다.');
             }
             // 학생 정보 추출
             const studentDataList = shareInfo.s || shareInfo.students || [];
@@ -6354,17 +6985,21 @@ export class MainController {
             // 학생 데이터 생성
             this.students = studentDataList.map((student, index) => {
                 if (Array.isArray(student)) {
+                    const name = String(student[0] || '').trim();
+                    const gender = (student[1] === 'F' ? 'F' : 'M');
                     return {
                         id: index + 1,
-                        name: student[0],
-                        gender: (student[1] || 'M')
+                        name: name || `학생${index + 1}`,
+                        gender: gender
                     };
                 }
                 else {
+                    const name = String(student.name || '').trim();
+                    const gender = (student.gender === 'F' ? 'F' : 'M');
                     return {
                         id: index + 1,
-                        name: student.name,
-                        gender: (student.gender || 'M')
+                        name: name || `학생${index + 1}`,
+                        gender: gender
                     };
                 }
             });
@@ -6391,7 +7026,7 @@ export class MainController {
             // 미리보기 업데이트 (좌석 카드 생성)
             this.updatePreviewForGenderCounts();
             // 자리 배치 렌더링 (학생 테이블 생성 없이 직접 렌더링)
-            setTimeout(() => {
+            this.setTimeoutSafe(() => {
                 // 좌석 영역 가져오기
                 const seatsArea = document.getElementById('seats-area');
                 if (!seatsArea) {
@@ -6407,7 +7042,7 @@ export class MainController {
                     this.renderExampleCards();
                 }
                 // 학생들을 좌석에 배치
-                setTimeout(() => {
+                this.setTimeoutSafe(() => {
                     const cards = seatsArea.querySelectorAll('.student-seat-card');
                     let cardIndex = 0;
                     this.students.forEach((student) => {
@@ -6435,8 +7070,20 @@ export class MainController {
             }, 300);
         }
         catch (error) {
-            console.error('뷰어 모드 로드 실패:', error);
-            document.body.innerHTML = '<div style="padding: 20px; text-align: center;"><h2>자리 배치도를 불러올 수 없습니다.</h2><p>공유 링크가 유효하지 않거나 만료되었을 수 있습니다.</p></div>';
+            if (this.isDevelopmentMode()) {
+                console.error('뷰어 모드 로드 실패:', error);
+            }
+            // 안전한 에러 메시지 표시 (innerHTML 대신 textContent 사용)
+            const errorDiv = document.createElement('div');
+            errorDiv.style.cssText = 'padding: 20px; text-align: center;';
+            const h2 = document.createElement('h2');
+            h2.textContent = '자리 배치도를 불러올 수 없습니다.';
+            const p = document.createElement('p');
+            p.textContent = '공유 링크가 유효하지 않거나 만료되었을 수 있습니다.';
+            errorDiv.appendChild(h2);
+            errorDiv.appendChild(p);
+            document.body.innerHTML = '';
+            document.body.appendChild(errorDiv);
         }
     }
     /**
@@ -6507,10 +7154,63 @@ export class MainController {
         viewportMeta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
     }
     /**
+     * 공유된 배치 데이터 검증
+     */
+    validateSharedData(shareInfo) {
+        // 타입 검증
+        const type = shareInfo.t || shareInfo.type;
+        if (type !== 'sa' && type !== 'seating-arrangement') {
+            return false;
+        }
+        // 학생 데이터 검증
+        const studentDataList = shareInfo.s || shareInfo.students || [];
+        if (!Array.isArray(studentDataList)) {
+            return false;
+        }
+        // 최대 학생 수 제한 (보안 및 성능)
+        if (studentDataList.length > 200) {
+            return false;
+        }
+        // 각 학생 데이터 검증
+        for (const student of studentDataList) {
+            if (Array.isArray(student)) {
+                // 압축된 형식: [이름, 성별]
+                if (student.length < 2 || typeof student[0] !== 'string' || student[0].length > 50) {
+                    return false;
+                }
+                if (student[1] !== 'M' && student[1] !== 'F') {
+                    return false;
+                }
+            }
+            else if (typeof student === 'object' && student !== null) {
+                // 객체 형식: {name: string, gender: 'M' | 'F'}
+                if (typeof student.name !== 'string' || student.name.length > 50) {
+                    return false;
+                }
+                if (student.gender !== 'M' && student.gender !== 'F') {
+                    return false;
+                }
+            }
+            else {
+                return false;
+            }
+        }
+        // 레이아웃 검증 (선택적)
+        const gridColumns = shareInfo.l || shareInfo.layout;
+        if (gridColumns && (typeof gridColumns !== 'string' || gridColumns.length > 500)) {
+            return false;
+        }
+        return true;
+    }
+    /**
      * 공유된 배치 데이터 로드
      */
     loadSharedLayout(shareData) {
         try {
+            // 입력 데이터 길이 검증 (보안)
+            if (!shareData || shareData.length > 10000) {
+                throw new Error('공유 데이터가 유효하지 않습니다.');
+            }
             // URL-safe Base64 디코딩 (+, /, = 문자 복원)
             const base64Data = shareData
                 .replace(/-/g, '+')
@@ -6525,16 +7225,25 @@ export class MainController {
             }
             catch (e) {
                 // 이전 형식 호환성: 일반 Base64 디코딩 시도
-                decodedData = decodeURIComponent(escape(atob(shareData)));
+                try {
+                    decodedData = decodeURIComponent(escape(atob(shareData)));
+                }
+                catch (e2) {
+                    throw new Error('공유 데이터 디코딩에 실패했습니다.');
+                }
             }
             // JSON 파싱
-            const shareInfo = JSON.parse(decodedData);
-            // 이전 형식과 새 형식 모두 지원
-            const type = shareInfo.t || shareInfo.type;
-            if (type !== 'sa' && type !== 'seating-arrangement') {
-                throw new Error('유효하지 않은 공유 데이터입니다.');
+            let shareInfo;
+            try {
+                shareInfo = JSON.parse(decodedData);
             }
-            console.log('공유된 배치 데이터 로드:', shareInfo);
+            catch (e) {
+                throw new Error('공유 데이터 형식이 올바르지 않습니다.');
+            }
+            // 데이터 검증
+            if (!this.validateSharedData(shareInfo)) {
+                throw new Error('공유 데이터 검증에 실패했습니다.');
+            }
             // 학생 정보로부터 배치 복원 (압축된 형식과 이전 형식 모두 지원)
             const studentDataList = shareInfo.s || shareInfo.students || [];
             const gridColumns = shareInfo.l || shareInfo.layout || '';
@@ -6542,18 +7251,22 @@ export class MainController {
             this.students = studentDataList.map((student, index) => {
                 if (Array.isArray(student)) {
                     // 압축된 형식: [이름, 성별]
+                    const name = String(student[0] || '').trim();
+                    const gender = (student[1] === 'F' ? 'F' : 'M');
                     return {
                         id: index + 1,
-                        name: student[0],
-                        gender: (student[1] || 'M')
+                        name: name || `학생${index + 1}`,
+                        gender: gender
                     };
                 }
                 else {
                     // 이전 형식: {name: string, gender: 'M' | 'F'}
+                    const name = String(student.name || '').trim();
+                    const gender = (student.gender === 'F' ? 'F' : 'M');
                     return {
                         id: index + 1,
-                        name: student.name,
-                        gender: (student.gender || 'M')
+                        name: name || `학생${index + 1}`,
+                        gender: gender
                     };
                 }
             });
@@ -6578,11 +7291,11 @@ export class MainController {
             // 미리보기 업데이트
             this.updatePreviewForGenderCounts();
             // 학생 테이블 생성
-            setTimeout(() => {
+            this.setTimeoutSafe(() => {
                 const totalStudents = this.students.length;
                 this.handleCreateStudentTable(totalStudents);
                 // 학생 정보 입력 (이름과 성별)
-                setTimeout(() => {
+                this.setTimeoutSafe(() => {
                     this.students.forEach((student, index) => {
                         const nameInput = document.getElementById(`student-name-${index + 1}`);
                         const genderSelect = document.getElementById(`student-gender-${index + 1}`);
@@ -6594,13 +7307,13 @@ export class MainController {
                         }
                     });
                     // 자리 배치 실행
-                    setTimeout(() => {
+                    this.setTimeoutSafe(() => {
                         const arrangeBtn = document.getElementById('arrange-seats');
                         if (arrangeBtn) {
                             arrangeBtn.click();
                         }
                         // 그리드 컬럼 설정 (레이아웃 복원)
-                        setTimeout(() => {
+                        this.setTimeoutSafe(() => {
                             const seatsArea = document.getElementById('seats-area');
                             if (seatsArea && gridColumns) {
                                 seatsArea.style.gridTemplateColumns = gridColumns;
@@ -6612,11 +7325,13 @@ export class MainController {
             }, 300);
         }
         catch (error) {
-            console.error('공유 데이터 로드 실패:', error);
+            if (this.isDevelopmentMode()) {
+                console.error('공유 데이터 로드 실패:', error);
+            }
             this.outputModule.showError('공유된 자리 배치도를 로드할 수 없습니다.');
             // 실패 시 기본 레이아웃 표시
             this.renderInitialExampleLayout();
-            setTimeout(() => {
+            this.setTimeoutSafe(() => {
                 this.updatePreviewForGenderCounts();
             }, 100);
         }
@@ -6747,29 +7462,18 @@ export class MainController {
         copyButton.className = 'primary-btn';
         copyButton.style.marginRight = '10px';
         copyButton.onclick = async () => {
-            try {
-                // 클립보드 API 사용
-                await navigator.clipboard.writeText(content);
+            const success = await this.copyToClipboard(content);
+            if (success) {
                 const originalText = copyButton.textContent;
                 copyButton.textContent = '✅ 복사됨!';
                 copyButton.style.background = '#28a745';
-                setTimeout(() => {
+                this.setTimeoutSafe(() => {
                     copyButton.textContent = originalText;
                     copyButton.style.background = '';
                 }, 2000);
             }
-            catch (err) {
-                // 클립보드 API 실패 시 대체 방법
-                textarea.select();
-                textarea.setSelectionRange(0, 99999);
-                document.execCommand('copy');
-                const originalText = copyButton.textContent;
-                copyButton.textContent = '✅ 복사됨!';
-                copyButton.style.background = '#28a745';
-                setTimeout(() => {
-                    copyButton.textContent = originalText;
-                    copyButton.style.background = '';
-                }, 2000);
+            else {
+                this.outputModule.showError('클립보드를 복사할 수 없습니다. 브라우저 설정을 확인해주세요.');
             }
         };
         const closeButton = document.createElement('button');
@@ -6784,7 +7488,7 @@ export class MainController {
         modalContent.appendChild(buttonContainer);
         modal.appendChild(modalContent);
         document.body.appendChild(modal);
-        document.addEventListener('keydown', handleKeyDown);
+        this.addEventListenerSafe(document, 'keydown', handleKeyDown);
         // 모달 배경 클릭으로 닫기
         modal.onclick = (e) => {
             if (e.target === modal) {
@@ -6792,7 +7496,7 @@ export class MainController {
             }
         };
         // 텍스트 영역에 포커스하고 전체 선택
-        setTimeout(() => {
+        this.setTimeoutSafe(() => {
             textarea.focus();
             textarea.select();
         }, 100);
@@ -6991,7 +7695,7 @@ export class MainController {
         modalContent.appendChild(buttonContainer);
         modal.appendChild(modalContent);
         document.body.appendChild(modal);
-        document.addEventListener('keydown', handleKeyDown);
+        this.addEventListenerSafe(document, 'keydown', handleKeyDown);
         // 모달 배경 클릭으로 닫기
         modal.onclick = (e) => {
             if (e.target === modal) {
@@ -7021,7 +7725,7 @@ export class MainController {
         curtainOverlay.classList.add('active');
         curtainOverlay.classList.remove('opening');
         // 약간의 지연 후 닫기 애니메이션 시작 (렌더링 보장)
-        setTimeout(() => {
+        this.setTimeoutSafe(() => {
             curtainOverlay.classList.add('closing');
         }, 10);
     }
@@ -7036,7 +7740,7 @@ export class MainController {
         curtainOverlay.classList.remove('closing');
         curtainOverlay.classList.add('opening');
         // 애니메이션 완료 후 오버레이 숨기기
-        setTimeout(() => {
+        this.setTimeoutSafe(() => {
             curtainOverlay.classList.remove('active', 'opening');
         }, 600); // transition 시간과 동일 (0.6s)
     }
@@ -7072,12 +7776,12 @@ export class MainController {
             const x = centerX + offsetX;
             const y = centerY + offsetY;
             // 약간의 지연을 주어 순차적으로 터지게 (간격 단축)
-            setTimeout(() => {
+            this.setTimeoutSafe(() => {
                 this.createFirework(container, x, y);
             }, i * 100);
         }
         // 애니메이션 완료 후 컨테이너 비활성화 (시간 연장)
-        setTimeout(() => {
+        this.setTimeoutSafe(() => {
             container.classList.remove('active');
             container.innerHTML = '';
         }, 3000);
@@ -7159,7 +7863,7 @@ export class MainController {
             }
         }
         // 폭죽 중심 제거 (애니메이션 후)
-        setTimeout(() => {
+        this.setTimeoutSafe(() => {
             if (center.parentNode) {
                 center.remove();
             }
@@ -7195,7 +7899,6 @@ export class MainController {
         }
         catch (error) {
             // Web Audio API가 지원되지 않거나 오류가 발생한 경우 조용히 실패
-            console.log('음향 효과 재생 실패:', error);
         }
     }
 }

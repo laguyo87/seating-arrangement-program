@@ -15,9 +15,13 @@ export declare class MainController {
     private nextSeatId;
     private dragSourceCard;
     private dragOverIndicator;
+    private touchStartCard;
+    private touchStartPosition;
     private isSyncing;
     private layoutHistory;
     private historyIndex;
+    private eventListeners;
+    private timers;
     constructor();
     /**
      * 초기화 시 이력 드롭다운 업데이트
@@ -81,6 +85,10 @@ export declare class MainController {
      */
     private enableSeatSwapDragAndDrop;
     /**
+     * 모바일 터치 드래그&드롭 지원
+     */
+    private enableTouchDragAndDrop;
+    /**
      * 드롭 위치 삽입 인디케이터 표시
      */
     private showInsertIndicator;
@@ -117,6 +125,14 @@ export declare class MainController {
      */
     private updateFixedSeatDropdowns;
     /**
+     * 입력 값 검증 및 수정 (음수, 0, 큰 숫자 처리)
+     */
+    private validateAndFixStudentInput;
+    /**
+     * 분단 수 입력 값 검증 및 수정
+     */
+    private validateAndFixPartitionInput;
+    /**
      * 성별별 학생 수에 따라 미리보기 업데이트
      */
     private updatePreviewForGenderCounts;
@@ -132,6 +148,18 @@ export declare class MainController {
      * 모둠 배치로 카드 렌더링 (그룹으로 묶어서 표시)
      */
     private renderGroupCards;
+    /**
+     * localStorage 사용 가능 여부 확인
+     */
+    private isLocalStorageAvailable;
+    /**
+     * 안전한 localStorage 저장
+     */
+    private safeSetItem;
+    /**
+     * 안전한 localStorage 읽기
+     */
+    private safeGetItem;
     /**
      * 좌석 배치 결과를 localStorage에 저장
      */
@@ -241,6 +269,10 @@ export declare class MainController {
      */
     private parseCsvFile;
     /**
+     * CSV 라인 파싱 (따옴표 처리)
+     */
+    private parseCsvLine;
+    /**
      * 학생 데이터로 테이블 생성
      * @param students 학생 배열
      */
@@ -287,9 +319,52 @@ export declare class MainController {
      */
     run(): void;
     /**
+     * 개발 모드 확인 (로컬호스트 또는 개발 환경)
+     */
+    private isDevelopmentMode;
+    /**
+     * 안전한 클립보드 복사 (브라우저 호환성 개선)
+     */
+    private copyToClipboard;
+    /**
+     * HTML 이스케이프 (XSS 방지)
+     * 향후 사용자 입력이 포함된 HTML 생성 시 사용
+     */
+    private escapeHtml;
+    /**
+     * 안전한 innerHTML 설정 (XSS 방지)
+     * 향후 사용자 입력이 포함된 HTML 생성 시 사용
+     */
+    private setSafeInnerHTML;
+    /**
+     * 안전한 이벤트 리스너 추가 (메모리 누수 방지)
+     * 향후 사용 예정
+     */
+    private addEventListenerSafe;
+    /**
+     * 안전한 setTimeout (메모리 누수 방지)
+     */
+    private setTimeoutSafe;
+    /**
+     * 모든 타이머 정리
+     */
+    private clearAllTimers;
+    /**
+     * 모든 이벤트 리스너 정리
+     */
+    private removeAllEventListeners;
+    /**
+     * 정리 메서드 (컨트롤러 종료 시 호출)
+     */
+    cleanup(): void;
+    /**
      * 좌석 배치하기 처리
      */
     private handleArrangeSeats;
+    /**
+     * 좌석 배치 처리 (내부 메서드)
+     */
+    private processArrangeSeats;
     /**
      * 자리 확정 처리
      */
@@ -350,6 +425,10 @@ export declare class MainController {
      * 뷰어 모드 UI 설정 (사이드바, 헤더 버튼 숨기기)
      */
     private setupViewerModeUI;
+    /**
+     * 공유된 배치 데이터 검증
+     */
+    private validateSharedData;
     /**
      * 공유된 배치 데이터 로드
      */
