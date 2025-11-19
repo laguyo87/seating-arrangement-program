@@ -34,23 +34,50 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Verify build output
+        run: |
+          echo "Checking dist folder..."
+          ls -la dist/ || echo "dist folder is empty or doesn't exist"
+          echo "Build verification complete"
+
       - name: Prepare deployment directory
         run: |
           mkdir -p deploy
-          # dist 폴더의 내용 복사
-          cp -r dist/* deploy/ 2>/dev/null || true
+          # dist 폴더의 내용 복사 (존재하는 경우)
+          if [ -d "dist" ] && [ "$(ls -A dist)" ]; then
+            cp -r dist/* deploy/ || true
+            echo "Copied dist/* to deploy/"
+          else
+            echo "Warning: dist folder is empty or doesn't exist"
+          fi
+          
           # 정적 파일들 복사
-          cp index.html deploy/ 2>/dev/null || true
-          cp style.css deploy/ 2>/dev/null || true
-          cp robots.txt deploy/ 2>/dev/null || true
-          cp sitemap.xml deploy/ 2>/dev/null || true
-          cp favicon.ico deploy/ 2>/dev/null || true
-          cp og-image.png deploy/ 2>/dev/null || true
-          cp browser-compatibility-check.js deploy/ 2>/dev/null || true
-          cp visitor-counter.js deploy/ 2>/dev/null || true
+          [ -f index.html ] && cp index.html deploy/ && echo "Copied index.html" || echo "index.html not found"
+          [ -f style.css ] && cp style.css deploy/ && echo "Copied style.css" || echo "style.css not found"
+          [ -f robots.txt ] && cp robots.txt deploy/ && echo "Copied robots.txt" || echo "robots.txt not found"
+          [ -f sitemap.xml ] && cp sitemap.xml deploy/ && echo "Copied sitemap.xml" || echo "sitemap.xml not found"
+          [ -f favicon.ico ] && cp favicon.ico deploy/ && echo "Copied favicon.ico" || echo "favicon.ico not found"
+          [ -f og-image.png ] && cp og-image.png deploy/ && echo "Copied og-image.png" || echo "og-image.png not found"
+          [ -f browser-compatibility-check.js ] && cp browser-compatibility-check.js deploy/ && echo "Copied browser-compatibility-check.js" || echo "browser-compatibility-check.js not found"
+          [ -f visitor-counter.js ] && cp visitor-counter.js deploy/ && echo "Copied visitor-counter.js" || echo "visitor-counter.js not found"
+          
           # index.html의 경로 수정 (dist/main.js -> main.js)
-          cd deploy
-          sed -i 's|src="dist/main.js"|src="main.js"|g' index.html 2>/dev/null || sed -i '' 's|src="dist/main.js"|src="main.js"|g' index.html 2>/dev/null || true
+          if [ -f deploy/index.html ]; then
+            cd deploy
+            sed -i 's|src="dist/main.js"|src="main.js"|g' index.html 2>/dev/null || sed -i '' 's|src="dist/main.js"|src="main.js"|g' index.html 2>/dev/null || true
+            echo "Updated index.html paths"
+            cd ..
+          fi
+          
+          # deploy 폴더 내용 확인
+          echo "Deploy folder contents:"
+          ls -la deploy/ || echo "deploy folder is empty"
+          
+          # 최소한 index.html이 있는지 확인
+          if [ ! -f deploy/index.html ]; then
+            echo "ERROR: index.html not found in deploy folder!"
+            exit 1
+          fi
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
