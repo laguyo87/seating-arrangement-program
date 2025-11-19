@@ -34,18 +34,31 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Prepare deployment directory
+        run: |
+          mkdir -p deploy
+          # dist 폴더의 내용 복사
+          cp -r dist/* deploy/ 2>/dev/null || true
+          # 정적 파일들 복사
+          cp index.html deploy/ 2>/dev/null || true
+          cp style.css deploy/ 2>/dev/null || true
+          cp robots.txt deploy/ 2>/dev/null || true
+          cp sitemap.xml deploy/ 2>/dev/null || true
+          cp favicon.ico deploy/ 2>/dev/null || true
+          cp og-image.png deploy/ 2>/dev/null || true
+          cp browser-compatibility-check.js deploy/ 2>/dev/null || true
+          cp visitor-counter.js deploy/ 2>/dev/null || true
+          # index.html의 경로 수정 (dist/main.js -> main.js)
+          cd deploy
+          sed -i 's|src="dist/main.js"|src="main.js"|g' index.html 2>/dev/null || sed -i '' 's|src="dist/main.js"|src="main.js"|g' index.html 2>/dev/null || true
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: |
-            .
-            !node_modules
-            !src
-            !.git
-            !.github
+          path: deploy
 
   deploy:
     environment:
