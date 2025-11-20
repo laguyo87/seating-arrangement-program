@@ -193,11 +193,8 @@ body {
 }
 
 .visitor-count {
-    font-size: 0.9em;
-    opacity: 0.9;
-    background: rgba(255, 255, 255, 0.2);
-    padding: 5px 15px;
-    border-radius: 15px;
+    font-size: 0.75em;
+    opacity: 0.8;
     margin: 0;
     white-space: nowrap;
 }

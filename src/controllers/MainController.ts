@@ -37,6 +37,7 @@ export class MainController {
     private isSyncing: boolean = false; // 동기화 중 플래그 (무한 루프 방지)
     private layoutHistory: Array<{type: string, data: any}> = []; // 통합 히스토리 (모든 액션 추적)
     private historyIndex: number = -1; // 현재 히스토리 인덱스
+    private dragDropEnabled: boolean = false; // 드래그&드롭 이벤트 리스너 등록 여부
     
     // 메모리 누수 방지를 위한 추적 변수
     private eventListeners: Array<{element: EventTarget, event: string, handler: EventListener | ((e: Event) => void)}> = [];
@@ -1742,6 +1743,12 @@ export class MainController {
     private enableSeatSwapDragAndDrop(): void {
         const seatsArea = document.getElementById('seats-area');
         if (!seatsArea) return;
+        
+        // 이미 이벤트 리스너가 등록되어 있으면 중복 등록 방지
+        if (this.dragDropEnabled) {
+            return;
+        }
+        this.dragDropEnabled = true;
 
         // dragstart
         this.addEventListenerSafe(seatsArea, 'dragstart', (ev) => {
@@ -1943,7 +1950,14 @@ export class MainController {
             
             const source = this.dragSourceCard;
             this.dragSourceCard = null;
-            if (!source) return;
+            if (!source) {
+                if (this.isDevelopmentMode()) {
+                    console.log('[드래그&드롭] source 카드가 없습니다.');
+                }
+                return;
+            }
+            
+            let hasChanged = false; // 실제로 변경이 있었는지 추적
             
             // 타겟이 카드인지 확인 (더 정확한 감지)
             let targetCard: HTMLElement | null = null;
@@ -1961,16 +1975,37 @@ export class MainController {
             // 카드에 직접 드롭한 경우: 교환
             if (targetCard && targetCard !== source) {
                 // 고정 좌석은 교환 불가
-                if (targetCard.classList.contains('fixed-seat') || source.classList.contains('fixed-seat')) return;
+                if (targetCard.classList.contains('fixed-seat') || source.classList.contains('fixed-seat')) {
+                    if (this.isDevelopmentMode()) {
+                        console.log('[드래그&드롭] 고정 좌석은 교환할 수 없습니다.');
+                    }
+                    return;
+                }
 
                 const srcNameEl = source.querySelector('.student-name') as HTMLElement | null;
                 const tgtNameEl = targetCard.querySelector('.student-name') as HTMLElement | null;
-                if (!srcNameEl || !tgtNameEl) return;
+                if (!srcNameEl || !tgtNameEl) {
+                    if (this.isDevelopmentMode()) {
+                        console.log('[드래그&드롭] 이름 요소를 찾을 수 없습니다.');
+                    }
+                    return;
+                }
 
                 // 이름 스왑
                 const tmpName = srcNameEl.textContent || '';
-                srcNameEl.textContent = tgtNameEl.textContent || '';
-                tgtNameEl.textContent = tmpName;
+                const srcOriginalName = tmpName;
+                const tgtOriginalName = tgtNameEl.textContent || '';
+                
+                // 이름이 같으면 변경 없음
+                if (srcOriginalName === tgtOriginalName) {
+                    if (this.isDevelopmentMode()) {
+                        console.log('[드래그&드롭] 같은 이름이므로 교환하지 않습니다.');
+                    }
+                    return;
+                }
+                
+                srcNameEl.textContent = tgtOriginalName;
+                tgtNameEl.textContent = srcOriginalName;
 
                 // 성별 배경 클래스 스왑
                 const srcIsM = source.classList.contains('gender-m');
@@ -1982,6 +2017,12 @@ export class MainController {
                 source.classList.toggle('gender-f', tgtIsF);
                 targetCard.classList.toggle('gender-m', srcIsM);
                 targetCard.classList.toggle('gender-f', srcIsF);
+                
+                hasChanged = true;
+                
+                if (this.isDevelopmentMode()) {
+                    console.log(`[드래그&드롭] 카드 교환: ${srcOriginalName} <-> ${tgtOriginalName}`);
+                }
             } else {
                 // 빈 공간에 드롭: 이동
                 // 드롭 위치 계산 (마우스 좌표 사용)
@@ -2051,12 +2092,24 @@ export class MainController {
                 } else {
                     seatsArea.appendChild(source);
                 }
+                
+                hasChanged = true;
+                
+                if (this.isDevelopmentMode()) {
+                    console.log('[드래그&드롭] 카드 이동 완료');
+                }
             }
             
-            // 드래그&드롭 완료 후 히스토리 저장 (약간의 지연을 두어 DOM 업데이트 완료 후 저장)
-            this.setTimeoutSafe(() => {
+            // 실제로 변경이 있었을 때만 히스토리 저장
+            if (hasChanged) {
+                // 드래그&드롭 완료 후 즉시 히스토리 저장 (동기적으로 저장하여 되돌리기 가능하도록)
+                // DOM 업데이트는 이미 완료된 상태이므로 즉시 저장 가능
                 this.saveLayoutToHistory();
-            }, 50);
+            } else {
+                if (this.isDevelopmentMode()) {
+                    console.log('[드래그&드롭] 변경사항이 없어 히스토리를 저장하지 않습니다.');
+                }
+            }
         });
         
         // 모바일 터치 이벤트 지원
@@ -2157,10 +2210,8 @@ export class MainController {
                         targetCard.classList.toggle('gender-m', srcIsM);
                         targetCard.classList.toggle('gender-f', srcIsF);
                         
-                        // 히스토리 저장
-                        this.setTimeoutSafe(() => {
-                            this.saveLayoutToHistory();
-                        }, 50);
+                        // 히스토리 저장 (즉시 저장하여 되돌리기 가능하도록)
+                        this.saveLayoutToHistory();
                     }
                 }
             }
@@ -2228,12 +2279,17 @@ export class MainController {
         
         // 새 상태 추가
         this.layoutHistory.push({ type, data });
+        this.historyIndex++;
         
         // 히스토리 크기 제한 (최대 100개)
         if (this.layoutHistory.length > 100) {
             this.layoutHistory.shift();
-        } else {
-            this.historyIndex++;
+            // shift()로 첫 번째 항목을 제거했으므로 인덱스도 감소
+            this.historyIndex--;
+        }
+        
+        if (this.isDevelopmentMode()) {
+            console.log(`[saveToHistory] 타입: ${type}, 인덱스: ${this.historyIndex}, 히스토리 길이: ${this.layoutHistory.length}`);
         }
         
         // 되돌리기 버튼 활성화/비활성화 업데이트
@@ -2250,6 +2306,11 @@ export class MainController {
         // 현재 상태를 HTML 문자열로 저장
         const currentState = seatsArea.innerHTML;
         
+        // 빈 상태는 저장하지 않음
+        if (!currentState || currentState.trim().length === 0) {
+            return;
+        }
+        
         // 학생 데이터도 함께 저장
         const studentData = this.inputModule.getStudentData();
         
@@ -2258,16 +2319,25 @@ export class MainController {
             students: JSON.parse(JSON.stringify(studentData)), // 깊은 복사
             gridTemplateColumns: seatsArea.style.gridTemplateColumns
         });
+        
+        if (this.isDevelopmentMode()) {
+            console.log(`[히스토리 저장] 인덱스: ${this.historyIndex}, 히스토리 길이: ${this.layoutHistory.length}`);
+        }
     }
     
     /**
      * 되돌리기 기능 실행 (모든 액션에 대해 작동)
      */
     private handleUndoLayout(): void {
+        if (this.isDevelopmentMode()) {
+            console.log(`[되돌리기 시도] 현재 인덱스: ${this.historyIndex}, 히스토리 길이: ${this.layoutHistory.length}`);
+        }
         
-        
+        // 되돌리기할 히스토리가 없음 (인덱스가 0 이하면 첫 번째 상태이므로 되돌릴 수 없음)
         if (this.historyIndex <= 0 || this.layoutHistory.length === 0) {
-            // 되돌리기할 히스토리가 없음
+            if (this.isDevelopmentMode()) {
+                console.log('[되돌리기 실패] 히스토리가 없습니다.');
+            }
             this.outputModule.showError('되돌리기할 이전 상태가 없습니다.');
             return;
         }
@@ -2276,15 +2346,40 @@ export class MainController {
         this.historyIndex--;
         const previousState = this.layoutHistory[this.historyIndex];
         
+        if (this.isDevelopmentMode()) {
+            console.log(`[되돌리기] 복원할 인덱스: ${this.historyIndex}, 상태 타입: ${previousState?.type}`);
+        }
         
+        if (!previousState) {
+            if (this.isDevelopmentMode()) {
+                console.log('[되돌리기 실패] 이전 상태를 찾을 수 없습니다.');
+            }
+            this.outputModule.showError('이전 상태를 찾을 수 없습니다.');
+            this.historyIndex++; // 인덱스 복원
+            return;
+        }
         
         // 상태 타입에 따라 복원
-        if (previousState && previousState.type === 'layout') {
+        if (previousState.type === 'layout') {
             const seatsArea = document.getElementById('seats-area');
             if (seatsArea && previousState.data) {
+                if (this.isDevelopmentMode()) {
+                    console.log('[되돌리기] 레이아웃 복원 시작');
+                }
+                
+                // 드래그&드롭 플래그 초기화 (innerHTML로 복원하면 DOM이 새로 생성되므로)
+                this.dragDropEnabled = false;
+                
                 // HTML 복원
                 if (previousState.data.seatsAreaHTML) {
                     seatsArea.innerHTML = previousState.data.seatsAreaHTML;
+                    if (this.isDevelopmentMode()) {
+                        console.log('[되돌리기] HTML 복원 완료');
+                    }
+                } else {
+                    if (this.isDevelopmentMode()) {
+                        console.warn('[되돌리기] 저장된 HTML이 없습니다.');
+                    }
                 }
                 
                 // 그리드 설정 복원
@@ -2293,31 +2388,52 @@ export class MainController {
                 }
                 
                 // 학생 데이터 복원
-                if (previousState.data.students) {
-                    // 학생 데이터 복원은 나중에 구현
-                    
+                if (previousState.data.students && Array.isArray(previousState.data.students)) {
+                    try {
+                        this.inputModule.setStudentData(previousState.data.students);
+                        if (this.isDevelopmentMode()) {
+                            console.log('[되돌리기] 학생 데이터 복원 완료');
+                        }
+                    } catch (error) {
+                        if (this.isDevelopmentMode()) {
+                            console.error('학생 데이터 복원 실패:', error);
+                        }
+                    }
                 }
                 
                 // 드래그&드롭 기능 다시 활성화 (복원된 카드에 대해)
+                // DOM이 새로 생성되었으므로 이벤트 리스너를 다시 등록해야 함
                 this.enableSeatSwapDragAndDrop();
+                
+                if (this.isDevelopmentMode()) {
+                    console.log('[되돌리기] 복원 완료');
+                }
+            } else {
+                if (this.isDevelopmentMode()) {
+                    console.warn('[되돌리기] seatsArea를 찾을 수 없거나 데이터가 없습니다.');
+                }
             }
-        } else if (previousState && previousState.type === 'student-input') {
+        } else if (previousState.type === 'student-input') {
             // 학생 입력 상태 복원
             if (previousState.data && previousState.data.students) {
-                this.inputModule.setStudentData(previousState.data.students);
+                try {
+                    this.inputModule.setStudentData(previousState.data.students);
+                } catch (error) {
+                    if (this.isDevelopmentMode()) {
+                        console.error('학생 입력 상태 복원 실패:', error);
+                    }
+                }
             }
-        } else if (previousState && previousState.type === 'options') {
+        } else if (previousState.type === 'options') {
             // 옵션 설정 복원
             if (previousState.data && previousState.data.options) {
                 // 옵션 복원 로직 (필요시 구현)
-                
+                // 현재는 옵션 복원이 필요하지 않을 수 있음
             }
         }
         
         // 되돌리기 버튼 상태 업데이트
         this.updateUndoButtonState();
-        
-        
     }
     
     /**
@@ -2327,8 +2443,8 @@ export class MainController {
         const undoButton = document.getElementById('undo-layout') as HTMLButtonElement;
         if (!undoButton) return;
         
-        // 히스토리가 있고 이전 상태가 있으면 활성화
-        if (this.historyIndex >= 0 && this.layoutHistory.length > 0) {
+        // 히스토리가 있고 이전 상태가 있으면 활성화 (인덱스가 0보다 커야 이전 상태로 되돌릴 수 있음)
+        if (this.historyIndex > 0 && this.layoutHistory.length > 0) {
             undoButton.disabled = false;
             undoButton.style.opacity = '1';
             undoButton.style.cursor = 'pointer';
@@ -2345,6 +2461,7 @@ export class MainController {
     private resetHistory(): void {
         this.layoutHistory = [];
         this.historyIndex = -1;
+        this.dragDropEnabled = false; // 드래그&드롭 플래그도 초기화
         this.updateUndoButtonState();
     }
 
