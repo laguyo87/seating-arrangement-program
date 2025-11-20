@@ -26,6 +26,7 @@ export class MainController {
         this.isSyncing = false; // 동기화 중 플래그 (무한 루프 방지)
         this.layoutHistory = []; // 통합 히스토리 (모든 액션 추적)
         this.historyIndex = -1; // 현재 히스토리 인덱스
+        this.isArrangingSeats = false; // 자리 배치 중 플래그 (재귀 호출 방지)
         /**
          * 좌석 카드 클릭 이벤트 핸들러
          */
@@ -4462,6 +4463,12 @@ export class MainController {
      * 좌석 배치하기 처리
      */
     handleArrangeSeats() {
+        // 재귀 호출 방지
+        if (this.isArrangingSeats) {
+            console.log('[handleArrangeSeats] 이미 자리 배치 중입니다. 중복 호출 무시.');
+            return;
+        }
+        this.isArrangingSeats = true;
         // 3초 동안 지속하는 음향 효과 재생
         this.playArrangementSound();
         try {
@@ -4499,13 +4506,32 @@ export class MainController {
             console.log('남학생 수:', maleStudents.length, '여학생 수:', femaleStudents.length);
             // 기존 카드들에서 이름만 변경 (카드 위치는 고정)
             const seatsArea = document.getElementById('seats-area');
-            if (!seatsArea)
+            if (!seatsArea) {
+                console.error('[handleArrangeSeats] seats-area 요소를 찾을 수 없습니다.');
+                alert('좌석 배치 영역을 찾을 수 없습니다. 페이지를 새로고침해주세요.');
+                this.stopCurtainAnimation();
                 return;
+            }
             // 기존 카드들 가져오기 (분단 레이블 제외)
             const existingCards = seatsArea.querySelectorAll('.student-seat-card');
             console.log('기존 카드 수:', existingCards.length);
             if (existingCards.length === 0) {
-                alert('먼저 좌석 배치 형태를 설정해주세요.');
+                // 카드가 없으면 미리보기를 먼저 생성
+                console.log('[handleArrangeSeats] 카드가 없어서 미리보기 생성 시도');
+                this.updatePreviewForGenderCounts();
+                // 미리보기 생성 후 다시 확인
+                setTimeout(() => {
+                    const retryCards = seatsArea.querySelectorAll('.student-seat-card');
+                    if (retryCards.length === 0) {
+                        alert('먼저 좌석 배치 형태를 설정하고 학생 정보를 입력해주세요.');
+                        this.stopCurtainAnimation();
+                        return;
+                    }
+                    // 재시도: 카드가 생성되었으면 다시 실행
+                    // 플래그를 해제한 후 재시도
+                    this.isArrangingSeats = false;
+                    this.handleArrangeSeats();
+                }, 100);
                 return;
             }
             // 옵션 체크박스 값 읽기
@@ -4996,6 +5022,11 @@ export class MainController {
         catch (error) {
             console.error('좌석 배치 중 오류:', error);
             this.outputModule.showError('좌석 배치 중 오류가 발생했습니다.');
+        }
+        finally {
+            // 플래그 해제 및 커튼 애니메이션 정지
+            this.isArrangingSeats = false;
+            this.stopCurtainAnimation();
         }
     }
     /**
