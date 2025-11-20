@@ -126,7 +126,7 @@ export class LayoutSelectorModule {
     private handleLayoutTypeSelect(layoutType: LayoutType): void {
         // 현재 선택과 충돌하는지 체크
         if (!this.isLayoutCompatible(layoutType)) {
-            this.showErrorMessage(this.getConflictMessage(layoutType));
+            alert(this.getConflictMessage(layoutType));
             return;
         }
         
@@ -155,7 +155,7 @@ export class LayoutSelectorModule {
         
         // 2열 좌석에서만 가능
         if (enabled && this.currentSeatType !== SeatType.PAIR) {
-            this.showErrorMessage('남녀 짝꿍 배치는 2열 좌석 배치에서만 선택할 수 있습니다.');
+            alert('남녀 짝꿍 배치는 2열 좌석 배치에서만 선택할 수 있습니다.');
             this.genderPairingEnabled = false;
             const checkbox = document.getElementById('gender-pairing') as HTMLInputElement;
             if (checkbox) {
@@ -268,48 +268,6 @@ export class LayoutSelectorModule {
         if (genderPairingCheckbox) {
             genderPairingCheckbox.checked = false;
         }
-    }
-
-    /**
-     * 에러 메시지를 DOM에 표시합니다.
-     * @param message 에러 메시지
-     */
-    private showErrorMessage(message: string): void {
-        // 기존 메시지 제거
-        const existingMessage = document.querySelector('.layout-selector-error-message');
-        if (existingMessage) {
-            existingMessage.remove();
-        }
-
-        // 새 메시지 생성
-        const messageElement = document.createElement('div');
-        messageElement.className = 'layout-selector-error-message';
-        messageElement.textContent = message;
-        messageElement.setAttribute('role', 'alert');
-        messageElement.setAttribute('aria-live', 'assertive');
-        messageElement.style.cssText = `
-            background: #f8d7da;
-            color: #721c24;
-            padding: 12px 16px;
-            margin: 10px 0;
-            border-radius: 5px;
-            border: 1px solid #f5c6cb;
-            font-weight: 500;
-            font-size: 0.95em;
-        `;
-        
-        // 컨테이너에 메시지 추가
-        this.container.insertBefore(messageElement, this.container.firstChild);
-        
-        // 클릭으로 제거 가능
-        messageElement.onclick = () => messageElement.remove();
-        
-        // 5초 후 자동 제거
-        setTimeout(() => {
-            if (messageElement.parentNode) {
-                messageElement.remove();
-            }
-        }, 5000);
     }
 }
 

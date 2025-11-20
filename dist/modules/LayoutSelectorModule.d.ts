@@ -80,10 +80,5 @@ export declare class LayoutSelectorModule {
      * 선택을 초기화합니다.
      */
     reset(): void;
-    /**
-     * 에러 메시지를 DOM에 표시합니다.
-     * @param message 에러 메시지
-     */
-    private showErrorMessage;
 }
 //# sourceMappingURL=LayoutSelectorModule.d.ts.map

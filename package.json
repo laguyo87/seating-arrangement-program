@@ -9,10 +9,7 @@
     "dev": "vite",
     "preview": "vite preview",
     "start": "python3 -m http.server 8000",
-    "generate:og-image": "node generate-og-image.js",
-    "test": "vitest",
-    "test:ui": "vitest --ui",
-    "test:coverage": "vitest --coverage"
+    "generate:og-image": "node generate-og-image.js"
   },
   "keywords": [
     "seating",
@@ -24,11 +21,7 @@
   "devDependencies": {
     "@types/html2canvas": "^0.5.35",
     "@types/node": "^20.0.0",
-    "typescript": "^5.0.0",
-    "vitest": "^1.0.0",
-    "@vitest/ui": "^1.0.0",
-    "@vitest/coverage-v8": "^1.0.0",
-    "jsdom": "^23.0.0"
+    "typescript": "^5.0.0"
   },
   "dependencies": {
     "canvas": "^3.2.0",
