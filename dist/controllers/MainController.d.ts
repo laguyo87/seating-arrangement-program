@@ -11,13 +11,12 @@ export declare class MainController {
     private students;
     private seats;
     private isInitialized;
-    private fixedSeatIds;
     private nextSeatId;
-    private dragSourceCard;
-    private dragOverIndicator;
     private isSyncing;
-    private layoutHistory;
-    private historyIndex;
+    private historyManager;
+    private fixedSeatManager;
+    private dragDropManager;
+    private dragOverIndicator;
     constructor();
     /**
      * 초기화 시 이력 드롭다운 업데이트
@@ -77,9 +76,17 @@ export declare class MainController {
      */
     private createStudentCard;
     /**
+     * 드래그&드롭 핸들러
+     */
+    private handleDragDrop;
+    /**
      * 좌석 카드 드래그&드롭 스왑 기능 활성화 (이벤트 위임)
      */
     private enableSeatSwapDragAndDrop;
+    /**
+     * 기존 드래그&드롭 메서드 (레거시 - 제거 예정, 더 이상 사용 안 함)
+     */
+    private enableSeatSwapDragAndDropOld;
     /**
      * 드롭 위치 삽입 인디케이터 표시
      */

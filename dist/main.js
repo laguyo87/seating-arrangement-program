@@ -13,6 +13,9 @@
  * 6. 자리 배치를 생성합니다.
  */
 import { MainController } from './controllers/MainController.js';
+import { logger } from './utils/logger.js';
+import { ErrorHandler } from './utils/errorHandler.js';
+import { ErrorCode } from './types/errors.js';
 /**
  * 프로그램 초기화 및 실행
  */
@@ -36,8 +39,8 @@ function startApplication() {
         controller.run();
     }
     catch (error) {
-        console.error('프로그램 시작 중 오류 발생:', error);
-        alert('프로그램을 시작할 수 없습니다. 콘솔을 확인해주세요.');
+        const userMessage = ErrorHandler.safeHandle(error, ErrorCode.INITIALIZATION_FAILED);
+        alert(userMessage);
     }
 }
 // 프로그램 시작
@@ -48,7 +51,7 @@ window.addEventListener('error', (event) => {
     if (event.filename && (event.filename.includes('content.js') || event.filename.includes('extension'))) {
         return;
     }
-    console.error('전역 오류 발생:', event.error);
+    logger.error('전역 오류 발생:', event.error);
 });
 window.addEventListener('unhandledrejection', (event) => {
     // 메시지 포트 관련 에러는 브라우저 확장 프로그램에서 발생하는 것으로 무시
@@ -57,7 +60,7 @@ window.addEventListener('unhandledrejection', (event) => {
         event.preventDefault(); // 기본 에러 처리 방지
         return;
     }
-    console.error('처리되지 않은 Promise 거부:', event.reason);
+    logger.error('처리되지 않은 Promise 거부:', event.reason);
     event.preventDefault(); // 에러가 콘솔에 표시되지 않도록
 });
 //# sourceMappingURL=main.js.map

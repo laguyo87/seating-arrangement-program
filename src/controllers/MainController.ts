@@ -538,7 +538,7 @@ export class MainController {
                     value = 0;
                 } else if (value > 40) {
                     value = 40;
-                    this.outputModule.showError('남학생 수는 0~40명까지만 입력 가능합니다.');
+                    alert('0~40까지만 입력 가능합니다.');
                 }
                 
                 if (parseInt(input.value || '0', 10) !== value) {
@@ -563,7 +563,7 @@ export class MainController {
                 } else if (value > 40) {
                     value = 40;
                     maleCountInput.value = '40';
-                    this.outputModule.showError('남학생 수는 0~40명까지만 입력 가능합니다.');
+                    alert('0~40까지만 입력 가능합니다.');
                 }
                 this.updatePreviewForGenderCounts();
             });
@@ -600,7 +600,7 @@ export class MainController {
                     value = 0;
                 } else if (value > 40) {
                     value = 40;
-                    this.outputModule.showError('여학생 수는 0~40명까지만 입력 가능합니다.');
+                    alert('0~40까지만 입력 가능합니다.');
                 }
                 
                 if (parseInt(input.value || '0', 10) !== value) {
@@ -619,7 +619,7 @@ export class MainController {
                 } else if (value > 40) {
                     value = 40;
                     femaleCountInput.value = '40';
-                    this.outputModule.showError('여학생 수는 0~40명까지만 입력 가능합니다.');
+                    alert('0~40까지만 입력 가능합니다.');
                 }
                 this.updatePreviewForGenderCounts();
             });
