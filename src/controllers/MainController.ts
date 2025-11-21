@@ -35,7 +35,6 @@ export class MainController {
     private isSyncing: boolean = false; // 동기화 중 플래그 (무한 루프 방지)
     private layoutHistory: Array<{type: string, data: any}> = []; // 통합 히스토리 (모든 액션 추적)
     private historyIndex: number = -1; // 현재 히스토리 인덱스
-    private isArrangingSeats: boolean = false; // 자리 배치 중 플래그 (재귀 호출 방지)
 
     constructor() {
         try {
@@ -5039,21 +5038,14 @@ export class MainController {
      * 좌석 배치하기 처리
      */
     private handleArrangeSeats(): void {
-        // 재귀 호출 방지
-        if (this.isArrangingSeats) {
-            console.log('[handleArrangeSeats] 이미 자리 배치 중입니다. 중복 호출 무시.');
-            return;
-        }
-        
-        this.isArrangingSeats = true;
-        
         // 3초 동안 지속하는 음향 효과 재생
         this.playArrangementSound();
         
+        // 커튼 애니메이션 즉시 시작 (try 블록 밖에서)
+        console.log('🚀 handleArrangeSeats 시작 - 커튼 애니메이션 호출');
+        this.startCurtainAnimation();
+        
         try {
-            // 커튼 애니메이션 시작
-            this.startCurtainAnimation();
-            
             // 테이블에서 학생 데이터 가져오기
             const studentData = this.inputModule.getStudentData();
             
@@ -5095,8 +5087,6 @@ export class MainController {
             // 기존 카드들에서 이름만 변경 (카드 위치는 고정)
             const seatsArea = document.getElementById('seats-area');
             if (!seatsArea) {
-                console.error('[handleArrangeSeats] seats-area 요소를 찾을 수 없습니다.');
-                alert('좌석 배치 영역을 찾을 수 없습니다. 페이지를 새로고침해주세요.');
                 this.stopCurtainAnimation();
                 return;
             }
@@ -5107,23 +5097,8 @@ export class MainController {
             console.log('기존 카드 수:', existingCards.length);
             
             if (existingCards.length === 0) {
-                // 카드가 없으면 미리보기를 먼저 생성
-                console.log('[handleArrangeSeats] 카드가 없어서 미리보기 생성 시도');
-                this.updatePreviewForGenderCounts();
-                
-                // 미리보기 생성 후 다시 확인
-                setTimeout(() => {
-                    const retryCards = seatsArea.querySelectorAll('.student-seat-card');
-                    if (retryCards.length === 0) {
-                        alert('먼저 좌석 배치 형태를 설정하고 학생 정보를 입력해주세요.');
-                        this.stopCurtainAnimation();
-                        return;
-                    }
-                    // 재시도: 카드가 생성되었으면 다시 실행
-                    // 플래그를 해제한 후 재시도
-                    this.isArrangingSeats = false;
-                    this.handleArrangeSeats();
-                }, 100);
+                alert('먼저 좌석 배치 형태를 설정해주세요.');
+                this.stopCurtainAnimation();
                 return;
             }
             
@@ -5567,9 +5542,6 @@ export class MainController {
         } catch (error) {
             console.error('좌석 배치 중 오류:', error);
             this.outputModule.showError('좌석 배치 중 오류가 발생했습니다.');
-        } finally {
-            // 플래그 해제 및 커튼 애니메이션 정지
-            this.isArrangingSeats = false;
             this.stopCurtainAnimation();
         }
     }
@@ -7783,17 +7755,72 @@ export class MainController {
      * 커튼 애니메이션 시작 (닫기)
      */
     private startCurtainAnimation(): void {
+        console.log('🎭 === 커튼 애니메이션 시작 ===');
         const curtainOverlay = document.getElementById('curtain-overlay');
-        if (!curtainOverlay) return;
-
-        // 커튼 오버레이 활성화
-        curtainOverlay.classList.add('active');
-        curtainOverlay.classList.remove('opening');
         
-        // 약간의 지연 후 닫기 애니메이션 시작 (렌더링 보장)
+        if (!curtainOverlay) {
+            console.error('❌ 커튼 오버레이 요소를 찾을 수 없습니다!');
+            const mainContent = document.querySelector('.main-content');
+            console.log('main-content:', mainContent);
+            if (mainContent) {
+                const children = Array.from(mainContent.children);
+                console.log('main-content 자식들:', children.map(el => ({
+                    id: el.id,
+                    className: el.className,
+                    tagName: el.tagName
+                })));
+            }
+            // 요소를 찾지 못해도 계속 진행 (폭죽은 작동하므로)
+            return;
+        }
+
+        console.log('✅ 커튼 오버레이 요소 찾음');
+        
+        // 기존 클래스 모두 제거
+        curtainOverlay.classList.remove('opening', 'closing', 'active');
+        
+        // 커튼을 화면 밖에서 시작하도록 초기화
+        const left = curtainOverlay.querySelector('.curtain-left') as HTMLElement;
+        const right = curtainOverlay.querySelector('.curtain-right') as HTMLElement;
+        if (left) {
+            left.style.transform = 'translateX(-100%)';
+            console.log('✅ 왼쪽 커튼 초기화');
+        }
+        if (right) {
+            right.style.transform = 'translateX(100%)';
+            console.log('✅ 오른쪽 커튼 초기화');
+        }
+        
+        // 커튼 오버레이 활성화 (폭죽과 동일한 방식)
+        curtainOverlay.classList.add('active');
+        console.log('✅ active 클래스 추가됨');
+        
+        // 즉시 스타일 확인
+        const computedStyle = window.getComputedStyle(curtainOverlay);
+        console.log('📊 커튼 스타일:', {
+            display: computedStyle.display,
+            zIndex: computedStyle.zIndex,
+            opacity: computedStyle.opacity,
+            visibility: computedStyle.visibility,
+            width: computedStyle.width,
+            height: computedStyle.height
+        });
+        
+        // 약간의 지연 후 닫기 애니메이션 시작
         setTimeout(() => {
             curtainOverlay.classList.add('closing');
-        }, 10);
+            console.log('✅ closing 클래스 추가됨 - 커튼이 닫히기 시작합니다!');
+            
+            // 애니메이션 시작 후 스타일 재확인
+            setTimeout(() => {
+                const leftStyle = window.getComputedStyle(left);
+                const rightStyle = window.getComputedStyle(right);
+                console.log('📊 커튼 transform:', {
+                    left: leftStyle.transform,
+                    right: rightStyle.transform
+                });
+            }, 100);
+        }, 100);
     }
 
     /**
@@ -7801,7 +7828,12 @@ export class MainController {
      */
     private openCurtain(): void {
         const curtainOverlay = document.getElementById('curtain-overlay');
-        if (!curtainOverlay) return;
+        if (!curtainOverlay) {
+            console.warn('커튼 오버레이 요소를 찾을 수 없습니다.');
+            return;
+        }
+
+        console.log('커튼 열기 애니메이션 시작');
 
         // 열기 애니메이션 시작
         curtainOverlay.classList.remove('closing');
@@ -7810,6 +7842,7 @@ export class MainController {
         // 애니메이션 완료 후 오버레이 숨기기
         setTimeout(() => {
             curtainOverlay.classList.remove('active', 'opening');
+            console.log('커튼 애니메이션 완료');
         }, 600); // transition 시간과 동일 (0.6s)
     }
 
@@ -7818,8 +7851,12 @@ export class MainController {
      */
     private stopCurtainAnimation(): void {
         const curtainOverlay = document.getElementById('curtain-overlay');
-        if (!curtainOverlay) return;
+        if (!curtainOverlay) {
+            console.warn('커튼 오버레이 요소를 찾을 수 없습니다.');
+            return;
+        }
 
+        console.log('커튼 애니메이션 중지');
         curtainOverlay.classList.remove('active', 'closing', 'opening');
     }
 

@@ -18,7 +18,6 @@ export declare class MainController {
     private isSyncing;
     private layoutHistory;
     private historyIndex;
-    private isArrangingSeats;
     constructor();
     /**
      * 초기화 시 이력 드롭다운 업데이트
