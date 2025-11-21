@@ -25,32 +25,54 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <!-- 스킵 링크 (접근성) -->
+    <a href="#main-content" class="skip-link">메인 콘텐츠로 건너뛰기</a>
+    <!-- 스크린 리더용 상태 알림 영역 -->
+    <div id="aria-live-region" aria-live="polite" aria-atomic="true" class="sr-only"></div>
+    <!-- 히스토리 타임라인 모달 -->
+    <div id="history-timeline-modal" class="history-timeline-modal" style="display: none;">
+        <div class="history-timeline-content">
+            <div class="history-timeline-header">
+                <h3>히스토리 타임라인</h3>
+                <button id="history-timeline-close" class="history-timeline-close" aria-label="닫기">×</button>
+            </div>
+            <div id="history-timeline-list" class="history-timeline-list">
+                <!-- 히스토리 항목들이 여기에 동적으로 추가됩니다 -->
+            </div>
+        </div>
+    </div>
     <!-- 상단 헤더 -->
-    <header class="top-header">
+    <header class="top-header" role="banner">
         <div class="header-content">
             <h1><span class="title-icon">🪑</span>교실 자리 배치 프로그램 <small style="font-size: 0.6em;">online</small></h1>
             <div class="header-info">
-                <button id="undo-layout" class="icon-btn" title="되돌리기 (Ctrl+Z / Cmd+Z)">↶</button>
-                <div class="history-dropdown" id="history-dropdown">
-                    <button class="history-dropdown-btn" id="history-dropdown-btn">📋 확정된 자리 이력</button>
-                    <div class="history-dropdown-content" id="history-dropdown-content">
+                <div class="history-controls" style="display: flex; align-items: center; gap: 5px;">
+                    <button id="undo-layout" class="icon-btn" title="되돌리기 (Ctrl+Z / Cmd+Z)" aria-label="되돌리기 (Ctrl+Z / Cmd+Z)">↶</button>
+                    <button id="redo-layout" class="icon-btn" title="다시 실행하기 (Ctrl+Y / Cmd+Y)" aria-label="다시 실행하기 (Ctrl+Y / Cmd+Y)">↷</button>
+                    <button id="history-timeline-btn" class="icon-btn" title="히스토리 타임라인" aria-label="히스토리 타임라인">📊</button>
+                </div>
+                <div class="history-dropdown" id="history-dropdown" role="menu">
+                    <button class="history-dropdown-btn" id="history-dropdown-btn" aria-label="확정된 자리 이력" aria-haspopup="true" aria-expanded="false">📋 확정된 자리 이력</button>
+                    <div class="history-dropdown-content" id="history-dropdown-content" role="menu">
                         <div class="history-empty" id="history-empty">확정된 자리 이력이 없습니다.</div>
                     </div>
                 </div>
-                <button id="user-manual-btn" class="user-manual-btn" title="사용설명서">📖 사용설명서</button>
-                <p class="visitor-count" id="visitor-count">총 방문자 수: <span id="visitor-number">-</span></p>
+                <button id="user-manual-btn" class="user-manual-btn" title="사용설명서" aria-label="사용설명서">📖 사용설명서</button>
+                <p class="visitor-count" id="visitor-count" aria-live="polite">총 방문자 수: <span id="visitor-number">-</span></p>
             </div>
         </div>
     </header>
 
     <!-- 메인 컨테이너 -->
     <div class="main-container">
+        <!-- 사이드바 오버레이 (모바일용) -->
+        <div id="sidebar-overlay" class="sidebar-overlay"></div>
         <!-- 사이드바 토글 버튼 -->
         <button id="sidebar-toggle-btn" class="sidebar-toggle-btn" title="사이드바 접기/펼치기">
             <span class="toggle-icon">◀</span>
         </button>
         <!-- 좌측 사이드바 (설정) -->
-        <aside class="sidebar" id="sidebar">
+        <aside class="sidebar" id="sidebar" role="complementary" aria-label="설정 패널">
             <div class="sidebar-content">
             <!-- 옵션1: 좌석 배치 형태 -->
             <section id="layout-section" class="step-section">
@@ -151,18 +173,24 @@
                 <h2>옵션2: 학생 자리 수</h2>
                 
                 <div class="form-group" style="display: flex; align-items: center; gap: 10px; flex-wrap: nowrap;">
-                    <div style="display: flex; align-items: center; gap: 5px;">
+                    <div style="display: flex; align-items: center; gap: 5px; position: relative;">
                         <label for="male-students" style="white-space: nowrap; font-size: 0.95em;">남학생:</label>
-                        <input type="number" id="male-students" min="0" max="40" placeholder="0" value="12" style="width: 60px; padding: 6px 8px;" />
+                        <input type="number" id="male-students" min="0" max="40" placeholder="0" value="12" 
+                               aria-label="남학생 수" aria-describedby="male-students-help" 
+                               aria-required="false" style="width: 60px; padding: 6px 8px;" />
+                        <span id="male-students-help" class="sr-only">0부터 40까지의 숫자를 입력하세요</span>
                     </div>
                     
-                    <div style="display: flex; align-items: center; gap: 5px;">
+                    <div style="display: flex; align-items: center; gap: 5px; position: relative;">
                         <label for="female-students" style="white-space: nowrap; font-size: 0.95em;">여학생:</label>
-                        <input type="number" id="female-students" min="0" max="40" placeholder="0" value="12" style="width: 60px; padding: 6px 8px;" />
+                        <input type="number" id="female-students" min="0" max="40" placeholder="0" value="12" 
+                               aria-label="여학생 수" aria-describedby="female-students-help" 
+                               aria-required="false" style="width: 60px; padding: 6px 8px;" />
+                        <span id="female-students-help" class="sr-only">0부터 40까지의 숫자를 입력하세요</span>
                     </div>
                 </div>
                 
-                <p class="help-text" style="margin-top: 8px; color: #666; font-size: 0.9em;">
+                <p class="help-text" id="gender-count-help" style="margin-top: 8px; color: #666; font-size: 0.9em;">
                     남학생 수와 여학생 수를 입력하면 우측에 미리보기가 자동으로 표시됩니다.
                 </p>
             </section>
@@ -175,10 +203,12 @@
                     <div style="display: flex; align-items: center; gap: 10px; flex-wrap: nowrap;">
                         <label for="number-of-partitions" style="margin-bottom: 0; white-space: nowrap; font-size: 0.95em;">분단 수:</label>
                         <div class="count-input-container" style="flex: 0 0 auto;">
-                            <input type="number" id="number-of-partitions" min="1" max="10" placeholder="분단 수" value="5" style="width: 80px;" />
+                            <input type="number" id="number-of-partitions" min="1" max="10" placeholder="분단 수" value="5" 
+                                   aria-label="분단 수" aria-describedby="partitions-help" 
+                                   aria-required="true" style="width: 80px;" />
                         </div>
                     </div>
-                    <p class="help-text" style="margin-top: 8px; color: #666; font-size: 0.9em;">
+                    <p class="help-text" id="partitions-help" style="margin-top: 8px; color: #666; font-size: 0.9em;">
                         교실의 분단 수를 입력하세요 (예: 2분단, 3분단 등)
                     </p>
                 </div>

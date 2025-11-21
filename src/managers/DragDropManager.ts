@@ -11,6 +11,12 @@ export class DragDropManager {
     private seatsArea: HTMLElement | null = null;
     private onDropCallback?: OnDropCallback;
     private isFixedSeat?: (seatId: number) => boolean;
+    
+    // 터치 이벤트 관련
+    private touchStartX: number = 0;
+    private touchStartY: number = 0;
+    private touchCurrentCard: HTMLElement | null = null;
+    private isDragging: boolean = false;
 
     constructor(seatsAreaId: string, onDrop?: OnDropCallback, isFixedSeat?: (seatId: number) => boolean) {
         this.seatsArea = document.getElementById(seatsAreaId);
@@ -157,6 +163,169 @@ export class DragDropManager {
             // 콜백 호출
             this.onDropCallback(source, targetCard, insertPosition);
         });
+        
+        // 터치 이벤트 지원 (모바일)
+        this.setupTouchEvents();
+    }
+    
+    /**
+     * 터치 이벤트 설정 (모바일 드래그 앤 드롭)
+     */
+    private setupTouchEvents(): void {
+        if (!this.seatsArea) return;
+        
+        // touchstart
+        this.seatsArea.addEventListener('touchstart', (e) => {
+            const touch = e.touches[0];
+            if (!touch) return;
+            
+            const target = (e.target as HTMLElement)?.closest('.student-seat-card') as HTMLElement | null;
+            if (!target) return;
+            
+            // 자리 배치가 완료되었는지 확인
+            const actionButtons = document.getElementById('layout-action-buttons');
+            const isLayoutComplete = actionButtons && actionButtons.style.display !== 'none';
+            
+            // 배치가 완료되지 않은 상태에서 고정 좌석 모드가 활성화되어 있으면 터치 비활성화
+            if (!isLayoutComplete) {
+                const fixedRandomMode = document.querySelector('input[name="custom-mode-2"][value="fixed-random"]:checked') as HTMLInputElement;
+                if (fixedRandomMode) {
+                    return;
+                }
+            }
+            
+            // 고정 좌석은 드래그 불가
+            if (target.classList.contains('fixed-seat')) {
+                return;
+            }
+            
+            this.touchStartX = touch.clientX;
+            this.touchStartY = touch.clientY;
+            this.touchCurrentCard = target;
+            this.isDragging = false;
+            
+            // 카드에 시각적 피드백
+            target.style.opacity = '0.7';
+            target.style.transform = 'scale(0.95)';
+        }, { passive: true });
+        
+        // touchmove
+        this.seatsArea.addEventListener('touchmove', (e) => {
+            if (!this.touchCurrentCard) return;
+            
+            const touch = e.touches[0];
+            if (!touch) return;
+            
+            const deltaX = Math.abs(touch.clientX - this.touchStartX);
+            const deltaY = Math.abs(touch.clientY - this.touchStartY);
+            
+            // 최소 이동 거리 확인 (10px)
+            if (deltaX > 10 || deltaY > 10) {
+                if (!this.isDragging) {
+                    this.isDragging = true;
+                    e.preventDefault(); // 스크롤 방지
+                    
+                    // 카드를 따라다니도록
+                    this.touchCurrentCard.style.position = 'fixed';
+                    this.touchCurrentCard.style.zIndex = '10000';
+                    this.touchCurrentCard.style.pointerEvents = 'none';
+                }
+                
+                // 카드 위치 업데이트
+                if (this.touchCurrentCard) {
+                    this.touchCurrentCard.style.left = `${touch.clientX - 50}px`;
+                    this.touchCurrentCard.style.top = `${touch.clientY - 50}px`;
+                }
+                
+                // 드래그 오버 상태 업데이트
+                const elementBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+                if (elementBelow) {
+                    const targetCard = (elementBelow as HTMLElement)?.closest('.student-seat-card') as HTMLElement | null;
+                    if (targetCard && targetCard !== this.touchCurrentCard) {
+                        this.updateDragOverStateForTouch(targetCard);
+                    } else {
+                        this.cleanupDragState();
+                    }
+                }
+            }
+        }, { passive: false });
+        
+        // touchend
+        this.seatsArea.addEventListener('touchend', (e) => {
+            if (!this.touchCurrentCard) return;
+            
+            const touch = e.changedTouches[0];
+            if (!touch) return;
+            
+            if (this.isDragging) {
+                // 드롭 처리
+                const elementBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+                let targetCard: HTMLElement | null = null;
+                
+                if (elementBelow) {
+                    const card = (elementBelow as HTMLElement)?.closest('.student-seat-card') as HTMLElement | null;
+                    if (card && card !== this.touchCurrentCard) {
+                        targetCard = card;
+                    }
+                }
+                
+                // 카드 스타일 복원
+                this.touchCurrentCard.style.position = '';
+                this.touchCurrentCard.style.zIndex = '';
+                this.touchCurrentCard.style.opacity = '';
+                this.touchCurrentCard.style.transform = '';
+                this.touchCurrentCard.style.left = '';
+                this.touchCurrentCard.style.top = '';
+                this.touchCurrentCard.style.pointerEvents = '';
+                
+                // 콜백 호출
+                if (this.onDropCallback && targetCard) {
+                    this.onDropCallback(this.touchCurrentCard, targetCard);
+                }
+                
+                this.cleanupDragState();
+            } else {
+                // 단순 터치 (드래그 아님)
+                this.touchCurrentCard.style.opacity = '';
+                this.touchCurrentCard.style.transform = '';
+            }
+            
+            this.touchCurrentCard = null;
+            this.isDragging = false;
+        }, { passive: true });
+        
+        // touchcancel
+        this.seatsArea.addEventListener('touchcancel', () => {
+            if (this.touchCurrentCard) {
+                this.touchCurrentCard.style.position = '';
+                this.touchCurrentCard.style.zIndex = '';
+                this.touchCurrentCard.style.opacity = '';
+                this.touchCurrentCard.style.transform = '';
+                this.touchCurrentCard.style.left = '';
+                this.touchCurrentCard.style.top = '';
+                this.touchCurrentCard.style.pointerEvents = '';
+                this.touchCurrentCard = null;
+            }
+            this.isDragging = false;
+            this.cleanupDragState();
+        }, { passive: true });
+    }
+    
+    /**
+     * 터치 드래그 오버 상태 업데이트
+     */
+    private updateDragOverStateForTouch(targetCard: HTMLElement): void {
+        if (!this.seatsArea) return;
+        
+        // 기존 하이라이트 제거
+        this.seatsArea.querySelectorAll('.drag-over').forEach(el => {
+            el.classList.remove('drag-over');
+        });
+        
+        // 타겟 카드 하이라이트
+        if (targetCard && !targetCard.classList.contains('fixed-seat')) {
+            targetCard.classList.add('drag-over');
+        }
     }
 
     /**
