@@ -1705,9 +1705,13 @@ export class MainController {
                 }
             }
             // 드래그&드롭 완료 후 히스토리 저장 (약간의 지연을 두어 DOM 업데이트 완료 후 저장)
-            setTimeout(() => {
-                this.saveLayoutToHistory();
-            }, 50);
+            // requestAnimationFrame을 사용하여 브라우저 렌더링 완료 후 저장
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    this.saveLayoutToHistory();
+                    console.log('드래그&드롭 후 히스토리 저장 완료');
+                });
+            });
         });
     }
     /**
@@ -1764,10 +1768,14 @@ export class MainController {
         // 히스토리 크기 제한 (최대 100개)
         if (this.layoutHistory.length > 100) {
             this.layoutHistory.shift();
+            // 첫 항목이 제거되었으므로 인덱스는 그대로 유지 (배열이 한 칸씩 앞으로 당겨짐)
+            // 하지만 새 항목이 추가되었으므로 인덱스는 마지막 인덱스(99)가 되어야 함
+            this.historyIndex = this.layoutHistory.length - 1;
         }
         else {
             this.historyIndex++;
         }
+        console.log('히스토리 저장:', { type, historyIndex: this.historyIndex, historyLength: this.layoutHistory.length });
         // 되돌리기 버튼 활성화/비활성화 업데이트
         this.updateUndoButtonState();
     }
@@ -1793,15 +1801,18 @@ export class MainController {
      */
     handleUndoLayout() {
         console.log('되돌리기 시도. 히스토리 인덱스:', this.historyIndex, '히스토리 길이:', this.layoutHistory.length);
-        if (this.historyIndex <= 0 || this.layoutHistory.length === 0) {
+        // 되돌리기할 히스토리가 없거나, 이미 첫 번째 상태인 경우
+        if (this.historyIndex < 0 || this.layoutHistory.length === 0 || this.historyIndex === 0) {
             // 되돌리기할 히스토리가 없음
             this.outputModule.showError('되돌리기할 이전 상태가 없습니다.');
+            this.updateUndoButtonState();
             return;
         }
         // 이전 상태로 복원 (인덱스를 먼저 감소시켜 이전 상태를 가져옴)
         this.historyIndex--;
         const previousState = this.layoutHistory[this.historyIndex];
         console.log('되돌리기 - 복원할 상태:', previousState);
+        console.log('되돌리기 - 복원할 인덱스:', this.historyIndex);
         // 상태 타입에 따라 복원
         if (previousState && previousState.type === 'layout') {
             const seatsArea = document.getElementById('seats-area');
@@ -4968,10 +4979,14 @@ export class MainController {
             setTimeout(() => {
                 this.openCurtain();
             }, 3000);
-            // 자리 배치 완료 후 히스토리 저장
-            setTimeout(() => {
-                this.saveLayoutToHistory();
-            }, 3100);
+            // 자리 배치 완료 후 초기 상태를 히스토리에 저장 (드래그&드롭 되돌리기를 위해)
+            // requestAnimationFrame을 사용하여 브라우저 렌더링 완료 후 저장
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    this.saveLayoutToHistory();
+                    console.log('자리 배치 완료 후 초기 상태 히스토리 저장 완료');
+                });
+            });
             // 배치 완료 후 화면을 맨 위로 스크롤 (스크롤 컨테이너와 윈도우 모두 시도)
             try {
                 const resultContainer = document.querySelector('.result-container');

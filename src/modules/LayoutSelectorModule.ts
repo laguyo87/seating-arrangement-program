@@ -241,7 +241,7 @@ export class LayoutSelectorModule {
      * @param eventName 이벤트 이름
      * @param data 이벤트 데이터
      */
-    private dispatchCustomEvent(eventName: string, data?: any): void {
+    private dispatchCustomEvent(eventName: string, data?: unknown): void {
         const event = new CustomEvent(eventName, { detail: data });
         this.container.dispatchEvent(event);
     }
