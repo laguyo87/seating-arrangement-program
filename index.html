@@ -51,6 +51,7 @@
                     <button id="redo-layout" class="icon-btn" title="다시 실행하기 (Ctrl+Y / Cmd+Y)" aria-label="다시 실행하기 (Ctrl+Y / Cmd+Y)">↷</button>
                     <button id="history-timeline-btn" class="icon-btn" title="히스토리 타임라인" aria-label="히스토리 타임라인">📊</button>
                 </div>
+                <button id="statistics-btn" class="icon-btn" title="통계 및 분석" aria-label="통계 및 분석">📈</button>
                 <div class="history-dropdown" id="history-dropdown" role="menu">
                     <button class="history-dropdown-btn" id="history-dropdown-btn" aria-label="확정된 자리 이력" aria-haspopup="true" aria-expanded="false">📋 확정된 자리 이력</button>
                     <div class="history-dropdown-content" id="history-dropdown-content" role="menu">
@@ -280,11 +281,14 @@
                 </div>
                <!-- 자리 배치도 액션 버튼들 (초기에는 숨김) -->
                <div id="layout-action-buttons" style="display: none;">
-                   <div style="display: flex; gap: 10px;">
-                       <button id="confirm-seats" class="primary-btn">✅ 자리 확정하기(저장)</button>
-                       <button id="share-layout" class="secondary-btn" style="white-space: nowrap;">📤 공유하기</button>
-                       <button id="print-layout" class="secondary-btn" style="white-space: nowrap;">🖨️ 인쇄하기</button>
-                       <button id="print-layout-teacher" class="secondary-btn" style="white-space: nowrap;">👨‍🏫 교탁용 인쇄하기</button>
+                   <div style="display: flex; gap: 10px; flex-wrap: nowrap; align-items: center;">
+                       <button id="confirm-seats" class="primary-btn" style="width: auto; padding: 6px 16px; height: auto !important; flex-shrink: 0; line-height: 1.4;">✅ 자리 확정하기(저장)</button>
+                       <button id="share-layout" class="secondary-btn" style="white-space: nowrap; width: auto; padding: 6px 16px; height: auto !important; flex-shrink: 0; line-height: 1.4;">📤 공유하기</button>
+                       <select id="print-layout-select" style="white-space: nowrap; padding: 6px 16px; border-radius: 6px; border: 1px solid #5a6268; background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%); color: white; cursor: pointer; font-size: 0.95em; height: auto !important; box-sizing: border-box; width: auto; flex-shrink: 0; line-height: 1.4;">
+                           <option value="" style="background: white; color: #333;">🖨️ 인쇄 옵션 선택</option>
+                           <option value="print-layout" style="background: white; color: #333;">🖨️ 인쇄하기</option>
+                           <option value="print-layout-teacher" style="background: white; color: #333;">👨‍🏫 교탁용 인쇄</option>
+                       </select>
                    </div>
                </div>
             </div>

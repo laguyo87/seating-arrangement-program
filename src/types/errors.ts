@@ -42,9 +42,6 @@ export enum ErrorCode {
     SHARED_DATA_INVALID = 'SHARED_DATA_INVALID',
     SHARED_DATA_LOAD_FAILED = 'SHARED_DATA_LOAD_FAILED',
     
-    // 인쇄 관련
-    PRINT_FAILED = 'PRINT_FAILED',
-    
     // 일반
     UNKNOWN_ERROR = 'UNKNOWN_ERROR',
     OPERATION_FAILED = 'OPERATION_FAILED'
@@ -163,10 +160,6 @@ const ERROR_MESSAGES: Record<ErrorCode, { userMessage: string; severity: ErrorSe
     [ErrorCode.SHARED_DATA_LOAD_FAILED]: {
         userMessage: '공유된 자리 배치도를 불러올 수 없습니다.',
         severity: ErrorSeverity.MEDIUM
-    },
-    [ErrorCode.PRINT_FAILED]: {
-        userMessage: '인쇄 중 문제가 발생했습니다. 브라우저의 인쇄 기능을 확인해주세요.',
-        severity: ErrorSeverity.LOW
     },
     [ErrorCode.UNKNOWN_ERROR]: {
         userMessage: '예상치 못한 문제가 발생했습니다. 페이지를 새로고침해주세요.',
