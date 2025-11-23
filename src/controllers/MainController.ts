@@ -346,7 +346,7 @@ export class MainController {
             if (options.maleStudents !== undefined) {
                 const maleStudentsInput = document.getElementById('male-students') as HTMLInputElement;
                 if (maleStudentsInput) {
-                    maleStudentsInput.value = options.maleStudents;
+                    maleStudentsInput.value = options.maleStudents.toString();
                     maleStudentsInput.dispatchEvent(new Event('input', { bubbles: true }));
                     maleStudentsInput.dispatchEvent(new Event('change', { bubbles: true }));
                 }
@@ -355,7 +355,7 @@ export class MainController {
             if (options.femaleStudents !== undefined) {
                 const femaleStudentsInput = document.getElementById('female-students') as HTMLInputElement;
                 if (femaleStudentsInput) {
-                    femaleStudentsInput.value = options.femaleStudents;
+                    femaleStudentsInput.value = options.femaleStudents.toString();
                     femaleStudentsInput.dispatchEvent(new Event('input', { bubbles: true }));
                     femaleStudentsInput.dispatchEvent(new Event('change', { bubbles: true }));
                 }
@@ -541,21 +541,34 @@ export class MainController {
         // 남학생 수 입력 필드 이벤트
         const maleCountInput = document.getElementById('male-students') as HTMLInputElement;
         if (maleCountInput) {
+            // 숫자만 입력되도록 제한
+            this.addEventListenerSafe(maleCountInput, 'input', (e: Event) => {
+                const input = e.target as HTMLInputElement;
+                // 숫자가 아닌 문자 제거
+                const cleanedValue = input.value.replace(/[^0-9]/g, '');
+                if (input.value !== cleanedValue) {
+                    input.value = cleanedValue;
+                }
+                this.updatePreviewForGenderCounts();
+                this.updateStudentTableStats(); // 통계 업데이트
+            });
+            
             this.addEventListenerSafe(maleCountInput, 'keydown', (e: Event) => {
                 const ke = e as KeyboardEvent;
                 if (ke.key === 'Enter') {
                     this.updatePreviewForGenderCounts();
                 }
+                // 숫자, 백스페이스, 삭제, 화살표 키 등만 허용
+                if (!/[0-9]/.test(ke.key) && 
+                    !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Tab', 'Enter', 'Home', 'End'].includes(ke.key) &&
+                    !(ke.ctrlKey || ke.metaKey || ke.altKey)) {
+                    ke.preventDefault();
+                }
             });
 
             this.addEventListenerSafe(maleCountInput, 'change', () => {
+                this.validateAndFixStudentInput(maleCountInput, 'male');
                 this.updatePreviewForGenderCounts();
-            });
-
-            // 입력값이 변경될 때마다 실시간으로 업데이트
-            this.addEventListenerSafe(maleCountInput, 'input', () => {
-                this.updatePreviewForGenderCounts();
-                this.updateStudentTableStats(); // 통계 업데이트
             });
         }
 
@@ -581,14 +594,31 @@ export class MainController {
         // 여학생 수 입력 필드 이벤트
         const femaleCountInput = document.getElementById('female-students') as HTMLInputElement;
         if (femaleCountInput) {
-            this.addEventListenerSafe(femaleCountInput, 'change', () => {
-                this.updatePreviewForGenderCounts();
-            });
-
-            // 입력값이 변경될 때마다 실시간으로 업데이트
-            this.addEventListenerSafe(femaleCountInput, 'input', () => {
+            // 숫자만 입력되도록 제한
+            this.addEventListenerSafe(femaleCountInput, 'input', (e: Event) => {
+                const input = e.target as HTMLInputElement;
+                // 숫자가 아닌 문자 제거
+                const cleanedValue = input.value.replace(/[^0-9]/g, '');
+                if (input.value !== cleanedValue) {
+                    input.value = cleanedValue;
+                }
                 this.updatePreviewForGenderCounts();
                 this.updateStudentTableStats(); // 통계 업데이트
+            });
+            
+            this.addEventListenerSafe(femaleCountInput, 'keydown', (e: Event) => {
+                const ke = e as KeyboardEvent;
+                // 숫자, 백스페이스, 삭제, 화살표 키 등만 허용
+                if (!/[0-9]/.test(ke.key) && 
+                    !['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Tab', 'Enter', 'Home', 'End'].includes(ke.key) &&
+                    !(ke.ctrlKey || ke.metaKey || ke.altKey)) {
+                    ke.preventDefault();
+                }
+            });
+            
+            this.addEventListenerSafe(femaleCountInput, 'change', () => {
+                this.validateAndFixStudentInput(femaleCountInput, 'female');
+                this.updatePreviewForGenderCounts();
             });
         }
 
@@ -611,29 +641,7 @@ export class MainController {
                 }
             });
             
-            // 남학생/여학생 수 입력 필드에 검증 이벤트 추가
-            const maleInput = document.getElementById('male-students') as HTMLInputElement;
-            const femaleInput = document.getElementById('female-students') as HTMLInputElement;
-            
-            if (maleInput) {
-                this.addEventListenerSafe(maleInput, 'change', () => {
-                    this.validateAndFixStudentInput(maleInput, 'male');
-                    this.updatePreviewForGenderCounts();
-                });
-                this.addEventListenerSafe(maleInput, 'blur', () => {
-                    this.validateAndFixStudentInput(maleInput, 'male');
-                });
-            }
-            
-            if (femaleInput) {
-                this.addEventListenerSafe(femaleInput, 'change', () => {
-                    this.validateAndFixStudentInput(femaleInput, 'female');
-                    this.updatePreviewForGenderCounts();
-                });
-                this.addEventListenerSafe(femaleInput, 'blur', () => {
-                    this.validateAndFixStudentInput(femaleInput, 'female');
-                });
-            }
+            // 남학생/여학생 수 입력 필드에 검증 이벤트 추가 (중복 제거 - 이미 위에서 처리됨)
             
             // 분단 수 변경 시 미리보기 업데이트
             this.addEventListenerSafe(partitionInput, 'change', () => {
@@ -2472,26 +2480,29 @@ export class MainController {
      * 입력 값 검증 및 수정 (음수, 0, 큰 숫자 처리)
      */
     private validateAndFixStudentInput(input: HTMLInputElement, inputType: 'male' | 'female'): void {
-        let value = parseInt(input.value || '0', 10);
+        // 숫자가 아닌 문자 제거
+        let cleanedValue = input.value.replace(/[^0-9]/g, '');
+        let value = parseInt(cleanedValue || '0', 10);
         
         // NaN 체크
         if (isNaN(value)) {
             value = 0;
         }
         
-        // 음수 처리: 0으로 설정
+        // 최소값 제한: 0
         if (value < 0) {
             value = 0;
         }
         
-        // 최대값 제한: 100
-        if (value > 100) {
-            value = 100;
-            this.outputModule.showInfo(`${inputType === 'male' ? '남학생' : '여학생'} 수는 최대 100명까지 입력 가능합니다.`);
+        // 최대값 제한: 40
+        if (value > 40) {
+            value = 40;
+            this.outputModule.showInfo(`${inputType === 'male' ? '남학생' : '여학생'} 수는 최대 40명까지 입력 가능합니다.`);
         }
         
         // 값이 변경되었으면 입력 필드 업데이트
-        if (parseInt(input.value || '0', 10) !== value) {
+        const currentValue = parseInt(input.value.replace(/[^0-9]/g, '') || '0', 10);
+        if (currentValue !== value || input.value !== value.toString()) {
             input.value = value.toString();
         }
     }

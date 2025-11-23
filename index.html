@@ -179,20 +179,22 @@
                 <div class="form-group" style="display: flex; align-items: center; gap: 10px; flex-wrap: nowrap;">
                     <div style="display: flex; align-items: center; gap: 5px;">
                         <label for="male-students" style="white-space: nowrap; font-size: 0.95em;">남학생:</label>
-                        <input type="number" id="male-students" min="0" max="100" placeholder="0" value="12" 
+                        <input type="text" id="male-students" placeholder="0" value="12" 
+                               inputmode="numeric" pattern="[0-9]*"
                                style="width: 60px; padding: 6px 8px;" 
-                               aria-label="남학생 수 입력 (0-100명)" 
+                               aria-label="남학생 수 입력" 
                                aria-describedby="male-students-help" />
-                        <span id="male-students-help" class="sr-only">남학생 수를 입력하세요. 최대 100명까지 입력 가능합니다.</span>
+                        <span id="male-students-help" class="sr-only">남학생 수를 입력하세요.</span>
                     </div>
                     
                     <div style="display: flex; align-items: center; gap: 5px;">
                         <label for="female-students" style="white-space: nowrap; font-size: 0.95em;">여학생:</label>
-                        <input type="number" id="female-students" min="0" max="100" placeholder="0" value="12" 
+                        <input type="text" id="female-students" placeholder="0" value="12" 
+                               inputmode="numeric" pattern="[0-9]*"
                                style="width: 60px; padding: 6px 8px;" 
-                               aria-label="여학생 수 입력 (0-100명)" 
+                               aria-label="여학생 수 입력" 
                                aria-describedby="female-students-help" />
-                        <span id="female-students-help" class="sr-only">여학생 수를 입력하세요. 최대 100명까지 입력 가능합니다.</span>
+                        <span id="female-students-help" class="sr-only">여학생 수를 입력하세요.</span>
                     </div>
                 </div>
                 
