@@ -2,238 +2,377 @@
 
 이 문서는 현재 프로그램의 개선 가능한 사항들을 체계적으로 정리한 것입니다.
 
+**최종 업데이트**: 2025-11-23  
+**현재 버전**: 1.0.0
+
+---
+
+## 📊 현재 코드 상태
+
+### 파일 크기
+- `MainController.ts`: 6,366줄 (리팩토링 진행 중, 2,446줄 감소)
+- `LayoutRenderer.ts`: 232줄 (✅ 1단계 완료)
+- `AnimationManager.ts`: 253줄 (✅ 2단계 완료)
+- `StorageManager.ts`: 280줄 (✅ 3단계 완료)
+- `CSVFileHandler.ts`: 1,000+줄 (✅ 4단계 완료)
+- `PrintExportManager.ts`: 894줄 (✅ 5단계 완료)
+- `UIManager.ts`: 297줄 (✅ 6단계 완료)
+- `StudentTableManager.ts`: 920줄 (✅ 7단계 완료)
+- 기존 Managers: 1,231줄 (DragDropManager, FixedSeatManager, HistoryManager, KeyboardDragDropManager)
+
+### 코드 품질 지표
+- `console.log` 사용: 약 36개 (logger 사용으로 대부분 마이그레이션 완료)
+- `any` 타입 사용: 19개 (MainController.ts 내)
+- TypeScript 컴파일 오류: 3개 (기존 오류, 리팩토링과 무관)
+
 ---
 
 ## 🔴 높은 우선순위 (Critical)
 
 ### 1. 코드 구조 및 유지보수성
-- [ ] **MainController.ts 파일 크기 문제** (약 8,000줄)
-  - 현재 하나의 파일에 모든 로직이 집중되어 있음
-  - 리팩토링 필요: 기능별로 더 작은 모듈로 분리
-  - 예: `HistoryManager`, `FixedSeatManager`, `LayoutRenderer`, `DragDropManager` 등으로 분리
-  - 우선순위: 매우 높음 (유지보수성에 직접적 영향)
 
-- [ ] **프로덕션 코드에서 디버그 로그 제거**
-  - 현재 `console.log`가 117개 이상 존재
-  - 프로덕션 빌드에서 제거하거나 조건부로만 출력
-  - 제안: 개발 모드에서만 활성화되도록 환경 변수 사용
-  - 또는 로깅 유틸리티 클래스 생성 (개발/프로덕션 분리)
+#### 1.1 MainController.ts 파일 크기 문제 (진행 중)
+- **현재 상태**: 6,366줄 (8,812줄 → 6,366줄, 2,446줄 감소)
+- **목표**: 기능별로 더 작은 모듈로 분리
+- **진행 상황**:
+  - ✅ **1단계 완료**: LayoutRenderer 분리 (renderFinalLayout, renderStudentCards, createStudentCard)
+  - ✅ **2단계 완료**: AnimationManager 분리
+    - `startCurtainAnimation()`, `stopCurtainAnimation()`, `openCurtain()`
+    - `startFireworks()`, `createFirework()`, `playArrangementSound()`
+    - AnimationManager.ts: 253줄 생성
+  - ✅ **3단계 완료**: StorageManager 분리
+    - `saveOptions()`, `loadOptions()`
+    - `safeSetItem()`, `safeGetItem()`, `isLocalStorageAvailable()`
+    - StorageManager.ts: 280줄 생성
+  - ✅ **4단계 완료**: CSVFileHandler 분리
+    - `handleFileUpload()`, `parseCsvFile()`, `downloadTemplateFile()`
+    - `createTableWithStudents()`, `loadStudentDataToTable()`
+    - CSVFileHandler.ts: 1,000+줄 생성
+  - ✅ **5단계 완료**: PrintExportManager 분리
+    - `printLayout()`, `printLayoutForTeacher()`, `exportAsText()`, `saveLayoutAsHtml()`
+    - PrintExportManager.ts: 894줄 생성
+  - ✅ **6단계 완료**: UIManager 분리
+    - `updatePreviewForGenderCounts()`, `updateStudentTableStats()`
+    - `initializeHistoryDropdown()`, `updateHistoryDropdown()`
+    - UIManager.ts: 297줄 생성
+  - ✅ **7단계 완료**: StudentTableManager 분리
+    - `createStudentTable()`, `loadClassNames()`
+    - `updateFixedSeatDropdowns()`, `addStudentRow()`, `deleteStudentRow()`
+    - `updateRowNumbers()`, `syncSidebarToTable()`, `moveToCell()`
+    - StudentTableManager.ts: 920줄 생성 (815줄 감소)
 
-- [ ] **타입 안전성 강화**
-  - `any` 타입 사용 최소화
-  - 더 엄격한 타입 정의
-  - 제네릭 활용으로 타입 재사용성 향상
+#### 1.2 프로덕션 코드에서 디버그 로그 정리
+- **현재 상태**: 약 36개 `console.log` 사용
+- **목표**: 모든 `console.*` 호출을 `logger`로 마이그레이션
+- **진행 상황**:
+  - ✅ logger 유틸리티 클래스 생성 완료
+  - [ ] MainController.ts 내 `console.log` → `logger` 마이그레이션
+  - [ ] LayoutRenderer.ts 내 `console.log` → `logger` 마이그레이션
+  - [ ] 프로덕션 빌드에서 디버그 로그 자동 제거 확인
 
-- [ ] **에러 처리 일관성**
-  - 전역 에러 핸들러는 잘 구현되어 있음 ✅
-  - 일부 메서드에서 에러 메시지 일관성 개선 필요
+#### 1.3 타입 안전성 강화
+- **현재 상태**: `any` 타입 19개 사용
+- **목표**: `any` 타입을 구체적인 타입으로 교체
+- **주요 위치**:
+  - MainController.ts 내 다양한 메서드
+  - 이벤트 핸들러 타입 정의
+  - DOM 요소 타입 캐스팅
+
+#### 1.4 에러 처리 일관성
+- **현재 상태**: 전역 에러 핸들러 구현됨 ✅
+- **개선 필요**:
+  - 일부 메서드에서 에러 메시지 일관성 개선
   - 사용자 친화적인 에러 메시지로 개선
+  - 에러 복구 메커니즘 추가
+
+---
 
 ### 2. 사용자 경험 (UX)
-- [ ] **로딩 상태 표시 부재**
-  - 대용량 데이터 처리 시 (100명 이상) 로딩 인디케이터 없음
-  - 자리 배치 중 사용자 피드백 부족
-  - 제안: 스피너 또는 프로그레스 바 추가
 
-- [ ] **입력 검증 피드백 개선**
-  - 실시간 검증 메시지 표시
-  - 잘못된 입력 필드에 시각적 하이라이트
-  - 예: 빨간 테두리, 에러 아이콘 표시
+#### 2.1 로딩 상태 표시
+- **현재 상태**: 기본 로딩 인디케이터 구현됨 ✅
+- **개선 필요**:
+  - [ ] 대용량 데이터 처리 시 (100명 이상) 프로그레스 바 추가
+  - [ ] 파일 업로드 진행률 표시
+  - [ ] 자리 배치 생성 진행률 표시
 
-- [ ] **모바일 반응형 개선**
-  - 작은 화면에서 사이드바가 너무 많은 공간 차지
-  - 터치 제스처 최적화 (드래그 앤 드롭)
-  - 모바일에서 테이블 스크롤 개선
+#### 2.2 입력 검증 피드백 개선
+- **현재 상태**: 기본 검증 구현됨
+- **개선 필요**:
+  - [ ] 실시간 검증 메시지 표시
+  - [ ] 잘못된 입력 필드에 시각적 하이라이트 (빨간 테두리, 에러 아이콘)
+  - [ ] 학생 수 입력 필드에 시각적 하이라이트 추가
+
+#### 2.3 모바일 반응형 개선
+- **현재 상태**: 기본 반응형 구현됨
+- **개선 필요**:
+  - [ ] 작은 화면에서 사이드바 최적화
+  - [ ] 터치 제스처 최적화 (드래그 앤 드롭)
+  - [ ] 모바일에서 테이블 스크롤 개선
+
+---
 
 ### 3. 접근성 (Accessibility)
-- [ ] **키보드 네비게이션**
-  - 모든 기능을 키보드만으로 사용 가능하도록 개선
-  - Tab 순서 최적화
-  - 포커스 표시 명확화
-  - 드래그&드롭을 키보드로도 가능하도록 (화살표 키로 이동)
 
-- [ ] **스크린 리더 지원**
-  - ARIA 레이블 추가 (`aria-label`, `aria-describedby`)
-  - 의미론적 HTML 태그 사용 (`<button>`, `<nav>`, `<main>` 등)
-  - 상태 변경 시 알림 제공 (`aria-live` 사용)
-  - 폼 입력 필드에 `aria-required`, `aria-invalid` 추가
+#### 3.1 키보드 네비게이션
+- **현재 상태**: 기본 키보드 지원 구현됨
+- **개선 필요**:
+  - [ ] Tab 순서 최적화
+  - [ ] 포커스 표시 명확화
+  - [ ] 드래그&드롭을 키보드로도 가능하도록 (화살표 키로 이동)
 
-- [ ] **색상 대비**
-  - WCAG 2.1 AA 기준 충족 확인 (최소 4.5:1 대비율)
-  - 색상만으로 정보를 전달하지 않도록 개선 (아이콘, 텍스트 병행)
-  - 고정 좌석 표시에 색상 외 시각적 구분 추가
+#### 3.2 스크린 리더 지원
+- **현재 상태**: 일부 ARIA 레이블 구현됨
+- **개선 필요**:
+  - [ ] ARIA 레이블 보완 (`aria-label`, `aria-describedby`)
+  - [ ] 의미론적 HTML 태그 사용 강화
+  - [ ] 상태 변경 시 알림 제공 (`aria-live` 사용)
+  - [ ] 폼 입력 필드에 `aria-required`, `aria-invalid` 추가
+
+#### 3.3 색상 대비
+- **개선 필요**:
+  - [ ] WCAG 2.1 AA 기준 충족 확인 (최소 4.5:1 대비율)
+  - [ ] 색상만으로 정보를 전달하지 않도록 개선 (아이콘, 텍스트 병행)
+  - [ ] 고정 좌석 표시에 색상 외 시각적 구분 추가
 
 ---
 
 ## 🟡 중간 우선순위 (Important)
 
 ### 4. 기능 개선
-- [ ] **준비중 기능 완성**
-  - 모둠 배치 기능 구현 (UI에 표시되어 있으나 미구현)
-  - ㄷ자 2명 짝꿍 배치 기능 구현
 
-- [ ] **자리 배치 히스토리 관리 강화**
+#### 4.1 준비중 기능 완성
+- [ ] **모둠 배치 기능 완성**
+  - 현재: UI에 표시되어 있으나 `renderGroupCards` 로직 미완성
+  - LayoutRenderer에 완전히 구현 필요
+- [ ] **ㄷ자 2명 짝꿍 배치 기능 구현**
+  - UI에 "준비중" 표시
+  - 레이아웃 알고리즘 구현 필요
+
+#### 4.2 자리 배치 히스토리 관리 강화
+- **현재 상태**: 
   - ✅ 되돌리기(Ctrl+Z) 기능 개선 완료 (드래그&드롭 지원)
+  - ✅ HistoryManager 분리 완료
+- **개선 필요**:
   - [ ] 히스토리 목록 시각화 (타임라인 형태)
   - [ ] 특정 시점으로 되돌리기 기능 (히스토리 목록에서 선택)
   - [ ] 다시 실행하기(Ctrl+Y / Cmd+Y) 기능 추가
 
-- [ ] **고정 좌석 기능 개선**
-  - 고정 좌석 일괄 지정/해제 기능
-  - 고정 좌석 템플릿 저장/불러오기
-  - 고정 좌석 시각적 구분 강화
+#### 4.3 고정 좌석 기능 개선
+- **현재 상태**: 기본 기능 구현됨 ✅
+- **개선 필요**:
+  - [ ] 고정 좌석 일괄 지정/해제 기능
+  - [ ] 고정 좌석 템플릿 저장/불러오기
+  - [ ] 고정 좌석 시각적 구분 강화
 
-- [ ] **엑셀/CSV 가져오기 개선**
-  - 현재 CSV만 지원, 엑셀(.xlsx) 직접 지원
-  - 파일 형식 자동 감지
-  - 업로드 시 미리보기 기능
+#### 4.4 엑셀/CSV 가져오기 개선
+- **현재 상태**: CSV 파일 지원 ✅
+- **개선 필요**:
+  - [ ] 엑셀(.xlsx) 직접 지원 (현재는 CSV로 변환 요구)
+  - [ ] 파일 형식 자동 감지
+  - [ ] 업로드 시 미리보기 기능
+  - [ ] 대용량 파일 처리 개선 (현재 50명 이상 시 비동기 처리)
+
+---
 
 ### 5. 성능 최적화
-- [ ] **대용량 데이터 처리**
-  - 100명 이상 학생 처리 시 성능 저하 가능성
-  - 가상 스크롤링 구현 검토 (학생 목록 테이블)
-  - 렌더링 최적화 (requestAnimationFrame 사용) - 일부 적용됨 ✅
-  - 배치 DOM 업데이트 (DocumentFragment 활용)
 
-- [ ] **메모리 관리**
-  - 이벤트 리스너 정리 확인 (메모리 누수 방지)
-  - DOM 요소 캐싱 최적화
-  - 불필요한 리렌더링 방지
-  - 히스토리 데이터 크기 제한 (현재 100개, 필요시 조정)
+#### 5.1 대용량 데이터 처리
+- **현재 상태**: 
+  - ✅ 50명 이상 시 비동기 처리 구현됨
+  - ✅ DocumentFragment 활용 (일부 적용)
+- **개선 필요**:
+  - [ ] 100명 이상 학생 처리 시 성능 최적화
+  - [ ] 가상 스크롤링 구현 검토 (학생 목록 테이블)
+  - [ ] 렌더링 최적화 강화 (requestAnimationFrame 활용 확대)
+  - [ ] 배치 DOM 업데이트 확대 (DocumentFragment 활용)
 
-- [ ] **로컬 스토리지 최적화**
-  - 데이터 압축 (큰 배치 데이터 저장 시)
-  - 저장 용량 제한 관리 (localStorage는 약 5-10MB 제한)
-  - 오래된 데이터 자동 정리
-  - 저장 실패 시 사용자에게 알림
+#### 5.2 메모리 관리
+- **현재 상태**: 
+  - ✅ 이벤트 리스너 추적 및 정리 구현됨
+  - ✅ setTimeout 추적 및 정리 구현됨
+- **개선 필요**:
+  - [ ] DOM 요소 캐싱 최적화
+  - [ ] 불필요한 리렌더링 방지
+  - [ ] 히스토리 데이터 크기 제한 (현재 100개, 필요시 조정)
+
+#### 5.3 로컬 스토리지 최적화
+- **개선 필요**:
+  - [ ] 데이터 압축 (큰 배치 데이터 저장 시)
+  - [ ] 저장 용량 제한 관리 (localStorage는 약 5-10MB 제한)
+  - [ ] 오래된 데이터 자동 정리
+  - [ ] 저장 실패 시 사용자에게 알림 (현재 try-catch로 처리)
+
+---
 
 ### 6. 데이터 검증 및 안정성
-- [ ] **엣지 케이스 처리**
-  - 학생 수가 0인 경우
-  - 남학생만 또는 여학생만 있는 경우
-  - 좌석 수보다 학생 수가 많은/적은 경우
-  - 고정 좌석 수가 학생 수보다 많은 경우
 
-- [ ] **데이터 무결성 검증**
-  - localStorage 데이터 손상 시 복구 메커니즘
-  - 잘못된 CSV 파일 업로드 시 상세한 에러 메시지
-  - 파일 크기 제한 및 검증
+#### 6.1 엣지 케이스 처리
+- **개선 필요**:
+  - [ ] 학생 수가 0인 경우 명확한 안내
+  - [ ] 남학생만 또는 여학생만 있는 경우 처리
+  - [ ] 좌석 수보다 학생 수가 많은/적은 경우 처리
+  - [ ] 고정 좌석 수가 학생 수보다 많은 경우 처리
 
-- [ ] **입력 검증 강화**
-  - 음수 입력 방지 (현재 HTML min 속성만 사용)
-  - 매우 큰 숫자 입력 제한
-  - 특수문자 포함 이름 처리
+#### 6.2 데이터 무결성 검증
+- **개선 필요**:
+  - [ ] localStorage 데이터 손상 시 복구 메커니즘
+  - [ ] 잘못된 CSV 파일 업로드 시 상세한 에러 메시지
+  - [ ] 파일 크기 제한 및 검증 강화
+
+#### 6.3 입력 검증 강화
+- **현재 상태**: 기본 검증 구현됨
+- **개선 필요**:
+  - [ ] 음수 입력 방지 강화 (현재 HTML min 속성만 사용)
+  - [ ] 매우 큰 숫자 입력 제한
+  - [ ] 특수문자 포함 이름 처리 개선
 
 ---
 
 ## 🟢 낮은 우선순위 (Nice to Have)
 
 ### 7. 추가 기능
-- [ ] **다국어 지원**
-  - 영어, 일본어 등 추가 언어 지원
-  - i18n 라이브러리 도입 검토
 
-- [ ] **클라우드 저장소 연동**
-  - Google Drive, Dropbox 등 연동
-  - 자동 백업 기능
+#### 7.1 다국어 지원
+- [ ] 영어, 일본어 등 추가 언어 지원
+- [ ] i18n 라이브러리 도입 검토
 
-- [ ] **통계 및 분석**
-  - 자리 배치 이력 통계
-  - 학생별 자리 이동 이력
-  - 성별 분포 시각화
+#### 7.2 클라우드 저장소 연동
+- [ ] Google Drive, Dropbox 등 연동
+- [ ] 자동 백업 기능
 
-- [ ] **인쇄 옵션 확장**
-  - 다양한 인쇄 레이아웃 옵션
-  - 이름표 생성 기능
-  - 출석부 형식 출력
+#### 7.3 통계 및 분석
+- [ ] 자리 배치 이력 통계
+- [ ] 학생별 자리 이동 이력
+- [ ] 성별 분포 시각화
 
-- [ ] **공유 기능 개선**
-  - QR 코드 생성
-  - 공유 링크 만료 시간 설정
-  - 비밀번호 보호 기능
+#### 7.4 인쇄 옵션 확장
+- [ ] 다양한 인쇄 레이아웃 옵션
+- [ ] 이름표 생성 기능
+- [ ] 출석부 형식 출력
+
+#### 7.5 공유 기능 개선
+- [ ] QR 코드 생성
+- [ ] 공유 링크 만료 시간 설정
+- [ ] 비밀번호 보호 기능
+
+---
 
 ### 8. 개발자 경험
-- [ ] **테스트 코드 작성**
-  - 단위 테스트 추가 (Jest, Vitest 등)
-  - 통합 테스트 작성
-  - E2E 테스트 (Playwright, Cypress 등)
 
-- [ ] **CI/CD 파이프라인**
-  - GitHub Actions 설정
-  - 자동 빌드 및 배포
-  - 자동 테스트 실행
+#### 8.1 테스트 코드 작성
+- [ ] 단위 테스트 추가 (Jest, Vitest 등)
+- [ ] 통합 테스트 작성
+- [ ] E2E 테스트 (Playwright, Cypress 등)
 
-- [ ] **코드 문서화**
-  - JSDoc 주석 보완
-  - API 문서 생성
-  - 사용자 가이드 비디오 제작
+#### 8.2 CI/CD 파이프라인
+- [ ] GitHub Actions 설정
+- [ ] 자동 빌드 및 배포
+- [ ] 자동 테스트 실행
+
+#### 8.3 코드 문서화
+- [ ] JSDoc 주석 보완
+- [ ] API 문서 생성
+- [ ] 사용자 가이드 비디오 제작
+
+---
 
 ### 9. 디자인 개선
-- [ ] **다크 모드 지원**
-  - 사용자 선호도에 따른 테마 전환
-  - 시스템 설정 자동 감지
 
-- [ ] **애니메이션 개선**
-  - 부드러운 전환 효과
-  - 로딩 애니메이션 추가
-  - 성공/실패 피드백 애니메이션
+#### 9.1 다크 모드 지원
+- [ ] 사용자 선호도에 따른 테마 전환
+- [ ] 시스템 설정 자동 감지
 
-- [ ] **아이콘 및 일러스트**
-  - 일관된 아이콘 세트 사용
-  - 커스텀 일러스트 추가
+#### 9.2 애니메이션 개선
+- [ ] 부드러운 전환 효과
+- [ ] 로딩 애니메이션 추가 (현재 기본 구현됨)
+- [ ] 성공/실패 피드백 애니메이션
+
+#### 9.3 아이콘 및 일러스트
+- [ ] 일관된 아이콘 세트 사용
+- [ ] 커스텀 일러스트 추가
+
+---
 
 ### 10. 보안 및 개인정보
-- [ ] **데이터 프라이버시**
-  - 로컬 스토리지 데이터 암호화 옵션
-  - 공유 링크에 민감 정보 포함 여부 확인
-  - GDPR 준수 검토
 
-- [ ] **입력 검증 강화**
-  - XSS 방지 (현재는 클라이언트 사이드만)
-  - 파일 업로드 보안 검증
+#### 10.1 데이터 프라이버시
+- [ ] 로컬 스토리지 데이터 암호화 옵션
+- [ ] 공유 링크에 민감 정보 포함 여부 확인
+- [ ] GDPR 준수 검토
+
+#### 10.2 입력 검증 강화
+- [ ] XSS 방지 강화 (현재는 클라이언트 사이드만)
+- [ ] 파일 업로드 보안 검증 강화
 
 ---
 
 ## 📊 우선순위별 요약
 
 ### 즉시 개선 필요 (1-2주 내)
-1. **프로덕션 코드에서 console.log 제거** (디버그 로그 정리)
-2. MainController.ts 리팩토링 (파일 분리) - 점진적 진행
-3. 로딩 상태 표시 추가 (대용량 데이터 처리 시)
-4. 키보드 접근성 개선 (ARIA 레이블, Tab 순서)
-5. 엣지 케이스 처리 강화
+1. **MainController.ts 리팩토링 계속 진행** (2-7단계)
+   - AnimationManager 분리
+   - StorageManager 분리
+   - CSVFileHandler 분리
+2. **프로덕션 코드에서 console.log 제거** (logger 마이그레이션 완료)
+3. **타입 안전성 강화** (any 타입 제거)
+4. **엣지 케이스 처리 강화**
 
 ### 단기 개선 (1개월 내)
-1. 준비중 기능 완성 (모둠 배치, ㄷ자 배치)
-2. 모바일 반응형 개선
-3. 성능 최적화 (대용량 데이터)
-4. 입력 검증 피드백 개선
+1. **준비중 기능 완성** (모둠 배치, ㄷ자 배치)
+2. **모바일 반응형 개선**
+3. **성능 최적화** (대용량 데이터)
+4. **입력 검증 피드백 개선**
+5. **키보드 접근성 개선** (ARIA 레이블, Tab 순서)
 
 ### 중기 개선 (3개월 내)
-1. 다국어 지원
-2. 테스트 코드 작성
-3. 클라우드 저장소 연동
-4. 통계 및 분석 기능
+1. **다국어 지원**
+2. **테스트 코드 작성**
+3. **클라우드 저장소 연동**
+4. **통계 및 분석 기능**
 
 ### 장기 개선 (6개월 이상)
-1. CI/CD 파이프라인 구축
-2. 다크 모드 지원
-3. 보안 강화
-4. 고급 기능 추가
+1. **CI/CD 파이프라인 구축**
+2. **다크 모드 지원**
+3. **보안 강화**
+4. **고급 기능 추가**
 
 ---
 
-## 📝 참고사항
+## ✅ 최근 개선 완료 사항
 
-- 현재 프로그램은 기본 기능이 잘 구현되어 있으며, 안정적으로 동작함
-- 개선점은 점진적으로 적용하는 것을 권장
-- 사용자 피드백을 수집하여 우선순위 조정 권장
-- 각 개선사항은 별도의 이슈/브랜치로 관리하는 것을 권장
+### 2025년 11월 23일
+- ✅ **LayoutRenderer 분리 (1단계 완료)**
+  - `renderFinalLayout()`, `renderStudentCards()`, `createStudentCard()` 메서드 분리
+  - LayoutRenderer 클래스 생성 (232줄)
+  - 의존성 주입 패턴 적용
+- ✅ **AnimationManager 분리 (2단계 완료)**
+  - `startCurtainAnimation()`, `stopCurtainAnimation()`, `openCurtain()` 메서드 분리
+  - `startFireworks()`, `createFirework()`, `playArrangementSound()` 메서드 분리
+  - AnimationManager 클래스 생성 (253줄)
+- ✅ **StorageManager 분리 (3단계 완료)**
+  - localStorage 관련 모든 메서드 분리
+  - StorageManager 클래스 생성 (280줄)
+- ✅ **CSVFileHandler 분리 (4단계 완료)**
+  - CSV 파일 처리 관련 모든 메서드 분리
+  - CSVFileHandler 클래스 생성 (1,000+줄)
+- ✅ **PrintExportManager 분리 (5단계 완료)**
+  - `printLayout()`, `printLayoutForTeacher()`, `exportAsText()`, `saveLayoutAsHtml()` 메서드 분리
+  - PrintExportManager 클래스 생성 (894줄)
+- ✅ **UIManager 분리 (6단계 완료)**
+  - `updatePreviewForGenderCounts()`, `updateStudentTableStats()` 메서드 분리
+  - `initializeHistoryDropdown()`, `updateHistoryDropdown()` 메서드 분리
+  - UIManager 클래스 생성 (297줄)
+  - MainController.ts: 8,812줄 → 7,181줄 (1,631줄 감소)
+- ✅ **OutputModule 개선**
+  - `clear()` 메서드가 `card-layout-container` 보존하도록 수정
+  - `showLoading()` 메서드 개선
+  - 메시지와 레이아웃 분리
+- ✅ **Vite 개발 서버 설정 개선**
+  - `dist` 폴더 변경 감지 제외 (불필요한 새로고침 방지)
+  - HMR 설정 최적화
 
----
-
-## ✅ 최근 개선 완료 사항 (2025년 11월)
-
+### 2025년 11월 18일 이전
 - ✅ **되돌리기 기능 개선**: 드래그&드롭 후 되돌리기 정상 작동하도록 수정
 - ✅ **커튼/폭죽 애니메이션**: z-index 조정 및 CSS 개선으로 정상 작동
 - ✅ **방문자 수 스타일**: 작은 글씨, 버튼 스타일 제거
@@ -242,7 +381,70 @@
 
 ---
 
-**최종 업데이트**: 2025-11-18
-**작성자**: AI Assistant
-**버전**: 1.0.0
+## 📝 리팩토링 진행 계획
 
+### 현재 진행 중: MainController.ts 리팩토링
+
+#### ✅ 완료된 단계
+1. **LayoutRenderer 분리** (1단계)
+   - `renderFinalLayout()` → LayoutRenderer로 이동
+   - `renderStudentCards()` → LayoutRenderer로 이동
+   - `createStudentCard()` → LayoutRenderer로 이동
+   - LayoutRenderer.ts: 232줄 생성
+
+2. **AnimationManager 분리** (2단계)
+   - `startCurtainAnimation()`, `stopCurtainAnimation()`, `openCurtain()` → AnimationManager로 이동
+   - `startFireworks()`, `createFirework()`, `playArrangementSound()` → AnimationManager로 이동
+   - AnimationManager.ts: 253줄 생성
+
+3. **StorageManager 분리** (3단계)
+   - `saveOptions()`, `loadOptions()` → StorageManager로 이동
+   - `safeSetItem()`, `safeGetItem()`, `isLocalStorageAvailable()` → StorageManager로 이동
+   - `saveLayoutResult()`, `loadSavedLayoutResult()` → StorageManager로 이동
+   - `saveClassStudentData()`, `loadClassStudentData()` → StorageManager로 이동
+   - `saveSeatHistory()`, `getSeatHistory()`, `deleteSeatHistoryItem()` → StorageManager로 이동
+   - StorageManager.ts: 280줄 생성
+
+4. **CSVFileHandler 분리** (4단계)
+   - `handleFileUpload()`, `parseCsvFile()`, `downloadTemplateFile()` → CSVFileHandler로 이동
+   - `createTableWithStudents()`, `loadStudentDataToTable()` → CSVFileHandler로 이동
+   - CSVFileHandler.ts: 1,000+줄 생성
+
+5. **PrintExportManager 분리** (5단계)
+   - `printLayout()`, `printLayoutForTeacher()` → PrintExportManager로 이동
+   - `exportAsText()`, `saveLayoutAsHtml()` → PrintExportManager로 이동
+   - PrintExportManager.ts: 894줄 생성
+
+6. **UIManager 분리** (6단계)
+   - `updatePreviewForGenderCounts()`, `updateStudentTableStats()` → UIManager로 이동
+   - `initializeHistoryDropdown()`, `updateHistoryDropdown()` → UIManager로 이동
+   - UIManager.ts: 297줄 생성
+   - MainController.ts: 8,812줄 → 7,181줄 (1,631줄 감소)
+
+#### 🔄 다음 단계 (우선순위 순)
+7. **StudentTableManager 분리** (예상 감소: ~500줄)
+
+7. **StudentTableManager 분리** (예상 감소: ~500줄)
+   - 학생 테이블 생성 및 관리
+   - 학생 데이터 로드
+   - 테이블 이벤트 처리
+
+#### 목표
+- MainController.ts: 8,812줄 → **약 6,000줄 이하** (현재 7,374줄, 약 1,374줄 추가 감소 필요)
+- 각 Manager: **200-1,000줄** 수준으로 분리
+- 단일 책임 원칙 준수
+
+---
+
+## 📝 참고사항
+
+- 현재 프로그램은 기본 기능이 잘 구현되어 있으며, 안정적으로 동작함
+- 개선점은 점진적으로 적용하는 것을 권장
+- 각 리팩토링 단계마다 테스트를 실행하여 안정성 확보
+- 사용자 피드백을 수집하여 우선순위 조정 권장
+- 각 개선사항은 별도의 이슈/브랜치로 관리하는 것을 권장
+
+---
+
+**작성자**: AI Assistant  
+**버전**: 1.0.0

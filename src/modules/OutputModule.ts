@@ -47,10 +47,14 @@ export class OutputModule {
      * @param type 메시지 타입
      */
     private showMessage(message: string, type: 'success' | 'error' | 'info'): void {
-        // 기존 메시지 제거
+        // 기존 메시지와 로딩 요소 제거 (card-layout-container는 보존)
         const existingMessage = this.container.querySelector('.output-message');
         if (existingMessage) {
             existingMessage.remove();
+        }
+        const existingLoading = this.container.querySelector('.loading');
+        if (existingLoading) {
+            existingLoading.remove();
         }
 
         // 새 메시지 생성
@@ -180,14 +184,33 @@ export class OutputModule {
      * 결과를 초기화합니다.
      */
     public clear(): void {
-        this.container.innerHTML = '';
+        // card-layout-container는 보존하고 메시지만 제거
+        const cardContainer = this.container.querySelector('#card-layout-container');
+        const studentTableContainer = this.container.querySelector('.student-table-container');
+        
+        // 메시지와 로딩 요소만 제거
+        const messages = this.container.querySelectorAll('.output-message, .loading, .statistics');
+        messages.forEach(msg => msg.remove());
+        
+        // card-layout-container와 student-table-container가 없으면 전체 초기화
+        if (!cardContainer && !studentTableContainer) {
+            this.container.innerHTML = '';
+        }
     }
 
     /**
      * 로딩 인디케이터를 표시합니다.
      */
     public showLoading(): void {
-        this.clear();
+        // 기존 메시지와 로딩 요소만 제거 (card-layout-container는 보존)
+        const existingMessage = this.container.querySelector('.output-message');
+        if (existingMessage) {
+            existingMessage.remove();
+        }
+        const existingLoading = this.container.querySelector('.loading');
+        if (existingLoading) {
+            existingLoading.remove();
+        }
         
         const loadingElement = document.createElement('div');
         loadingElement.className = 'loading';
@@ -211,7 +234,14 @@ export class OutputModule {
             document.head.appendChild(style);
         }
         
-        this.container.appendChild(loadingElement);
+        // card-layout-container 앞에 로딩 요소 추가
+        const cardContainer = this.container.querySelector('#card-layout-container');
+        if (cardContainer && cardContainer.parentNode) {
+            cardContainer.parentNode.insertBefore(loadingElement, cardContainer);
+        } else {
+            // card-layout-container가 없으면 컨테이너에 직접 추가
+            this.container.appendChild(loadingElement);
+        }
     }
 
     /**
