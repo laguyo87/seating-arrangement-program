@@ -562,10 +562,34 @@ button:focus-visible,
 a:focus-visible,
 input:focus-visible,
 select:focus-visible,
-textarea:focus-visible {
+textarea:focus-visible,
+[tabindex]:focus-visible {
     outline: 3px solid #667eea;
     outline-offset: 2px;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.2);
+}
+
+/* 키보드 포커스된 좌석 카드 스타일 */
+.student-seat-card:focus-visible {
+    outline: 3px solid #667eea;
+    outline-offset: 3px;
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.3);
+    z-index: 10;
+}
+
+.student-seat-card.keyboard-focused {
+    outline: 3px solid #667eea;
+    outline-offset: 3px;
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.3);
+    z-index: 10;
+}
+
+.student-seat-card.keyboard-selected {
+    outline: 4px solid #764ba2;
+    outline-offset: 3px;
+    box-shadow: 0 0 0 5px rgba(118, 75, 162, 0.3);
+    background-color: rgba(118, 75, 162, 0.1);
+    z-index: 11;
 }
 
 /* 스킵 링크 (접근성) */
@@ -1362,40 +1386,96 @@ button:disabled {
     }
     
     /* 테이블 스크롤 개선 */
-    .student-input-table {
+    .student-input-table,
+    .student-table-container {
         display: block;
         width: 100%;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
         scrollbar-width: thin;
+        scroll-behavior: smooth;
+        /* 모바일에서 스크롤 영역 명확히 표시 */
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-x: contain;
     }
     
-    .student-input-table table {
+    .student-input-table table,
+    .student-table-container table {
         min-width: 600px;
     }
     
-    .student-input-table::-webkit-scrollbar {
+    .student-input-table::-webkit-scrollbar,
+    .student-table-container::-webkit-scrollbar {
         height: 8px;
     }
     
-    .student-input-table::-webkit-scrollbar-track {
+    .student-input-table::-webkit-scrollbar-track,
+    .student-table-container::-webkit-scrollbar-track {
         background: #f1f1f1;
+        border-radius: 4px;
     }
     
-    .student-input-table::-webkit-scrollbar-thumb {
+    .student-input-table::-webkit-scrollbar-thumb,
+    .student-table-container::-webkit-scrollbar-thumb {
         background: #888;
         border-radius: 4px;
     }
     
+    .student-input-table::-webkit-scrollbar-thumb:hover,
+    .student-table-container::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+    
+    /* 테이블 래퍼에 스크롤 힌트 추가 */
+    .student-table-container::before,
+    .student-table-container::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 20px;
+        pointer-events: none;
+        z-index: 1;
+        transition: opacity 0.3s;
+    }
+    
+    .student-table-container::before {
+        left: 0;
+        background: linear-gradient(to right, rgba(255,255,255,0.9), transparent);
+    }
+    
+    .student-table-container::after {
+        right: 0;
+        background: linear-gradient(to left, rgba(255,255,255,0.9), transparent);
+    }
+    
     /* 좌석 카드 터치 최적화 */
     .student-seat-card {
-        touch-action: pan-y;
+        touch-action: manipulation; /* 더블탭 줌 방지, 드래그 허용 */
         -webkit-tap-highlight-color: transparent;
+        user-select: none; /* 텍스트 선택 방지 */
+        -webkit-user-select: none;
     }
     
     /* 드래그 앤 드롭 터치 최적화 */
     #seats-area {
-        touch-action: pan-y pinch-zoom;
+        touch-action: pan-y pinch-zoom; /* 세로 스크롤과 핀치 줌 허용 */
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    /* 드래그 중인 카드 스타일 */
+    .student-seat-card.dragging {
+        opacity: 0.8 !important;
+        transform: scale(1.1) !important;
+        z-index: 1000 !important;
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3) !important;
+    }
+    
+    /* 드롭 타겟 하이라이트 */
+    .student-seat-card.drop-target {
+        outline: 3px dashed #667eea !important;
+        outline-offset: 2px !important;
+        background-color: rgba(102, 126, 234, 0.1) !important;
     }
     
     /* 입력 필드 터치 최적화 */

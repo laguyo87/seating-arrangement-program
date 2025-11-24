@@ -54,12 +54,24 @@ export declare class OutputModule {
      */
     clear(): void;
     /**
-     * 로딩 인디케이터를 표시합니다.
-     */
-    showLoading(): void;
-    /**
      * 통계를 숨깁니다.
      */
     hideStatistics(): void;
+    /**
+     * 프로그레스 바를 표시합니다.
+     * @param message 진행 상황 메시지
+     * @param initialProgress 초기 진행률 (0-100)
+     * @returns 프로그레스 바 업데이트 함수
+     */
+    showProgress(message: string, initialProgress?: number): (progress: number, statusMessage?: string) => void;
+    /**
+     * 프로그레스 바를 숨깁니다.
+     */
+    hideProgress(): void;
+    /**
+     * 로딩 인디케이터를 표시합니다 (프로그레스 바 없이).
+     * @param message 로딩 메시지
+     */
+    showLoading(message?: string): void;
 }
 //# sourceMappingURL=OutputModule.d.ts.map

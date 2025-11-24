@@ -87,23 +87,75 @@ export class CSVFileHandler {
             return;
         }
         
-        this.deps.outputModule.showInfo('파일을 읽는 중입니다...');
+        // 파일 크기 확인
+        const fileSize = file.size;
+        const useProgress = fileSize > 100000; // 100KB 이상일 때 프로그레스 바 사용
+        
+        let updateProgress: ((progress: number, statusMessage?: string) => void) | null = null;
+        
+        if (useProgress) {
+            updateProgress = this.deps.outputModule.showProgress('파일을 읽는 중입니다...', 0);
+        } else {
+            this.deps.outputModule.showInfo('파일을 읽는 중입니다...');
+        }
         
         // CSV 파일 읽기
         if (fileName.endsWith('.csv')) {
             const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    const text = e.target?.result as string;
-                    this.parseCsvFile(text);
-                } catch (error) {
-                    logger.error('파일 읽기 오류:', error);
-                    this.deps.outputModule.showError('파일을 읽는 중 오류가 발생했습니다.');
-                }
-            };
+            
+            // 진행률 업데이트 (FileReader API는 진행률을 직접 제공하지 않으므로 추정)
+            if (updateProgress) {
+                let loadedBytes = 0;
+                const totalBytes = fileSize;
+                
+                // 파일 읽기 시작
+                updateProgress(10, '파일 읽기 시작...');
+                
+                // 주기적으로 진행률 업데이트 (추정)
+                const progressInterval = setInterval(() => {
+                    if (loadedBytes < totalBytes) {
+                        loadedBytes = Math.min(loadedBytes + totalBytes / 20, totalBytes * 0.9);
+                        const progress = 10 + (loadedBytes / totalBytes) * 80;
+                        updateProgress!(progress, `파일 읽는 중... (${Math.round(progress)}%)`);
+                    }
+                }, 100);
+                
+                reader.onload = (e) => {
+                    clearInterval(progressInterval);
+                    if (updateProgress) {
+                        updateProgress(100, '파일 읽기 완료');
+                        setTimeout(() => {
+                            this.deps.outputModule.hideProgress();
+                        }, 500);
+                    }
+                    
+                    try {
+                        const text = e.target?.result as string;
+                        this.parseCsvFile(text);
+                    } catch (error) {
+                        logger.error('파일 읽기 오류:', error);
+                        this.deps.outputModule.showError('파일을 읽는 중 오류가 발생했습니다.');
+                    }
+                };
+            } else {
+                reader.onload = (e) => {
+                    try {
+                        const text = e.target?.result as string;
+                        this.parseCsvFile(text);
+                    } catch (error) {
+                        logger.error('파일 읽기 오류:', error);
+                        this.deps.outputModule.showError('파일을 읽는 중 오류가 발생했습니다.');
+                    }
+                };
+            }
+            
             reader.onerror = () => {
+                if (updateProgress) {
+                    this.deps.outputModule.hideProgress();
+                }
                 this.deps.outputModule.showError('파일을 읽는 중 오류가 발생했습니다.');
             };
+            
             reader.readAsText(file, 'UTF-8');
         } else {
             // 엑셀 파일인 경우 안내 메시지

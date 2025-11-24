@@ -10,6 +10,17 @@ import { Seat } from '../models/Seat.js';
 import { StorageManager } from './StorageManager.js';
 
 /**
+ * 좌석 이력 항목 타입
+ */
+export interface SeatHistoryItem {
+    id: string;
+    date: string;
+    layout: Array<{seatId: number, studentName: string, gender: 'M' | 'F'}>;
+    pairInfo?: Array<{student1: string, student2: string}>;
+    timestamp: number;
+}
+
+/**
  * UIManager가 필요로 하는 의존성 인터페이스
  */
 export interface UIManagerDependencies {
@@ -26,7 +37,7 @@ export interface UIManagerDependencies {
     // MainController 메서드들
     validateAndFixStudentInput: (input: HTMLInputElement, inputType: 'male' | 'female') => void;
     renderExampleCards: () => void;
-    getSeatHistory: () => Array<{id: string, date: string, timestamp?: number, seats: any}>;
+    getSeatHistory: () => SeatHistoryItem[];
     deleteHistoryItem: (historyId: string) => void;
     loadHistoryItem: (historyId: string) => void;
 }

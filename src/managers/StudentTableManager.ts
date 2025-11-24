@@ -72,6 +72,12 @@ export class StudentTableManager {
             (canvasContainer as HTMLElement).style.display = 'none';
         }
 
+        // 자리 배치도 숨기기 (학생 테이블 표시 시)
+        const cardLayoutContainer = outputSection.querySelector('#card-layout-container');
+        if (cardLayoutContainer) {
+            (cardLayoutContainer as HTMLElement).style.display = 'none';
+        }
+
         // 테이블 생성
         let studentTableContainer = outputSection.querySelector('.student-table-container') as HTMLElement | null;
         
@@ -91,6 +97,7 @@ export class StudentTableManager {
             grid-template-columns: repeat(3, 1fr);
             gap: 20px;
             margin-bottom: 20px;
+            position: relative;
         `;
         
         // 반응형: 작은 화면에서는 2단, 큰 화면에서는 3단

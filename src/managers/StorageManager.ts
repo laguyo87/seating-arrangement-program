@@ -4,6 +4,21 @@
  */
 
 import { OutputModule } from '../modules/OutputModule.js';
+
+/**
+ * 옵션 설정 데이터 타입
+ */
+interface OptionsData {
+    layoutType?: string;
+    pairMode?: string;
+    groupSize?: string;
+    groupGenderMix?: boolean;
+    maleStudents?: string;
+    femaleStudents?: string;
+    numberOfPartitions?: string;
+    customMode2?: string;
+    [key: string]: unknown; // 확장 가능한 구조
+}
 import { logger } from '../utils/logger.js';
 
 /**
@@ -83,7 +98,7 @@ export class StorageManager {
      */
     public saveOptions(): void {
         try {
-            const options: any = {};
+            const options: OptionsData = {};
 
             // 옵션1: 좌석 배치 형태
             const layoutType = document.querySelector('input[name="layout-type"]:checked') as HTMLInputElement;
@@ -151,9 +166,9 @@ export class StorageManager {
             }
 
             // JSON 파싱 시도 (데이터 손상 처리)
-            let options: any;
+            let options: OptionsData;
             try {
-                options = JSON.parse(savedOptionsStr);
+                options = JSON.parse(savedOptionsStr) as OptionsData;
             } catch (parseError) {
                 // 데이터 손상 시 저장소에서 제거하고 기본값으로 복구
                 try {
@@ -203,7 +218,7 @@ export class StorageManager {
                     if (options.groupGenderMix !== undefined) {
                         setTimeoutSafe(() => {
                             const groupGenderMixInput = document.getElementById('group-gender-mix') as HTMLInputElement;
-                            if (groupGenderMixInput) {
+                            if (groupGenderMixInput && typeof options.groupGenderMix === 'boolean') {
                                 groupGenderMixInput.checked = options.groupGenderMix;
                                 groupGenderMixInput.dispatchEvent(new Event('change', { bubbles: true }));
                             }

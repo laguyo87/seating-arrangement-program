@@ -199,9 +199,138 @@ export class OutputModule {
     }
 
     /**
-     * 로딩 인디케이터를 표시합니다.
+     * 통계를 숨깁니다.
      */
-    public showLoading(): void {
+    public hideStatistics(): void {
+        const statsElement = this.container.querySelector('.statistics');
+        if (statsElement) {
+            statsElement.remove();
+        }
+    }
+
+    /**
+     * 프로그레스 바를 표시합니다.
+     * @param message 진행 상황 메시지
+     * @param initialProgress 초기 진행률 (0-100)
+     * @returns 프로그레스 바 업데이트 함수
+     */
+    public showProgress(message: string, initialProgress: number = 0): (progress: number, statusMessage?: string) => void {
+        // 기존 프로그레스 바 제거
+        const existingProgress = this.container.querySelector('.progress-container');
+        if (existingProgress) {
+            existingProgress.remove();
+        }
+
+        // 프로그레스 바 컨테이너 생성
+        const progressContainer = document.createElement('div');
+        progressContainer.className = 'progress-container';
+        progressContainer.style.cssText = `
+            padding: 30px;
+            background: white;
+            border-radius: 8px;
+            margin: 20px 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        `;
+
+        // 메시지 영역
+        const messageElement = document.createElement('div');
+        messageElement.className = 'progress-message';
+        messageElement.textContent = message;
+        messageElement.style.cssText = `
+            margin-bottom: 15px;
+            font-size: 16px;
+            font-weight: 500;
+            color: #333;
+        `;
+
+        // 프로그레스 바 영역
+        const progressBarWrapper = document.createElement('div');
+        progressBarWrapper.style.cssText = `
+            width: 100%;
+            height: 24px;
+            background: #e9ecef;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+        `;
+
+        const progressBar = document.createElement('div');
+        progressBar.className = 'progress-bar';
+        progressBar.style.cssText = `
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
+            width: ${Math.max(0, Math.min(100, initialProgress))}%;
+            transition: width 0.3s ease;
+            position: relative;
+        `;
+
+        // 진행률 텍스트
+        const progressText = document.createElement('div');
+        progressText.className = 'progress-text';
+        progressText.style.cssText = `
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 12px;
+            font-weight: 600;
+            color: #333;
+            z-index: 1;
+        `;
+        progressText.textContent = `${Math.round(initialProgress)}%`;
+
+        // 상태 메시지 영역
+        const statusElement = document.createElement('div');
+        statusElement.className = 'progress-status';
+        statusElement.style.cssText = `
+            margin-top: 10px;
+            font-size: 14px;
+            color: #666;
+            min-height: 20px;
+        `;
+
+        progressBarWrapper.appendChild(progressBar);
+        progressBarWrapper.appendChild(progressText);
+        progressContainer.appendChild(messageElement);
+        progressContainer.appendChild(progressBarWrapper);
+        progressContainer.appendChild(statusElement);
+
+        // card-layout-container 앞에 프로그레스 바 추가
+        const cardContainer = this.container.querySelector('#card-layout-container');
+        if (cardContainer && cardContainer.parentNode) {
+            cardContainer.parentNode.insertBefore(progressContainer, cardContainer);
+        } else {
+            this.container.appendChild(progressContainer);
+        }
+
+        // 프로그레스 바 업데이트 함수 반환
+        return (progress: number, statusMessage?: string) => {
+            const clampedProgress = Math.max(0, Math.min(100, progress));
+            progressBar.style.width = `${clampedProgress}%`;
+            progressText.textContent = `${Math.round(clampedProgress)}%`;
+            
+            if (statusMessage) {
+                statusElement.textContent = statusMessage;
+            }
+        };
+    }
+
+    /**
+     * 프로그레스 바를 숨깁니다.
+     */
+    public hideProgress(): void {
+        const progressContainer = this.container.querySelector('.progress-container');
+        if (progressContainer) {
+            progressContainer.remove();
+        }
+    }
+
+    /**
+     * 로딩 인디케이터를 표시합니다 (프로그레스 바 없이).
+     * @param message 로딩 메시지
+     */
+    public showLoading(message: string = '자리 배치를 생성하는 중...'): void {
         // 기존 메시지와 로딩 요소만 제거 (card-layout-container는 보존)
         const existingMessage = this.container.querySelector('.output-message');
         if (existingMessage) {
@@ -211,13 +340,17 @@ export class OutputModule {
         if (existingLoading) {
             existingLoading.remove();
         }
+        const existingProgress = this.container.querySelector('.progress-container');
+        if (existingProgress) {
+            existingProgress.remove();
+        }
         
         const loadingElement = document.createElement('div');
         loadingElement.className = 'loading';
         loadingElement.innerHTML = `
             <div style="text-align: center; padding: 40px;">
                 <div style="border: 4px solid #f3f3f3; border-top: 4px solid #667eea; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto;"></div>
-                <p style="margin-top: 20px; color: #666;">자리 배치를 생성하는 중...</p>
+                <p style="margin-top: 20px; color: #666;">${message}</p>
             </div>
         `;
         
@@ -241,16 +374,6 @@ export class OutputModule {
         } else {
             // card-layout-container가 없으면 컨테이너에 직접 추가
             this.container.appendChild(loadingElement);
-        }
-    }
-
-    /**
-     * 통계를 숨깁니다.
-     */
-    public hideStatistics(): void {
-        const statsElement = this.container.querySelector('.statistics');
-        if (statsElement) {
-            statsElement.remove();
         }
     }
 }

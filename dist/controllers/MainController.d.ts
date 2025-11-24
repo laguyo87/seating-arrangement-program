@@ -8,32 +8,37 @@ export declare class MainController {
     private canvasModule;
     private outputModule;
     private customLayoutModule;
+    private layoutRenderer;
+    private animationManager;
+    private storageManager;
+    private csvFileHandler;
+    private printExportManager;
+    private uiManager;
+    private studentTableManager;
+    private inputValidator;
+    private keyboardDragDropManager;
     private students;
     private seats;
     private isInitialized;
+    private fixedSeatIds;
     private nextSeatId;
-    private isSyncing;
-    private historyManager;
-    private fixedSeatManager;
-    private dragDropManager;
+    private dragSourceCard;
     private dragOverIndicator;
+    private touchStartCard;
+    private touchStartPosition;
+    private isSyncing;
+    private layoutHistory;
+    private historyIndex;
+    private eventListeners;
+    private timers;
     constructor();
     /**
      * 초기화 시 이력 드롭다운 업데이트
      */
-    private initializeHistoryDropdown;
     /**
      * 앱 초기 상태로 되돌리기
      */
     private resetApp;
-    /**
-     * 옵션 설정 저장
-     */
-    private saveOptions;
-    /**
-     * 저장된 옵션 설정 불러오기
-     */
-    private loadOptions;
     /**
      * 초기 캔버스에 칠판과 교탁 그리기
      */
@@ -41,6 +46,10 @@ export declare class MainController {
     /**
      * 이벤트 리스너 초기화
      */
+    /**
+     * 입력 필드 검증 설정
+     */
+    private setupInputValidation;
     private initializeEventListeners;
     /**
      * 라디오 버튼 이벤트 리스너 초기화
@@ -76,17 +85,13 @@ export declare class MainController {
      */
     private createStudentCard;
     /**
-     * 드래그&드롭 핸들러
-     */
-    private handleDragDrop;
-    /**
      * 좌석 카드 드래그&드롭 스왑 기능 활성화 (이벤트 위임)
      */
     private enableSeatSwapDragAndDrop;
     /**
-     * 기존 드래그&드롭 메서드 (레거시 - 제거 예정, 더 이상 사용 안 함)
+     * 모바일 터치 드래그&드롭 지원
      */
-    private enableSeatSwapDragAndDropOld;
+    private enableTouchDragAndDrop;
     /**
      * 드롭 위치 삽입 인디케이터 표시
      */
@@ -124,6 +129,16 @@ export declare class MainController {
      */
     private updateFixedSeatDropdowns;
     /**
+     * 입력 값 검증 및 수정 (음수, 0, 큰 숫자 처리)
+     * InputValidator가 실시간 검증을 처리하므로, 여기서는 값 정규화만 수행
+     */
+    private validateAndFixStudentInput;
+    /**
+     * 분단 수 입력 값 검증 및 수정
+     * InputValidator가 실시간 검증을 처리하므로, 여기서는 값 정규화만 수행
+     */
+    private validateAndFixPartitionInput;
+    /**
      * 성별별 학생 수에 따라 미리보기 업데이트
      */
     private updatePreviewForGenderCounts;
@@ -139,6 +154,18 @@ export declare class MainController {
      * 모둠 배치로 카드 렌더링 (그룹으로 묶어서 표시)
      */
     private renderGroupCards;
+    /**
+     * localStorage 사용 가능 여부 확인
+     */
+    private isLocalStorageAvailable;
+    /**
+     * 안전한 localStorage 저장
+     */
+    private safeSetItem;
+    /**
+     * 안전한 localStorage 읽기
+     */
+    private safeGetItem;
     /**
      * 좌석 배치 결과를 localStorage에 저장
      */
@@ -234,21 +261,7 @@ export declare class MainController {
      */
     private moveToCell;
     /**
-     * 양식 파일 다운로드
-     */
-    private downloadTemplateFile;
-    /**
-     * 파일 업로드 처리
-     * @param event 파일 선택 이벤트
-     */
-    private handleFileUpload;
-    /**
-     * CSV 파일 파싱 및 테이블에 데이터 입력
-     * @param csvText CSV 파일 내용
-     */
-    private parseCsvFile;
-    /**
-     * 학생 데이터로 테이블 생성
+     * 학생 데이터로 테이블 생성 (handleCreateStudentTable에서 사용)
      * @param students 학생 배열
      */
     private createTableWithStudents;
@@ -294,9 +307,52 @@ export declare class MainController {
      */
     run(): void;
     /**
+     * 개발 모드 확인 (로컬호스트 또는 개발 환경)
+     */
+    private isDevelopmentMode;
+    /**
+     * 안전한 클립보드 복사 (브라우저 호환성 개선)
+     */
+    private copyToClipboard;
+    /**
+     * HTML 이스케이프 (XSS 방지)
+     * 향후 사용자 입력이 포함된 HTML 생성 시 사용
+     */
+    private escapeHtml;
+    /**
+     * 안전한 innerHTML 설정 (XSS 방지)
+     * 향후 사용자 입력이 포함된 HTML 생성 시 사용
+     */
+    private setSafeInnerHTML;
+    /**
+     * 안전한 이벤트 리스너 추가 (메모리 누수 방지)
+     * 향후 사용 예정
+     */
+    private addEventListenerSafe;
+    /**
+     * 안전한 setTimeout (메모리 누수 방지)
+     */
+    private setTimeoutSafe;
+    /**
+     * 모든 타이머 정리
+     */
+    private clearAllTimers;
+    /**
+     * 모든 이벤트 리스너 정리
+     */
+    private removeAllEventListeners;
+    /**
+     * 정리 메서드 (컨트롤러 종료 시 호출)
+     */
+    cleanup(): void;
+    /**
      * 좌석 배치하기 처리
      */
     private handleArrangeSeats;
+    /**
+     * 좌석 배치 처리 (내부 메서드)
+     */
+    private processArrangeSeats;
     /**
      * 자리 확정 처리
      */
@@ -334,14 +390,6 @@ export declare class MainController {
      */
     private createStudentNameCard;
     /**
-     * 자리 배치도 인쇄 처리
-     */
-    private handlePrintLayout;
-    /**
-     * 교탁용 자리 배치도 인쇄 처리 (180도 회전)
-     */
-    private handlePrintLayoutForTeacher;
-    /**
      * 자리 배치도 저장 처리
      */
     private handleSaveLayout;
@@ -357,6 +405,10 @@ export declare class MainController {
      * 뷰어 모드 UI 설정 (사이드바, 헤더 버튼 숨기기)
      */
     private setupViewerModeUI;
+    /**
+     * 공유된 배치 데이터 검증
+     */
+    private validateSharedData;
     /**
      * 공유된 배치 데이터 로드
      */
@@ -378,28 +430,40 @@ export declare class MainController {
      */
     private toggleSidebar;
     /**
-     * 커튼 애니메이션 시작 (닫기)
+     * 모바일 반응형 초기화
      */
-    private startCurtainAnimation;
+    private initializeMobileResponsive;
     /**
-     * 커튼 애니메이션 종료 (열기)
+     * 화면 크기 변경 처리
      */
-    private openCurtain;
+    private handleResize;
     /**
-     * 커튼 애니메이션 즉시 종료 (에러 시)
+     * 키보드 네비게이션 초기화
      */
-    private stopCurtainAnimation;
+    private initializeKeyboardNavigation;
     /**
-     * 폭죽 애니메이션 시작
+     * Tab 순서 최적화
      */
-    private startFireworks;
+    private optimizeTabOrder;
     /**
-     * 개별 폭죽 생성 및 파티클 애니메이션
+     * 포커스 표시 개선
      */
-    private createFirework;
+    private enhanceFocusStyles;
     /**
-     * 자리 배치 실행 시 음향 효과 재생 (3초)
+     * 키보드 드래그&드롭 설정
      */
-    private playArrangementSound;
+    private setupKeyboardDragDrop;
+    /**
+     * 키보드로 좌석 이동 처리
+     */
+    private handleKeyboardSeatMove;
+    /**
+     * 인접한 좌석 찾기
+     */
+    private findAdjacentSeat;
+    /**
+     * 좌석 교환
+     */
+    private swapSeats;
 }
 //# sourceMappingURL=MainController.d.ts.map

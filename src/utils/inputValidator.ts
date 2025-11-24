@@ -318,7 +318,7 @@ export class ValidationRules {
                 if (typeof value === 'string') {
                     return value.trim().length > 0;
                 }
-                return value !== null && value !== undefined && value !== '';
+                return value !== null && value !== undefined && String(value) !== '';
             },
             errorMessage: `${fieldName}을(를) 입력해주세요.`
         };
