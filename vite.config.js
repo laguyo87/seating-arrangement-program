@@ -15,7 +15,18 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true
+    sourcemap: true,
+    rollupOptions: {
+      input: './index.html'
+    },
+    // 의존성을 번들에 포함
+    commonjsOptions: {
+      include: [/xlsx/, /node_modules/]
+    }
+  },
+  // xlsx 같은 외부 의존성을 번들에 포함
+  optimizeDeps: {
+    include: ['xlsx']
   }
 });
 
