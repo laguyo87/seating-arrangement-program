@@ -1,6 +1,8 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+  // GitHub Pages base URL 설정
+  base: '/seating-arrangement-program/',
   server: {
     port: 8001,
     open: true,
