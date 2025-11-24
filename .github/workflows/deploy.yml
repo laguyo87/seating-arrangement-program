@@ -34,14 +34,23 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Copy static files to dist
+        run: |
+          cp browser-compatibility-check.js dist/ 2>/dev/null || true
+          cp visitor-counter.js dist/ 2>/dev/null || true
+          cp style.css dist/ 2>/dev/null || true
+          cp og-image.png dist/ 2>/dev/null || true
+          cp robots.txt dist/ 2>/dev/null || true
+          cp sitemap.xml dist/ 2>/dev/null || true
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
-          # GitHub Pages는 루트에서 index.html을 찾으므로 전체 프로젝트를 배포
+          path: 'dist'
+          # Vite 빌드 결과물(dist/)을 배포
 
   deploy:
     environment:

@@ -22,8 +22,12 @@ export default defineConfig({
     // 의존성을 번들에 포함
     commonjsOptions: {
       include: [/xlsx/, /node_modules/]
-    }
+    },
+    // 정적 파일 복사
+    copyPublicDir: true
   },
+  // 정적 파일 복사 설정
+  publicDir: false
   // xlsx 같은 외부 의존성을 번들에 포함
   optimizeDeps: {
     include: ['xlsx']
