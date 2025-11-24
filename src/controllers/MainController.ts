@@ -863,6 +863,11 @@ export class MainController {
                 this.handleUndoLayout();
             }
             
+            // 다시 실행하기 버튼 클릭
+            if (target.id === 'redo-layout') {
+                this.handleRedoLayout();
+            }
+            
             // 저장하기 버튼 클릭
             if (target.id === 'save-layout') {
                 this.handleSaveLayout();
@@ -879,23 +884,46 @@ export class MainController {
             }
         });
         
-        // 키보드 단축키: Ctrl+Z / Cmd+Z (되돌리기)
+        // 키보드 단축키: Ctrl+Z / Cmd+Z (되돌리기), Ctrl+Y / Cmd+Y (다시 실행하기)
         this.addEventListenerSafe(document, 'keydown', (e) => {
-            // Ctrl+Z (Windows/Linux) 또는 Cmd+Z (Mac)
             const ke = e as KeyboardEvent;
+            
+            // 입력 필드에 포커스가 있으면 기본 동작 허용 (텍스트 입력 되돌리기/다시 실행하기)
+            const activeElement = document.activeElement as HTMLElement;
+            const isInputFocused = activeElement && (
+                activeElement.tagName === 'INPUT' || 
+                activeElement.tagName === 'TEXTAREA' ||
+                (activeElement.isContentEditable === true)
+            );
+            
+            // Ctrl+Z / Cmd+Z (되돌리기)
             if ((ke.ctrlKey || ke.metaKey) && ke.key === 'z' && !ke.shiftKey) {
-                // 입력 필드에 포커스가 있으면 기본 동작 허용 (텍스트 입력 되돌리기)
-                const activeElement = document.activeElement as HTMLElement;
-                if (activeElement && (
-                    activeElement.tagName === 'INPUT' || 
-                    activeElement.tagName === 'TEXTAREA' ||
-                    (activeElement.isContentEditable === true)
-                )) {
+                if (isInputFocused) {
                     return; // 기본 동작 허용
                 }
                 
                 e.preventDefault();
                 this.handleUndoLayout();
+            }
+            
+            // Ctrl+Y / Cmd+Y (다시 실행하기)
+            if ((ke.ctrlKey || ke.metaKey) && ke.key === 'y' && !ke.shiftKey) {
+                if (isInputFocused) {
+                    return; // 기본 동작 허용
+                }
+                
+                e.preventDefault();
+                this.handleRedoLayout();
+            }
+            
+            // Ctrl+Shift+Z / Cmd+Shift+Z (다시 실행하기 - 대체 단축키)
+            if ((ke.ctrlKey || ke.metaKey) && ke.key === 'z' && ke.shiftKey) {
+                if (isInputFocused) {
+                    return; // 기본 동작 허용
+                }
+                
+                e.preventDefault();
+                this.handleRedoLayout();
             }
         });
     }
@@ -1190,7 +1218,7 @@ export class MainController {
                 
             }
             
-            // 모둠 배치로 렌더링
+            // 모둠 배치로 렌더링 (LayoutRenderer를 통해 처리)
             const dummySeats: Seat[] = this.students.map((_, index) => ({
                 id: index + 1,
                 position: { x: 0, y: 0 },
@@ -1200,7 +1228,8 @@ export class MainController {
                 isActive: true
             }));
             
-            this.renderGroupCards(dummySeats, groupSizeNumber, seatsArea);
+            // LayoutRenderer를 통해 모둠 배치 렌더링
+            this.layoutRenderer.renderFinalLayout(dummySeats);
             return;
         }
         
@@ -2484,29 +2513,108 @@ export class MainController {
             }
         }
         
-        // 되돌리기 버튼 상태 업데이트
-        this.updateUndoButtonState();
+        // 되돌리기/다시 실행하기 버튼 상태 업데이트
+        this.updateUndoRedoButtonState();
         
         
     }
     
     /**
-     * 되돌리기 버튼 활성화/비활성화 상태 업데이트
+     * 다시 실행하기 기능 실행
+     */
+    private handleRedoLayout(): void {
+        // 다시 실행할 히스토리가 없는 경우
+        if (this.historyIndex >= this.layoutHistory.length - 1 || this.layoutHistory.length === 0) {
+            const message = ErrorHandler.getUserFriendlyMessage(ErrorCode.UNDO_NOT_AVAILABLE);
+            this.outputModule.showError(message);
+            return;
+        }
+        
+        // 다음 상태로 복원 (인덱스를 먼저 증가시켜 다음 상태를 가져옴)
+        this.historyIndex++;
+        const nextState = this.layoutHistory[this.historyIndex];
+        
+        // 상태 타입에 따라 복원
+        if (nextState && nextState.type === 'layout') {
+            const seatsArea = document.getElementById('seats-area');
+            if (seatsArea && nextState.data) {
+                // HTML 복원
+                if (nextState.data.seatsAreaHTML && typeof nextState.data.seatsAreaHTML === 'string') {
+                    seatsArea.innerHTML = nextState.data.seatsAreaHTML;
+                }
+                
+                // 그리드 설정 복원
+                if (nextState.data.gridTemplateColumns && typeof nextState.data.gridTemplateColumns === 'string') {
+                    seatsArea.style.gridTemplateColumns = nextState.data.gridTemplateColumns;
+                }
+                
+                // 학생 데이터 복원
+                if (nextState.data.students) {
+                    // 학생 데이터 복원은 나중에 구현
+                    
+                }
+                
+                // 드래그&드롭 기능 다시 활성화 (복원된 카드에 대해)
+                this.enableSeatSwapDragAndDrop();
+            }
+        } else if (nextState && nextState.type === 'student-input') {
+            // 학생 입력 상태 복원
+            if (nextState.data && nextState.data.students) {
+                this.inputModule.setStudentData(nextState.data.students);
+            }
+        } else if (nextState && nextState.type === 'options') {
+            // 옵션 설정 복원
+            if (nextState.data && nextState.data.options) {
+                // 옵션 복원 로직 (필요시 구현)
+                
+            }
+        }
+        
+        // 되돌리기/다시 실행하기 버튼 상태 업데이트
+        this.updateUndoRedoButtonState();
+    }
+    
+    /**
+     * 되돌리기/다시 실행하기 버튼 활성화/비활성화 상태 업데이트
+     */
+    private updateUndoRedoButtonState(): void {
+        const undoButton = document.getElementById('undo-layout') as HTMLButtonElement;
+        const redoButton = document.getElementById('redo-layout') as HTMLButtonElement;
+        
+        // 되돌리기 버튼 상태 업데이트
+        if (undoButton) {
+            // 히스토리가 있고 이전 상태가 있으면 활성화
+            if (this.historyIndex > 0 && this.layoutHistory.length > 0) {
+                undoButton.disabled = false;
+                undoButton.style.opacity = '1';
+                undoButton.style.cursor = 'pointer';
+            } else {
+                undoButton.disabled = true;
+                undoButton.style.opacity = '0.5';
+                undoButton.style.cursor = 'not-allowed';
+            }
+        }
+        
+        // 다시 실행하기 버튼 상태 업데이트
+        if (redoButton) {
+            // 히스토리가 있고 다음 상태가 있으면 활성화
+            if (this.historyIndex < this.layoutHistory.length - 1 && this.layoutHistory.length > 0) {
+                redoButton.disabled = false;
+                redoButton.style.opacity = '1';
+                redoButton.style.cursor = 'pointer';
+            } else {
+                redoButton.disabled = true;
+                redoButton.style.opacity = '0.5';
+                redoButton.style.cursor = 'not-allowed';
+            }
+        }
+    }
+    
+    /**
+     * 되돌리기 버튼 활성화/비활성화 상태 업데이트 (하위 호환성)
      */
     private updateUndoButtonState(): void {
-        const undoButton = document.getElementById('undo-layout') as HTMLButtonElement;
-        if (!undoButton) return;
-        
-        // 히스토리가 있고 이전 상태가 있으면 활성화
-        if (this.historyIndex >= 0 && this.layoutHistory.length > 0) {
-            undoButton.disabled = false;
-            undoButton.style.opacity = '1';
-            undoButton.style.cursor = 'pointer';
-        } else {
-            undoButton.disabled = true;
-            undoButton.style.opacity = '0.5';
-            undoButton.style.cursor = 'not-allowed';
-        }
+        this.updateUndoRedoButtonState();
     }
     
     /**
@@ -2725,15 +2833,13 @@ export class MainController {
         const isGroupLayout = layoutType === 'group' && (groupSize === 'group-3' || groupSize === 'group-4' || groupSize === 'group-5' || groupSize === 'group-6');
         const groupSizeNumber = groupSize === 'group-3' ? 3 : groupSize === 'group-4' ? 4 : groupSize === 'group-5' ? 5 : groupSize === 'group-6' ? 6 : 0;
 
-        
-
         if (isGroupLayout && groupSizeNumber > 0) {
-            // 모둠 배치: 카드를 그룹으로 묶어서 표시
+            // 모둠 배치: LayoutRenderer를 통해 처리
+            this.layoutRenderer.renderFinalLayout(seats);
+            return;
+        }
             
-            this.renderGroupCards(seats, groupSizeNumber, seatsArea);
-        } else {
             // 일반 배치: 기존 방식대로 표시
-            
             // 학생 수에 따라 그리드 열 수 결정
             const columnCount = this.students.length <= 20 ? 4 : 6;
             seatsArea.style.gridTemplateColumns = `repeat(${columnCount}, 1fr)`;
@@ -2747,7 +2853,6 @@ export class MainController {
                 const card = this.createStudentCard(student, index);
                 seatsArea.appendChild(card);
             });
-        }
 
         // 렌더 후 드래그&드롭 스왑 핸들러 보장
         this.enableSeatSwapDragAndDrop();
@@ -2758,248 +2863,6 @@ export class MainController {
         }, 100);
     }
 
-    /**
-     * 모둠 배치로 카드 렌더링 (그룹으로 묶어서 표시)
-     */
-    private renderGroupCards(seats: Seat[], groupSize: number, seatsArea: HTMLElement): void {
-        
-        
-        // this.students가 비어있으면 임시 학생 데이터 생성
-        if (this.students.length === 0) {
-            const maleCount = parseInt((document.getElementById('male-students') as HTMLInputElement)?.value || '0', 10);
-            const femaleCount = parseInt((document.getElementById('female-students') as HTMLInputElement)?.value || '0', 10);
-            const totalCount = maleCount + femaleCount;
-            
-            
-            
-            // 임시 학생 데이터 생성
-            const tempStudents: Student[] = [];
-            for (let i = 0; i < totalCount; i++) {
-                const gender = i < maleCount ? 'M' : 'F';
-                tempStudents.push({
-                    id: i + 1,
-                    name: gender === 'M' ? `남학생${i + 1}` : `여학생${i - maleCount + 1}`,
-                    gender: gender as 'M' | 'F'
-                });
-            }
-            this.students = tempStudents;
-        }
-        
-        // 남녀 섞기 옵션 확인
-        const genderMixCheckbox = document.getElementById('group-gender-mix') as HTMLInputElement;
-        const shouldMixGender = genderMixCheckbox ? genderMixCheckbox.checked : false;
-        
-        // 남녀 섞기 옵션이 체크되어 있으면 각 모둠에 남녀가 균등하게 섞이도록 배치
-        let studentsToUse: Student[] = [];
-        if (shouldMixGender) {
-            // 남학생과 여학생 분리
-            const maleStudents = this.students.filter(s => s.gender === 'M');
-            const femaleStudents = this.students.filter(s => s.gender === 'F');
-            
-            // 각 그룹에 배치할 남녀 수 계산
-            const totalStudents = this.students.length;
-            const groupCount = Math.ceil(totalStudents / groupSize);
-            const malesPerGroup = Math.floor(maleStudents.length / groupCount);
-            const femalesPerGroup = Math.floor(femaleStudents.length / groupCount);
-            const remainingMales = maleStudents.length % groupCount;
-            const remainingFemales = femaleStudents.length % groupCount;
-            
-            // 각 그룹별로 남녀를 균등하게 배치
-            let maleIndex = 0;
-            let femaleIndex = 0;
-            
-            for (let groupIdx = 0; groupIdx < groupCount; groupIdx++) {
-                // 현재 그룹에 배치할 남녀 수 (남은 학생들을 앞 그룹에 배치)
-                const currentMales = malesPerGroup + (groupIdx < remainingMales ? 1 : 0);
-                const currentFemales = femalesPerGroup + (groupIdx < remainingFemales ? 1 : 0);
-                
-                // 남학생 추가
-                for (let i = 0; i < currentMales && maleIndex < maleStudents.length; i++) {
-                    studentsToUse.push(maleStudents[maleIndex++]);
-                }
-                
-                // 여학생 추가
-                for (let i = 0; i < currentFemales && femaleIndex < femaleStudents.length; i++) {
-                    studentsToUse.push(femaleStudents[femaleIndex++]);
-                }
-            }
-            
-            // 각 그룹 내에서 남녀를 섞기
-            for (let groupIdx = 0; groupIdx < groupCount; groupIdx++) {
-                const startIdx = groupIdx * groupSize;
-                const endIdx = Math.min(startIdx + groupSize, studentsToUse.length);
-                
-                // 그룹 내에서만 섞기
-                for (let i = endIdx - 1; i > startIdx; i--) {
-                    const j = startIdx + Math.floor(Math.random() * (i - startIdx + 1));
-                    [studentsToUse[i], studentsToUse[j]] = [studentsToUse[j], studentsToUse[i]];
-                }
-            }
-            
-            
-        } else {
-            // 남녀 섞기 옵션이 체크되지 않으면 기존 순서 유지
-            studentsToUse = [...this.students];
-        }
-        
-        // 분단 수 가져오기
-        const partitionInput = document.getElementById('number-of-partitions') as HTMLInputElement;
-        const partitionCount = partitionInput ? parseInt(partitionInput.value || '3', 10) : 3;
-        
-        
-        
-        // 그리드 레이아웃 설정 (모둠별로 배치)
-        seatsArea.style.display = 'grid';
-        seatsArea.style.gap = '20px 40px'; // 모둠 간 간격 (세로 20px, 가로 40px - 모둠 간 넓은 간격)
-        seatsArea.style.gridTemplateColumns = `repeat(${partitionCount}, 1fr)`;
-        seatsArea.style.justifyContent = 'center';
-        seatsArea.style.justifyItems = 'center'; // 각 모둠 컨테이너를 중앙 정렬
-
-        // 그룹 내 그리드 설정 (3명: 2x2, 4명: 2x2, 5명: 2x3, 6명: 2x3)
-        let colsPerGroup: number;
-        let rowsPerGroup: number;
-        if (groupSize === 3) {
-            colsPerGroup = 2; // 3명: 가로 2개
-            rowsPerGroup = 2; // 3명: 세로 2개
-        } else if (groupSize === 4) {
-            colsPerGroup = 2; // 4명: 가로 2개
-            rowsPerGroup = 2; // 4명: 세로 2개
-        } else if (groupSize === 5) {
-            colsPerGroup = 2; // 5명: 가로 2개
-            rowsPerGroup = 3; // 5명: 세로 3개
-        } else { // groupSize === 6
-            colsPerGroup = 2; // 6명: 가로 2개
-            rowsPerGroup = 3; // 6명: 세로 3개
-        }
-
-        // 학생들을 그룹으로 나누기 (섞인 학생 배열 사용)
-        const totalStudents = studentsToUse.length;
-        const groupCount = Math.ceil(totalStudents / groupSize);
-        
-        // 모둠별 그룹 수 계산
-        const groupsPerPartition = Math.ceil(groupCount / partitionCount);
-        
-        
-
-        // 모둠별로 그룹 배치
-        for (let partitionIndex = 0; partitionIndex < partitionCount; partitionIndex++) {
-            const partitionStartGroup = partitionIndex * groupsPerPartition;
-            const partitionEndGroup = Math.min(partitionStartGroup + groupsPerPartition, groupCount);
-            
-            // 모둠 컨테이너 생성 (레이블과 그룹들을 함께 묶음)
-            const partitionContainer = document.createElement('div');
-            partitionContainer.style.cssText = `
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                gap: 10px;
-                width: 100%;
-            `;
-            
-            // 분단 레이블 추가 (모둠 컨테이너 내부에)
-            const label = document.createElement('div');
-            label.textContent = `${partitionIndex + 1}분단`;
-            label.style.textAlign = 'center';
-            label.style.fontWeight = 'bold';
-            label.style.color = '#667eea';
-            label.style.fontSize = '0.9em';
-            label.style.width = '100%';
-            partitionContainer.appendChild(label);
-            
-            // 각 모둠 내의 그룹들을 담을 컨테이너
-            const groupsContainer = document.createElement('div');
-            groupsContainer.style.cssText = `
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                gap: 10px;
-                width: 100%;
-            `;
-            
-            // 각 모둠 내의 그룹들
-            for (let groupIndex = partitionStartGroup; groupIndex < partitionEndGroup; groupIndex++) {
-                // 그룹 컨테이너 생성
-                const groupContainer = document.createElement('div');
-                groupContainer.className = 'seat-group-container';
-                // 그리드 행 수도 명시적으로 설정
-                const gridTemplateRows = groupSize === 3 ? 'repeat(2, 1fr)' : 
-                                       groupSize === 4 ? 'repeat(2, 1fr)' : 
-                                       groupSize === 5 ? 'repeat(3, 1fr)' : 
-                                       'repeat(3, 1fr)'; // 6명
-                groupContainer.style.cssText = `
-                    display: grid;
-                    grid-template-columns: repeat(${colsPerGroup}, 1fr);
-                    grid-template-rows: ${gridTemplateRows};
-                    gap: 0;
-                    border: 3px solid #667eea;
-                    border-radius: 12px;
-                    padding: 5px;
-                    background: #f8f9fa;
-                    width: fit-content;
-                    min-width: 250px;
-                    box-sizing: border-box;
-                `;
-
-                // 그룹 내 카드 생성
-                const startIndex = groupIndex * groupSize;
-                const endIndex = Math.min(startIndex + groupSize, totalStudents);
-                
-                
-
-                for (let i = startIndex; i < endIndex; i++) {
-                    if (!studentsToUse[i]) {
-                        logger.warn(`학생 데이터 없음 - index: ${i}`);
-                        continue;
-                    }
-                    
-                    const student = studentsToUse[i];
-                    const card = this.createStudentCard(student, i);
-                    
-                    // 그룹 내 카드는 gap 없이 붙여서 표시
-                    card.style.margin = '0';
-                    card.style.borderRadius = '0';
-                    card.style.width = '100%';
-                    card.style.height = '100%';
-                    card.style.minWidth = '0';
-                    card.style.maxWidth = 'none';
-                    card.style.boxSizing = 'border-box';
-                    card.style.position = 'relative';
-                    
-                    const positionInGroup = i - startIndex;
-                    const row = Math.floor(positionInGroup / colsPerGroup);
-                    const col = positionInGroup % colsPerGroup;
-                    const isLastRow = row === rowsPerGroup - 1 || i === endIndex - 1 || (i + 1 - startIndex) > (row + 1) * colsPerGroup;
-                    const isFirstRow = row === 0;
-                    const isFirstCol = col === 0;
-                    const isLastCol = col === colsPerGroup - 1 || (i === endIndex - 1 && (i - startIndex) % colsPerGroup === (endIndex - startIndex - 1) % colsPerGroup);
-                    
-                    // 모서리 둥글게 처리
-                    if (isFirstRow && isFirstCol) {
-                        card.style.borderTopLeftRadius = '8px';
-                    }
-                    if (isFirstRow && isLastCol) {
-                        card.style.borderTopRightRadius = '8px';
-                    }
-                    if (isLastRow && isFirstCol) {
-                        card.style.borderBottomLeftRadius = '8px';
-                    }
-                    if (isLastRow && isLastCol) {
-                        card.style.borderBottomRightRadius = '8px';
-                    }
-
-                    groupContainer.appendChild(card);
-                }
-
-                groupsContainer.appendChild(groupContainer);
-            }
-            
-            // groupsContainer를 partitionContainer에 추가
-            partitionContainer.appendChild(groupsContainer);
-            
-            // partitionContainer를 seatsArea에 추가
-            seatsArea.appendChild(partitionContainer);
-        }
-    }
 
 
     /**

@@ -119,17 +119,235 @@ export class LayoutRenderer {
      * 모둠 배치로 카드 렌더링 (그룹으로 묶어서 표시)
      */
     private renderGroupCards(seats: Seat[], groupSize: number, seatsArea: HTMLElement): void {
-        // 이 메서드는 MainController에서 복잡한 로직이 있으므로
-        // 일단 기본 구조만 만들고, 나중에 이동
         const students = this.deps.getStudents();
         
+        // students가 비어있으면 임시 학생 데이터 생성
+        let studentsToUse: Student[] = [];
         if (students.length === 0) {
-            // 임시 학생 데이터 생성 로직은 MainController에 남겨둠
-            return;
+            const maleCount = parseInt((document.getElementById('male-students') as HTMLInputElement)?.value || '0', 10);
+            const femaleCount = parseInt((document.getElementById('female-students') as HTMLInputElement)?.value || '0', 10);
+            const totalCount = maleCount + femaleCount;
+            
+            // 임시 학생 데이터 생성
+            const tempStudents: Student[] = [];
+            for (let i = 0; i < totalCount; i++) {
+                const gender = i < maleCount ? 'M' : 'F';
+                tempStudents.push({
+                    id: i + 1,
+                    name: gender === 'M' ? `남학생${i + 1}` : `여학생${i - maleCount + 1}`,
+                    gender: gender as 'M' | 'F'
+                });
+            }
+            studentsToUse = tempStudents;
+        } else {
+            studentsToUse = [...students];
+        }
+        
+        // 남녀 섞기 옵션 확인
+        const genderMixCheckbox = document.getElementById('group-gender-mix') as HTMLInputElement;
+        const shouldMixGender = genderMixCheckbox ? genderMixCheckbox.checked : false;
+        
+        // 남녀 섞기 옵션이 체크되어 있으면 각 모둠에 남녀가 균등하게 섞이도록 배치
+        if (shouldMixGender && students.length > 0) {
+            // 남학생과 여학생 분리
+            const maleStudents = studentsToUse.filter(s => s.gender === 'M');
+            const femaleStudents = studentsToUse.filter(s => s.gender === 'F');
+            
+            // 각 그룹에 배치할 남녀 수 계산
+            const totalStudents = studentsToUse.length;
+            const groupCount = Math.ceil(totalStudents / groupSize);
+            const malesPerGroup = Math.floor(maleStudents.length / groupCount);
+            const femalesPerGroup = Math.floor(femaleStudents.length / groupCount);
+            const remainingMales = maleStudents.length % groupCount;
+            const remainingFemales = femaleStudents.length % groupCount;
+            
+            // 각 그룹별로 남녀를 균등하게 배치
+            let maleIndex = 0;
+            let femaleIndex = 0;
+            const mixedStudents: Student[] = [];
+            
+            for (let groupIdx = 0; groupIdx < groupCount; groupIdx++) {
+                // 현재 그룹에 배치할 남녀 수 (남은 학생들을 앞 그룹에 배치)
+                const currentMales = malesPerGroup + (groupIdx < remainingMales ? 1 : 0);
+                const currentFemales = femalesPerGroup + (groupIdx < remainingFemales ? 1 : 0);
+                
+                // 남학생 추가
+                for (let i = 0; i < currentMales && maleIndex < maleStudents.length; i++) {
+                    mixedStudents.push(maleStudents[maleIndex++]);
+                }
+                
+                // 여학생 추가
+                for (let i = 0; i < currentFemales && femaleIndex < femaleStudents.length; i++) {
+                    mixedStudents.push(femaleStudents[femaleIndex++]);
+                }
+            }
+            
+            // 각 그룹 내에서 남녀를 섞기
+            for (let groupIdx = 0; groupIdx < groupCount; groupIdx++) {
+                const startIdx = groupIdx * groupSize;
+                const endIdx = Math.min(startIdx + groupSize, mixedStudents.length);
+                
+                // 그룹 내에서만 섞기
+                for (let i = endIdx - 1; i > startIdx; i--) {
+                    const j = startIdx + Math.floor(Math.random() * (i - startIdx + 1));
+                    [mixedStudents[i], mixedStudents[j]] = [mixedStudents[j], mixedStudents[i]];
+                }
+            }
+            
+            studentsToUse = mixedStudents;
+        }
+        
+        // 분단 수 가져오기
+        const partitionInput = document.getElementById('number-of-partitions') as HTMLInputElement;
+        const partitionCount = partitionInput ? parseInt(partitionInput.value || '3', 10) : 3;
+        
+        // 그리드 레이아웃 설정 (모둠별로 배치)
+        seatsArea.style.display = 'grid';
+        seatsArea.style.gap = '20px 40px'; // 모둠 간 간격 (세로 20px, 가로 40px - 모둠 간 넓은 간격)
+        seatsArea.style.gridTemplateColumns = `repeat(${partitionCount}, 1fr)`;
+        seatsArea.style.justifyContent = 'center';
+        seatsArea.style.justifyItems = 'center'; // 각 모둠 컨테이너를 중앙 정렬
+
+        // 그룹 내 그리드 설정 (3명: 2x2, 4명: 2x2, 5명: 2x3, 6명: 2x3)
+        let colsPerGroup: number;
+        let rowsPerGroup: number;
+        if (groupSize === 3) {
+            colsPerGroup = 2; // 3명: 가로 2개
+            rowsPerGroup = 2; // 3명: 세로 2개
+        } else if (groupSize === 4) {
+            colsPerGroup = 2; // 4명: 가로 2개
+            rowsPerGroup = 2; // 4명: 세로 2개
+        } else if (groupSize === 5) {
+            colsPerGroup = 2; // 5명: 가로 2개
+            rowsPerGroup = 3; // 5명: 세로 3개
+        } else { // groupSize === 6
+            colsPerGroup = 2; // 6명: 가로 2개
+            rowsPerGroup = 3; // 6명: 세로 3개
         }
 
-        // TODO: renderGroupCards 로직 이동 (복잡하므로 단계적으로)
-        logger.warn('renderGroupCards는 아직 구현되지 않았습니다. MainController에서 처리합니다.');
+        // 학생들을 그룹으로 나누기 (섞인 학생 배열 사용)
+        const totalStudents = studentsToUse.length;
+        const groupCount = Math.ceil(totalStudents / groupSize);
+        
+        // 모둠별 그룹 수 계산
+        const groupsPerPartition = Math.ceil(groupCount / partitionCount);
+
+        // 모둠별로 그룹 배치
+        for (let partitionIndex = 0; partitionIndex < partitionCount; partitionIndex++) {
+            const partitionStartGroup = partitionIndex * groupsPerPartition;
+            const partitionEndGroup = Math.min(partitionStartGroup + groupsPerPartition, groupCount);
+            
+            // 모둠 컨테이너 생성 (레이블과 그룹들을 함께 묶음)
+            const partitionContainer = document.createElement('div');
+            partitionContainer.style.cssText = `
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 10px;
+                width: 100%;
+            `;
+            
+            // 분단 레이블 추가 (모둠 컨테이너 내부에)
+            const label = document.createElement('div');
+            label.textContent = `${partitionIndex + 1}분단`;
+            label.style.textAlign = 'center';
+            label.style.fontWeight = 'bold';
+            label.style.color = '#667eea';
+            label.style.fontSize = '0.9em';
+            label.style.width = '100%';
+            partitionContainer.appendChild(label);
+            
+            // 각 모둠 내의 그룹들을 담을 컨테이너
+            const groupsContainer = document.createElement('div');
+            groupsContainer.style.cssText = `
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 10px;
+                width: 100%;
+            `;
+            
+            // 각 모둠 내의 그룹들
+            for (let groupIndex = partitionStartGroup; groupIndex < partitionEndGroup; groupIndex++) {
+                // 그룹 컨테이너 생성
+                const groupContainer = document.createElement('div');
+                groupContainer.className = 'seat-group-container';
+                // 그리드 행 수도 명시적으로 설정
+                const gridTemplateRows = groupSize === 3 ? 'repeat(2, 1fr)' : 
+                                       groupSize === 4 ? 'repeat(2, 1fr)' : 
+                                       groupSize === 5 ? 'repeat(3, 1fr)' : 
+                                       'repeat(3, 1fr)'; // 6명
+                groupContainer.style.cssText = `
+                    display: grid;
+                    grid-template-columns: repeat(${colsPerGroup}, 1fr);
+                    grid-template-rows: ${gridTemplateRows};
+                    gap: 0;
+                    border: 3px solid #667eea;
+                    border-radius: 12px;
+                    padding: 5px;
+                    background: #f8f9fa;
+                    width: fit-content;
+                    min-width: 250px;
+                    box-sizing: border-box;
+                `;
+
+                // 그룹 내 카드 생성
+                const startIndex = groupIndex * groupSize;
+                const endIndex = Math.min(startIndex + groupSize, totalStudents);
+
+                for (let i = startIndex; i < endIndex; i++) {
+                    if (!studentsToUse[i]) {
+                        logger.warn(`학생 데이터 없음 - index: ${i}`);
+                        continue;
+                    }
+                    
+                    const student = studentsToUse[i];
+                    const card = this.createStudentCard(student, i);
+                    
+                    // 그룹 내 카드는 gap 없이 붙여서 표시
+                    card.style.margin = '0';
+                    card.style.borderRadius = '0';
+                    card.style.width = '100%';
+                    card.style.height = '100%';
+                    card.style.minWidth = '0';
+                    card.style.maxWidth = 'none';
+                    card.style.boxSizing = 'border-box';
+                    card.style.position = 'relative';
+                    
+                    const positionInGroup = i - startIndex;
+                    const row = Math.floor(positionInGroup / colsPerGroup);
+                    const col = positionInGroup % colsPerGroup;
+                    const isLastRow = row === rowsPerGroup - 1 || i === endIndex - 1 || (i + 1 - startIndex) > (row + 1) * colsPerGroup;
+                    const isFirstRow = row === 0;
+                    const isFirstCol = col === 0;
+                    const isLastCol = col === colsPerGroup - 1 || (i === endIndex - 1 && (i - startIndex) % colsPerGroup === (endIndex - startIndex - 1) % colsPerGroup);
+                    
+                    // 모서리 둥글게 처리
+                    if (isFirstRow && isFirstCol) {
+                        card.style.borderTopLeftRadius = '8px';
+                    }
+                    if (isFirstRow && isLastCol) {
+                        card.style.borderTopRightRadius = '8px';
+                    }
+                    if (isLastRow && isFirstCol) {
+                        card.style.borderBottomLeftRadius = '8px';
+                    }
+                    if (isLastRow && isLastCol) {
+                        card.style.borderBottomRightRadius = '8px';
+                    }
+
+                    groupContainer.appendChild(card);
+                }
+
+                groupsContainer.appendChild(groupContainer);
+            }
+            
+            // groupsContainer를 partitionContainer에 추가
+            partitionContainer.appendChild(groupsContainer);
+            
+            // partitionContainer를 seatsArea에 추가
+            seatsArea.appendChild(partitionContainer);
+        }
     }
 
     /**

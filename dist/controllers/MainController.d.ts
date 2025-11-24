@@ -109,7 +109,15 @@ export declare class MainController {
      */
     private handleUndoLayout;
     /**
-     * 되돌리기 버튼 활성화/비활성화 상태 업데이트
+     * 다시 실행하기 기능 실행
+     */
+    private handleRedoLayout;
+    /**
+     * 되돌리기/다시 실행하기 버튼 활성화/비활성화 상태 업데이트
+     */
+    private updateUndoRedoButtonState;
+    /**
+     * 되돌리기 버튼 활성화/비활성화 상태 업데이트 (하위 호환성)
      */
     private updateUndoButtonState;
     /**
@@ -150,10 +158,6 @@ export declare class MainController {
      * 학생 데이터로 카드 렌더링
      */
     private renderStudentCards;
-    /**
-     * 모둠 배치로 카드 렌더링 (그룹으로 묶어서 표시)
-     */
-    private renderGroupCards;
     /**
      * localStorage 사용 가능 여부 확인
      */
