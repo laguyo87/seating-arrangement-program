@@ -41,6 +41,7 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: '.'
+          # GitHub Pages는 루트에서 index.html을 찾으므로 전체 프로젝트를 배포
 
   deploy:
     environment:

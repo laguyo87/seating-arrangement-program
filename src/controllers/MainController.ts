@@ -889,11 +889,11 @@ export class MainController {
             const ke = e as KeyboardEvent;
             
             // 입력 필드에 포커스가 있으면 기본 동작 허용 (텍스트 입력 되돌리기/다시 실행하기)
-            const activeElement = document.activeElement as HTMLElement;
+                const activeElement = document.activeElement as HTMLElement;
             const isInputFocused = activeElement && (
-                activeElement.tagName === 'INPUT' || 
-                activeElement.tagName === 'TEXTAREA' ||
-                (activeElement.isContentEditable === true)
+                    activeElement.tagName === 'INPUT' || 
+                    activeElement.tagName === 'TEXTAREA' ||
+                    (activeElement.isContentEditable === true)
             );
             
             // Ctrl+Z / Cmd+Z (되돌리기)
@@ -2583,15 +2583,15 @@ export class MainController {
         
         // 되돌리기 버튼 상태 업데이트
         if (undoButton) {
-            // 히스토리가 있고 이전 상태가 있으면 활성화
+        // 히스토리가 있고 이전 상태가 있으면 활성화
             if (this.historyIndex > 0 && this.layoutHistory.length > 0) {
-                undoButton.disabled = false;
-                undoButton.style.opacity = '1';
-                undoButton.style.cursor = 'pointer';
-            } else {
-                undoButton.disabled = true;
-                undoButton.style.opacity = '0.5';
-                undoButton.style.cursor = 'not-allowed';
+            undoButton.disabled = false;
+            undoButton.style.opacity = '1';
+            undoButton.style.cursor = 'pointer';
+        } else {
+            undoButton.disabled = true;
+            undoButton.style.opacity = '0.5';
+            undoButton.style.cursor = 'not-allowed';
             }
         }
         
