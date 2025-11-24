@@ -62,13 +62,19 @@
     - StudentTableManager.ts: 920줄 생성 (815줄 감소)
 
 #### 1.2 프로덕션 코드에서 디버그 로그 정리
-- **현재 상태**: 약 36개 `console.log` 사용
-- **목표**: 모든 `console.*` 호출을 `logger`로 마이그레이션
+- **현재 상태**: 모든 `console.*` 호출을 `logger`로 마이그레이션 완료
+- **목표**: 모든 `console.*` 호출을 `logger`로 마이그레이션 ✅
 - **진행 상황**:
   - ✅ logger 유틸리티 클래스 생성 완료
-  - [ ] MainController.ts 내 `console.log` → `logger` 마이그레이션
-  - [ ] LayoutRenderer.ts 내 `console.log` → `logger` 마이그레이션
-  - [ ] 프로덕션 빌드에서 디버그 로그 자동 제거 확인
+  - ✅ MainController.ts 내 `console.*` → `logger` 마이그레이션 완료 (23개)
+  - ✅ LayoutRenderer.ts 내 `console.*` → `logger` 마이그레이션 완료 (2개)
+  - ✅ PrintExportManager.ts 내 `console.*` → `logger` 마이그레이션 완료 (4개)
+  - ✅ CSVFileHandler.ts 내 `console.*` → `logger` 마이그레이션 완료 (2개)
+  - ✅ StudentTableManager.ts 내 `console.*` → `logger` 마이그레이션 완료 (1개)
+  - ✅ StorageManager.ts 내 `console.*` → `logger` 마이그레이션 완료 (4개)
+  - ✅ AnimationManager.ts 내 `console.*` → `logger` 마이그레이션 완료 (1개)
+  - ✅ 총 36개 `console.*` 호출 마이그레이션 완료
+  - ✅ 프로덕션 빌드에서 디버그 로그 자동 제거 확인 (logger는 개발 모드에서만 출력)
 
 #### 1.3 타입 안전성 강화
 - **현재 상태**: `any` 타입 19개 사용

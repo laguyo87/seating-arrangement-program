@@ -20,6 +20,7 @@ import { CSVFileHandler, CSVFileHandlerDependencies } from '../managers/CSVFileH
 import { PrintExportManager, PrintExportManagerDependencies } from '../managers/PrintExportManager.js';
 import { UIManager, UIManagerDependencies } from '../managers/UIManager.js';
 import { StudentTableManager, StudentTableManagerDependencies } from '../managers/StudentTableManager.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * 메인 컨트롤러 클래스
@@ -248,9 +249,7 @@ export class MainController {
                 }
             }
         } catch (error) {
-            if (this.isDevelopmentMode()) {
-            console.error('초기화 실패:', error);
-            }
+            logger.error('초기화 실패:', error);
             this.outputModule.showError('프로그램 초기화 중 오류가 발생했습니다.');
         }
     }
@@ -322,9 +321,7 @@ export class MainController {
 
             this.outputModule.showInfo('초기화되었습니다. 기본 설정으로 돌아갑니다.');
         } catch (error) {
-            if (this.isDevelopmentMode()) {
-            console.error('초기화 중 오류:', error);
-            }
+            logger.error('초기화 중 오류:', error);
             this.outputModule.showError('초기화 중 오류가 발생했습니다.');
         }
     }
@@ -942,9 +939,7 @@ export class MainController {
         // 카드 컨테이너 표시
         const cardContainer = document.getElementById('card-layout-container');
         if (!cardContainer) {
-            if (this.isDevelopmentMode()) {
-            console.error('카드 컨테이너를 찾을 수 없습니다.');
-            }
+            logger.error('카드 컨테이너를 찾을 수 없습니다.');
             return;
         }
         
@@ -2700,7 +2695,7 @@ export class MainController {
 
                 for (let i = startIndex; i < endIndex; i++) {
                     if (!studentsToUse[i]) {
-                        console.warn(`학생 데이터 없음 - index: ${i}`);
+                        logger.warn(`학생 데이터 없음 - index: ${i}`);
                         continue;
                     }
                     
@@ -2787,9 +2782,7 @@ export class MainController {
             } else {
                 this.outputModule.showError('데이터 저장에 실패했습니다. 브라우저 설정을 확인해주세요.');
             }
-            if (this.isDevelopmentMode()) {
-                console.error('localStorage 저장 실패:', error);
-            }
+            logger.error('localStorage 저장 실패:', error);
             return false;
         }
     }
@@ -2805,9 +2798,7 @@ export class MainController {
         try {
             return localStorage.getItem(key);
         } catch (error) {
-            if (this.isDevelopmentMode()) {
-                console.error('localStorage 읽기 실패:', error);
-            }
+            logger.error('localStorage 읽기 실패:', error);
             return null;
         }
     }
@@ -2828,9 +2819,7 @@ export class MainController {
                 // 저장 실패 시 사용자에게 알림 (이미 safeSetItem에서 표시됨)
             }
         } catch (error) {
-            if (this.isDevelopmentMode()) {
-            console.error('배치 결과 저장 중 오류:', error);
-            }
+            logger.error('배치 결과 저장 중 오류:', error);
             this.outputModule.showError('배치 결과 저장 중 오류가 발생했습니다.');
         }
     }
@@ -2880,9 +2869,7 @@ export class MainController {
                 } catch {}
             }
         } catch (error) {
-            if (this.isDevelopmentMode()) {
-            console.error('배치 결과 불러오기 중 오류:', error);
-            }
+            logger.error('배치 결과 불러오기 중 오류:', error);
             // 에러 발생 시 저장소 정리 시도
             try {
                 localStorage.removeItem('layoutResult');
@@ -2914,9 +2901,7 @@ export class MainController {
 
             this.outputModule.showSuccess(`나머지 ${unassignedStudents.length}명의 학생이 랜덤으로 배치되었습니다.`);
         } catch (error) {
-            if (this.isDevelopmentMode()) {
-            console.error('랜덤 배치 중 오류:', error);
-            }
+            logger.error('랜덤 배치 중 오류:', error);
             this.outputModule.showError('랜덤 배치 중 오류가 발생했습니다.');
         }
     }
@@ -3071,9 +3056,7 @@ export class MainController {
             this.storageManager.safeSetItem('classStudentData', JSON.stringify(studentData));
             
         } catch (error) {
-            if (this.isDevelopmentMode()) {
-            console.error('학생 데이터 저장 중 오류:', error);
-            }
+            logger.error('학생 데이터 저장 중 오류:', error);
             this.outputModule.showError('학생 데이터 저장 중 오류가 발생했습니다.');
             return;
         }
@@ -4292,9 +4275,7 @@ export class MainController {
     public run(): void {
         if (!this.isInitialized) {
             // 개발 모드에서만 에러 로깅
-            if (this.isDevelopmentMode()) {
-            console.error('컨트롤러가 초기화되지 않았습니다.');
-            }
+            logger.error('컨트롤러가 초기화되지 않았습니다.');
             return;
         }
     }
@@ -4337,9 +4318,7 @@ export class MainController {
             document.body.removeChild(textarea);
             return successful;
         } catch (err) {
-            if (this.isDevelopmentMode()) {
-                console.error('클립보드 복사 실패:', err);
-            }
+            logger.error('클립보드 복사 실패:', err);
             return false;
         }
     }
@@ -4446,9 +4425,7 @@ export class MainController {
                 this.processArrangeSeats(studentData);
             }
         } catch (error) {
-            if (this.isDevelopmentMode()) {
-                console.error('좌석 배치 중 오류:', error);
-            }
+            logger.error('좌석 배치 중 오류:', error);
             this.outputModule.showError('좌석 배치 중 오류가 발생했습니다.');
             this.animationManager.stopCurtainAnimation();
         }
@@ -4977,9 +4954,7 @@ export class MainController {
             
             this.animationManager.stopCurtainAnimation();
             
-            if (this.isDevelopmentMode()) {
-            console.error('좌석 배치 중 오류:', error);
-            }
+            logger.error('좌석 배치 중 오류:', error);
             this.outputModule.showError('좌석 배치 중 오류가 발생했습니다. 콘솔을 확인해주세요.');
         }
     }
@@ -5092,9 +5067,7 @@ export class MainController {
 
             this.outputModule.showSuccess(`자리가 확정되었습니다! 날짜: ${dateString}`);
         } catch (error) {
-            if (this.isDevelopmentMode()) {
-            console.error('자리 확정 중 오류:', error);
-            }
+            logger.error('자리 확정 중 오류:', error);
             this.outputModule.showError('자리 확정 중 오류가 발생했습니다.');
         }
     }
@@ -5267,9 +5240,7 @@ export class MainController {
                 historyContent.style.display = 'none';
             }
         } catch (error) {
-            if (this.isDevelopmentMode()) {
-            console.error('이력 삭제 중 오류:', error);
-            }
+            logger.error('이력 삭제 중 오류:', error);
             this.outputModule.showError('이력 삭제 중 오류가 발생했습니다.');
         }
     }
@@ -5328,9 +5299,7 @@ export class MainController {
 
             this.outputModule.showSuccess(`${historyItem.date}의 자리 배치를 불러왔습니다.`);
         } catch (error) {
-            if (this.isDevelopmentMode()) {
-            console.error('이력 불러오기 중 오류:', error);
-            }
+            logger.error('이력 불러오기 중 오류:', error);
             this.outputModule.showError('이력을 불러오는 중 오류가 발생했습니다.');
         }
     }
@@ -5507,9 +5476,7 @@ export class MainController {
             this.showShareModal(shareUrl);
 
         } catch (error) {
-            if (this.isDevelopmentMode()) {
-                console.error('공유 중 오류:', error);
-            }
+            logger.error('공유 중 오류:', error);
             this.outputModule.showError('공유 중 오류가 발생했습니다.');
         }
     }
@@ -5656,9 +5623,7 @@ export class MainController {
             }, 300);
             
         } catch (error) {
-            if (this.isDevelopmentMode()) {
-                console.error('뷰어 모드 로드 실패:', error);
-            }
+            logger.error('뷰어 모드 로드 실패:', error);
             // 안전한 에러 메시지 표시 (innerHTML 대신 textContent 사용)
             const errorDiv = document.createElement('div');
             errorDiv.style.cssText = 'padding: 20px; text-align: center;';
@@ -5935,9 +5900,7 @@ export class MainController {
             }, 300);
             
         } catch (error) {
-            if (this.isDevelopmentMode()) {
-                console.error('공유 데이터 로드 실패:', error);
-            }
+            logger.error('공유 데이터 로드 실패:', error);
             this.outputModule.showError('공유된 자리 배치도를 로드할 수 없습니다.');
             
             // 실패 시 기본 레이아웃 표시
@@ -6074,7 +6037,7 @@ export class MainController {
                 }
                 document.removeEventListener('keydown', handleKeyDown);
             } catch (error) {
-                console.warn('모달 닫기 중 오류 (무시됨):', error);
+                logger.warn('모달 닫기 중 오류 (무시됨):', error);
             }
         };
 
@@ -6318,7 +6281,7 @@ export class MainController {
                 }
                 document.removeEventListener('keydown', handleKeyDown);
             } catch (error) {
-                console.warn('모달 닫기 중 오류 (무시됨):', error);
+                logger.warn('모달 닫기 중 오류 (무시됨):', error);
             }
         };
 

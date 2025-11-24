@@ -4,6 +4,7 @@
  */
 
 import { OutputModule } from '../modules/OutputModule.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * CSVFileHandler가 필요로 하는 의존성 인터페이스
@@ -96,9 +97,7 @@ export class CSVFileHandler {
                     const text = e.target?.result as string;
                     this.parseCsvFile(text);
                 } catch (error) {
-                    if (this.deps.isDevelopmentMode()) {
-                        console.error('파일 읽기 오류:', error);
-                    }
+                    logger.error('파일 읽기 오류:', error);
                     this.deps.outputModule.showError('파일을 읽는 중 오류가 발생했습니다.');
                 }
             };
@@ -221,9 +220,7 @@ export class CSVFileHandler {
                 uploadInput.value = '';
             }
         } catch (error) {
-            if (this.deps.isDevelopmentMode()) {
-                console.error('CSV 파싱 오류:', error);
-            }
+            logger.error('CSV 파싱 오류:', error);
             this.deps.outputModule.showError('CSV 파일을 읽는 중 오류가 발생했습니다. 파일 형식을 확인해주세요.');
         }
     }

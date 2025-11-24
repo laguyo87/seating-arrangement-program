@@ -4,6 +4,7 @@
  */
 
 import { OutputModule } from '../modules/OutputModule.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * StorageManager가 필요로 하는 의존성 인터페이스
@@ -56,9 +57,7 @@ export class StorageManager {
             } else {
                 this.deps.outputModule.showError('데이터 저장에 실패했습니다. 브라우저 설정을 확인해주세요.');
             }
-            if (this.deps.isDevelopmentMode()) {
-                console.error('localStorage 저장 실패:', error);
-            }
+            logger.error('localStorage 저장 실패:', error);
             return false;
         }
     }
@@ -74,9 +73,7 @@ export class StorageManager {
         try {
             return localStorage.getItem(key);
         } catch (error) {
-            if (this.deps.isDevelopmentMode()) {
-                console.error('localStorage 읽기 실패:', error);
-            }
+            logger.error('localStorage 읽기 실패:', error);
             return null;
         }
     }
@@ -138,9 +135,7 @@ export class StorageManager {
                 this.deps.outputModule.showSuccess('옵션 설정이 기억되었습니다.');
             }
         } catch (error) {
-            if (this.deps.isDevelopmentMode()) {
-                console.error('옵션 설정 저장 중 오류:', error);
-            }
+            logger.error('옵션 설정 저장 중 오류:', error);
             this.deps.outputModule.showError('옵션 설정 저장 중 오류가 발생했습니다.');
         }
     }
@@ -255,11 +250,11 @@ export class StorageManager {
                 }
             }
         } catch (error) {
-            if (this.deps.isDevelopmentMode()) {
-                console.error('옵션 설정 불러오기 중 오류:', error);
-            }
+            logger.error('옵션 설정 불러오기 중 오류:', error);
             // 오류가 발생해도 기본값으로 진행
         }
     }
 }
+
+
 

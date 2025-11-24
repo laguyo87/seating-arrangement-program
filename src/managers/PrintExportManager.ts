@@ -5,6 +5,7 @@
 
 import { OutputModule } from '../modules/OutputModule.js';
 import { Seat } from '../models/Seat.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * PrintExportManager가 필요로 하는 의존성 인터페이스
@@ -332,9 +333,7 @@ export class PrintExportManager {
             }, 500);
 
         } catch (error) {
-            if (this.deps.isDevelopmentMode()) {
-                console.error('인쇄 중 오류:', error);
-            }
+            logger.error('인쇄 중 오류:', error);
             this.deps.outputModule.showError('인쇄 중 오류가 발생했습니다.');
         }
     }
@@ -667,9 +666,7 @@ export class PrintExportManager {
             }, 500);
 
         } catch (error) {
-            if (this.deps.isDevelopmentMode()) {
-                console.error('교탁용 인쇄 중 오류:', error);
-            }
+            logger.error('교탁용 인쇄 중 오류:', error);
             this.deps.outputModule.showError('교탁용 인쇄 중 오류가 발생했습니다.');
         }
     }
@@ -693,9 +690,7 @@ export class PrintExportManager {
 
             this.deps.outputModule.showSuccess('결과가 다운로드되었습니다.');
         } catch (error) {
-            if (this.deps.isDevelopmentMode()) {
-                console.error('내보내기 중 오류:', error);
-            }
+            logger.error('내보내기 중 오류:', error);
             this.deps.outputModule.showError('내보내기 중 오류가 발생했습니다.');
         }
     }
@@ -884,9 +879,7 @@ export class PrintExportManager {
             this.deps.outputModule.showSuccess(`자리 배치도가 "${fileName}"으로 저장되었습니다.`);
 
         } catch (error) {
-            if (this.deps.isDevelopmentMode()) {
-                console.error('저장 중 오류:', error);
-            }
+            logger.error('저장 중 오류:', error);
             this.deps.outputModule.showError('저장 중 오류가 발생했습니다.');
         }
     }

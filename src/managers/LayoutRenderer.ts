@@ -6,6 +6,7 @@
 import { Student } from '../models/Student.js';
 import { Seat } from '../models/Seat.js';
 import { OutputModule } from '../modules/OutputModule.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * LayoutRenderer가 필요로 하는 의존성 인터페이스
@@ -44,9 +45,7 @@ export class LayoutRenderer {
         const cardContainer = document.getElementById('card-layout-container');
         
         if (!cardContainer) {
-            if (this.deps.isDevelopmentMode()) {
-                console.error('카드 컨테이너를 찾을 수 없습니다.');
-            }
+            logger.error('카드 컨테이너를 찾을 수 없습니다.');
             return;
         }
         
@@ -130,7 +129,7 @@ export class LayoutRenderer {
         }
 
         // TODO: renderGroupCards 로직 이동 (복잡하므로 단계적으로)
-        console.warn('renderGroupCards는 아직 구현되지 않았습니다. MainController에서 처리합니다.');
+        logger.warn('renderGroupCards는 아직 구현되지 않았습니다. MainController에서 처리합니다.');
     }
 
     /**

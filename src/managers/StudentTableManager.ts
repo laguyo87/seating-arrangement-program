@@ -8,6 +8,7 @@ import { StorageManager } from './StorageManager.js';
 import { CSVFileHandler } from './CSVFileHandler.js';
 import { UIManager } from './UIManager.js';
 import { Student } from '../models/Student.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * StudentTableManager가 필요로 하는 의존성 인터페이스
@@ -589,9 +590,7 @@ export class StudentTableManager {
                 this.deps.csvFileHandler.loadStudentDataToTable(savedData);
             }
         } catch (error) {
-            if (this.deps.isDevelopmentMode()) {
-                console.error('우리반 학생 데이터 불러오기 중 오류:', error);
-            }
+            logger.error('우리반 학생 데이터 불러오기 중 오류:', error);
             this.deps.outputModule.showError('우리반 학생 데이터를 불러오는 중 오류가 발생했습니다.');
         }
     }
@@ -917,4 +916,6 @@ export class StudentTableManager {
         }, 100);
     }
 }
+
+
 

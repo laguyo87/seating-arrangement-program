@@ -3,7 +3,8 @@
  * 개발 모드에서만 로그를 출력하고, 프로덕션에서는 제거됩니다.
  */
 
-const isDevelopment = import.meta.env.MODE === 'development' || import.meta.env.DEV;
+// Vite 환경 변수 타입 안전성 확보
+const isDevelopment = (import.meta as any).env?.MODE === 'development' || (import.meta as any).env?.DEV === true;
 
 /**
  * 로그 인자 타입 (unknown을 사용하여 타입 안전성 확보)

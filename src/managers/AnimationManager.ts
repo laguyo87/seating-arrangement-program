@@ -3,6 +3,8 @@
  * 커튼, 폭죽 애니메이션 및 사운드 효과 담당
  */
 
+import { logger } from '../utils/logger.js';
+
 /**
  * AnimationManager가 필요로 하는 의존성 인터페이스
  */
@@ -244,10 +246,10 @@ export class AnimationManager {
             source.start(0);
         } catch (error) {
             // 오디오 재생 실패 시 조용히 무시 (사용자 경험 방해 방지)
-            if (this.deps.isDevelopmentMode()) {
-                console.warn('음향 효과 재생 실패:', error);
-            }
+            logger.warn('음향 효과 재생 실패:', error);
         }
     }
 }
+
+
 
