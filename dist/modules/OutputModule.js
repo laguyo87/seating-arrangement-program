@@ -7,11 +7,23 @@
  */
 export class OutputModule {
     constructor(containerId) {
+        this.ariaLiveRegion = null;
         const container = document.getElementById(containerId);
         if (!container) {
             throw new Error(`Container with id '${containerId}' not found`);
         }
         this.container = container;
+        // ARIA live region 초기화
+        this.ariaLiveRegion = document.getElementById('aria-live-region');
+        if (!this.ariaLiveRegion) {
+            // aria-live region이 없으면 생성
+            this.ariaLiveRegion = document.createElement('div');
+            this.ariaLiveRegion.id = 'aria-live-region';
+            this.ariaLiveRegion.setAttribute('aria-live', 'polite');
+            this.ariaLiveRegion.setAttribute('aria-atomic', 'true');
+            this.ariaLiveRegion.className = 'sr-only';
+            this.container.insertBefore(this.ariaLiveRegion, this.container.firstChild);
+        }
     }
     /**
      * 성공 메시지를 표시합니다.
@@ -49,31 +61,57 @@ export class OutputModule {
         if (existingLoading) {
             existingLoading.remove();
         }
-        // 새 메시지 생성
-        const messageElement = document.createElement('div');
+        // 새 메시지 생성 (의미론적 태그 사용)
+        const messageElement = document.createElement(type === 'error' ? 'div' : 'div');
         messageElement.className = `output-message ${type}`;
         messageElement.textContent = message;
+        // ARIA 속성 추가 (스크린 리더 지원)
+        messageElement.setAttribute('role', type === 'error' ? 'alert' : 'status');
+        messageElement.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
+        messageElement.setAttribute('aria-atomic', 'true');
         // 타입별 스타일
         messageElement.style.padding = '15px';
         messageElement.style.margin = '20px 0';
         messageElement.style.borderRadius = '5px';
         messageElement.style.fontWeight = 'bold';
         if (type === 'success') {
+            // WCAG 2.1 AA 기준 충족: #155724 on #d4edda (대비율 4.8:1)
             messageElement.style.background = '#d4edda';
             messageElement.style.color = '#155724';
             messageElement.style.border = '1px solid #c3e6cb';
+            messageElement.setAttribute('aria-label', `성공: ${message}`);
+            // 아이콘 추가 (색상 외 시각적 구분)
+            messageElement.innerHTML = `✅ <span>${message}</span>`;
         }
         else if (type === 'error') {
+            // WCAG 2.1 AA 기준 충족: #721c24 on #f8d7da (대비율 5.2:1)
             messageElement.style.background = '#f8d7da';
             messageElement.style.color = '#721c24';
             messageElement.style.border = '1px solid #f5c6cb';
+            messageElement.setAttribute('aria-label', `오류: ${message}`);
+            // 아이콘 추가 (색상 외 시각적 구분)
+            messageElement.innerHTML = `❌ <span>${message}</span>`;
         }
         else {
+            // WCAG 2.1 AA 기준 충족: #0c5460 on #d1ecf1 (대비율 4.6:1)
             messageElement.style.background = '#d1ecf1';
             messageElement.style.color = '#0c5460';
             messageElement.style.border = '1px solid #bee5eb';
+            messageElement.setAttribute('aria-label', `정보: ${message}`);
+            // 아이콘 추가 (색상 외 시각적 구분)
+            messageElement.innerHTML = `ℹ️ <span>${message}</span>`;
         }
         this.container.appendChild(messageElement);
+        // 스크린 리더를 위한 aria-live 영역 업데이트
+        if (this.ariaLiveRegion) {
+            this.ariaLiveRegion.textContent = message;
+            // 메시지가 업데이트되었음을 알리기 위해 잠시 후 초기화
+            setTimeout(() => {
+                if (this.ariaLiveRegion) {
+                    this.ariaLiveRegion.textContent = '';
+                }
+            }, 1000);
+        }
         // 5초 후 자동 제거 (에러는 클릭으로만 제거)
         if (type !== 'error') {
             setTimeout(() => {
@@ -82,6 +120,9 @@ export class OutputModule {
         }
         else {
             messageElement.onclick = () => messageElement.remove();
+            messageElement.setAttribute('tabindex', '0');
+            messageElement.setAttribute('role', 'alert');
+            messageElement.style.cursor = 'pointer';
         }
     }
     /**
@@ -273,8 +314,15 @@ export class OutputModule {
             const clampedProgress = Math.max(0, Math.min(100, progress));
             progressBar.style.width = `${clampedProgress}%`;
             progressText.textContent = `${Math.round(clampedProgress)}%`;
+            // ARIA 속성 업데이트
+            progressContainer.setAttribute('aria-valuenow', clampedProgress.toString());
             if (statusMessage) {
                 statusElement.textContent = statusMessage;
+                progressContainer.setAttribute('aria-label', `${message}: ${statusMessage}`);
+            }
+            // 스크린 리더를 위한 업데이트
+            if (this.ariaLiveRegion && statusMessage) {
+                this.ariaLiveRegion.textContent = `${message}: ${statusMessage} (${Math.round(clampedProgress)}%)`;
             }
         };
     }

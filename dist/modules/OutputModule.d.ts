@@ -7,6 +7,7 @@
  */
 export declare class OutputModule {
     private container;
+    private ariaLiveRegion;
     constructor(containerId: string);
     /**
      * 성공 메시지를 표시합니다.

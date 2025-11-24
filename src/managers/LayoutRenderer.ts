@@ -146,7 +146,9 @@ export class LayoutRenderer {
         
         // 접근성 개선: ARIA 레이블 추가
         card.setAttribute('role', 'button');
-        card.setAttribute('aria-label', `좌석 ${seatId}: ${student.name} (${student.gender === 'M' ? '남학생' : '여학생'})`);
+        // 성별 아이콘 정보 포함
+        const genderLabel = student.gender === 'M' ? '남학생 ♂' : '여학생 ♀';
+        card.setAttribute('aria-label', `좌석 ${seatId}: ${student.name} (${genderLabel})`);
         card.setAttribute('tabindex', '0');
         
         // 좌석 번호 표시 (좌측 상단)

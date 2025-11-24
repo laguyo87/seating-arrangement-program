@@ -92,8 +92,12 @@ export class InputValidator {
         // 검증 결과에 따라 스타일 및 메시지 업데이트
         if (isValid) {
             this.clearError(input);
+            // aria-invalid 제거
+            input.setAttribute('aria-invalid', 'false');
         } else {
             this.showError(input, errorMessage, config);
+            // aria-invalid 설정
+            input.setAttribute('aria-invalid', 'true');
         }
 
         return isValid;
@@ -179,6 +183,7 @@ export class InputValidator {
             // ARIA 속성 업데이트
             input.setAttribute('aria-invalid', 'true');
             input.setAttribute('aria-describedby', messageId);
+            input.setAttribute('aria-errormessage', messageId);
         }
     }
 

@@ -81,8 +81,8 @@
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-content">
             <!-- 옵션1: 좌석 배치 형태 -->
-            <section id="layout-section" class="step-section">
-                <h2>옵션1: 좌석 배치 형태</h2>
+            <section id="layout-section" class="step-section" aria-labelledby="layout-section-title">
+                <h2 id="layout-section-title">옵션1: 좌석 배치 형태</h2>
                 
                 <div class="form-group">
                     <div class="radio-group">
@@ -175,8 +175,8 @@
             </section>
 
             <!-- 옵션2: 학생 자리 수 -->
-            <section id="input-section" class="step-section">
-                <h2>옵션2: 학생 자리 수</h2>
+            <section id="input-section" class="step-section" aria-labelledby="input-section-title">
+                <h2 id="input-section-title">옵션2: 학생 자리 수</h2>
                 
                 <div class="form-group" style="display: flex; align-items: center; gap: 10px; flex-wrap: nowrap;">
                     <div style="display: flex; align-items: center; gap: 5px;">
@@ -185,8 +185,9 @@
                                inputmode="numeric" pattern="[0-9]*"
                                style="width: 60px; padding: 6px 8px;" 
                                aria-label="남학생 수 입력" 
-                               aria-describedby="male-students-help" />
-                        <span id="male-students-help" class="sr-only">남학생 수를 입력하세요.</span>
+                               aria-describedby="male-students-help male-students-desc"
+                               aria-required="false" />
+                        <span id="male-students-help" class="sr-only">남학생 수를 입력하세요. 0부터 100까지 입력 가능합니다.</span>
                     </div>
                     
                     <div style="display: flex; align-items: center; gap: 5px;">
@@ -195,19 +196,21 @@
                                inputmode="numeric" pattern="[0-9]*"
                                style="width: 60px; padding: 6px 8px;" 
                                aria-label="여학생 수 입력" 
-                               aria-describedby="female-students-help" />
-                        <span id="female-students-help" class="sr-only">여학생 수를 입력하세요.</span>
+                               aria-describedby="female-students-help female-students-desc"
+                               aria-required="false" />
+                        <span id="female-students-help" class="sr-only">여학생 수를 입력하세요. 0부터 100까지 입력 가능합니다.</span>
                     </div>
                 </div>
                 
-                <p class="help-text" style="margin-top: 8px; color: #666; font-size: 0.9em;">
+                <p id="male-students-desc" class="help-text" style="margin-top: 8px; color: #666; font-size: 0.9em;">
                     남학생 수와 여학생 수를 입력하면 우측에 미리보기가 자동으로 표시됩니다.
                 </p>
+                <p id="female-students-desc" class="sr-only">여학생 수와 남학생 수를 입력하면 우측에 미리보기가 자동으로 표시됩니다.</p>
             </section>
 
             <!-- 옵션3: 분단 개수 -->
-            <section id="partition-section" class="step-section">
-                <h2>옵션3: 분단 개수</h2>
+            <section id="partition-section" class="step-section" aria-labelledby="partition-section-title">
+                <h2 id="partition-section-title">옵션3: 분단 개수</h2>
                 
                 <div class="form-group">
                     <div style="display: flex; align-items: center; gap: 10px; flex-wrap: nowrap;">
@@ -216,19 +219,20 @@
                             <input type="number" id="number-of-partitions" min="1" max="10" placeholder="분단 수" value="5" 
                                    style="width: 80px;" 
                                    aria-label="분단 수 입력 (1-10개)" 
-                                   aria-describedby="partitions-help" />
+                                   aria-describedby="partitions-help number-of-partitions-desc"
+                                   aria-required="true" />
                             <span id="partitions-help" class="sr-only">교실의 분단 수를 입력하세요. 1개부터 10개까지 입력 가능합니다.</span>
                         </div>
                     </div>
-                    <p class="help-text" style="margin-top: 8px; color: #666; font-size: 0.9em;">
+                    <p id="number-of-partitions-desc" class="help-text" style="margin-top: 8px; color: #666; font-size: 0.9em;">
                         교실의 분단 수를 입력하세요 (예: 2분단, 3분단 등)
                     </p>
                 </div>
             </section>
 
             <!-- 옵션4: 맞춤 구성 -->
-            <section id="custom2-section" class="step-section">
-                <h2>옵션4: 맞춤 구성</h2>
+            <section id="custom2-section" class="step-section" aria-labelledby="custom2-section-title">
+                <h2 id="custom2-section-title">옵션4: 맞춤 구성</h2>
                 
                 <div class="form-group">
                     <div class="radio-group">
@@ -245,8 +249,8 @@
             </section>
 
             <!-- 🪑 좌석 배치하기 -->
-            <section id="main-action-section" class="step-section">
-                <h2>🪑 좌석 배치하기</h2>
+            <section id="main-action-section" class="step-section" aria-labelledby="main-action-section-title">
+                <h2 id="main-action-section-title">🪑 좌석 배치하기</h2>
                 
                 <div class="form-group">
                     <button id="create-student-table" class="primary-btn" aria-label="학생 이름 입력 테이블 생성">학생 이름 입력하기</button>

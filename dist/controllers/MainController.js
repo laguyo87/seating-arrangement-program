@@ -1432,7 +1432,9 @@ export class MainController {
         card.setAttribute('data-seat-id', seatId.toString());
         // 접근성 개선: ARIA 레이블 추가
         card.setAttribute('role', 'button');
-        card.setAttribute('aria-label', `좌석 ${seatId}: ${student.name} (${student.gender === 'M' ? '남학생' : '여학생'})`);
+        // 성별 아이콘 정보 포함
+        const genderLabel = student.gender === 'M' ? '남학생 ♂' : '여학생 ♀';
+        card.setAttribute('aria-label', `좌석 ${seatId}: ${student.name} (${genderLabel})`);
         card.setAttribute('tabindex', '0');
         // 좌석 번호 표시 (좌측 상단)
         const seatNumberDiv = document.createElement('div');
@@ -1473,21 +1475,27 @@ export class MainController {
         // 성별에 따라 클래스 추가
         if (student.gender === 'M') {
             card.classList.add('gender-m');
+            // ARIA 레이블에 성별 아이콘 정보 추가
+            card.setAttribute('aria-label', `좌석 ${seatId}: ${student.name} (남학생 ♂)`);
         }
         else {
             card.classList.add('gender-f');
+            // ARIA 레이블에 성별 아이콘 정보 추가
+            card.setAttribute('aria-label', `좌석 ${seatId}: ${student.name} (여학생 ♀)`);
         }
         card.appendChild(nameDiv);
         // 이미 고정된 좌석인 경우 시각적 표시
         if (this.fixedSeatIds.has(seatId)) {
             card.classList.add('fixed-seat');
-            card.setAttribute('aria-label', `고정 좌석 ${seatId}: ${student.name} (${student.gender === 'M' ? '남학생' : '여학생'}) - 클릭하여 해제`);
+            const genderLabel = student.gender === 'M' ? '남학생 ♂' : '여학생 ♀';
+            card.setAttribute('aria-label', `고정 좌석 ${seatId}: ${student.name} (${genderLabel}) - 클릭하여 해제`);
             card.title = '고정 좌석 (클릭하여 해제)';
-            // 🔒 아이콘 추가
+            // 🔒 아이콘 추가 (색상 외 시각적 구분)
             const lockIcon = document.createElement('div');
             lockIcon.className = 'fixed-seat-lock';
             lockIcon.textContent = '🔒';
             lockIcon.setAttribute('aria-hidden', 'true');
+            lockIcon.setAttribute('aria-label', '고정 좌석');
             lockIcon.style.cssText = 'position: absolute; top: 5px; right: 5px; font-size: 1.2em; z-index: 10; pointer-events: none;';
             card.appendChild(lockIcon);
         }
@@ -6088,16 +6096,25 @@ export class MainController {
         sourceCard.classList.toggle('gender-f', tgtIsF);
         targetCard.classList.toggle('gender-m', srcIsM);
         targetCard.classList.toggle('gender-f', srcIsF);
-        // ARIA 레이블 업데이트
+        // ARIA 레이블 업데이트 (성별 정보 포함)
         const srcSeatId = sourceCard.getAttribute('data-seat-id');
         const tgtSeatId = targetCard.getAttribute('data-seat-id');
         const srcName = srcNameEl.textContent || '빈 좌석';
         const tgtName = tgtNameEl.textContent || '빈 좌석';
+        // 성별 정보 가져오기
+        const srcIsMale = sourceCard.classList.contains('gender-m');
+        const srcIsFemale = sourceCard.classList.contains('gender-f');
+        const tgtIsMale = targetCard.classList.contains('gender-m');
+        const tgtIsFemale = targetCard.classList.contains('gender-f');
+        const srcGenderLabel = srcIsMale ? '남학생 ♂' : (srcIsFemale ? '여학생 ♀' : '');
+        const tgtGenderLabel = tgtIsMale ? '남학생 ♂' : (tgtIsFemale ? '여학생 ♀' : '');
         if (srcSeatId) {
-            sourceCard.setAttribute('aria-label', `좌석 ${srcSeatId}: ${tgtName}. 화살표 키로 이동, Enter로 선택`);
+            const genderInfo = srcGenderLabel ? ` (${srcGenderLabel})` : '';
+            sourceCard.setAttribute('aria-label', `좌석 ${srcSeatId}: ${tgtName}${genderInfo}. 화살표 키로 이동, Enter로 선택`);
         }
         if (tgtSeatId) {
-            targetCard.setAttribute('aria-label', `좌석 ${tgtSeatId}: ${srcName}. 화살표 키로 이동, Enter로 선택`);
+            const genderInfo = tgtGenderLabel ? ` (${tgtGenderLabel})` : '';
+            targetCard.setAttribute('aria-label', `좌석 ${tgtSeatId}: ${srcName}${genderInfo}. 화살표 키로 이동, Enter로 선택`);
         }
         // 성공 피드백
         targetCard.style.transform = 'scale(1.05)';

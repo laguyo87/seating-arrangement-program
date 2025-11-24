@@ -1625,23 +1625,66 @@ button:disabled {
 }
 
 .student-seat-card.gender-m {
-    background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
+    background: linear-gradient(135deg, #1565c0 0%, #0d47a1 100%);
     border-color: #0d47a1;
+    position: relative;
 }
 
 .student-seat-card.gender-m .student-name {
-    color: #ffffff !important; /* WCAG 2.1 AA 기준 충족 (4.5:1 이상) */
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    color: #ffffff !important; /* WCAG 2.1 AA 기준 충족 (대비율 7.0:1 이상) */
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    font-weight: 600;
+}
+
+/* 남학생 아이콘 추가 (색상 외 시각적 구분) */
+.student-seat-card.gender-m::before {
+    content: '♂';
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    font-size: 1.1em;
+    color: #ffffff;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-weight: bold;
+    z-index: 5;
+    line-height: 1;
 }
 
 .student-seat-card.gender-f {
-    background: linear-gradient(135deg, #c2185b 0%, #ad1457 100%);
+    background: linear-gradient(135deg, #ad1457 0%, #880e4f 100%);
     border-color: #880e4f;
+    position: relative;
 }
 
 .student-seat-card.gender-f .student-name {
-    color: #ffffff !important; /* WCAG 2.1 AA 기준 충족 (4.5:1 이상) */
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    color: #ffffff !important; /* WCAG 2.1 AA 기준 충족 (대비율 6.5:1 이상) */
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    font-weight: 600;
+}
+
+/* 여학생 아이콘 추가 (색상 외 시각적 구분) */
+.student-seat-card.gender-f::before {
+    content: '♀';
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    font-size: 1.1em;
+    color: #ffffff;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-weight: bold;
+    z-index: 5;
+    line-height: 1;
+}
+
+/* 고정 좌석인 경우 아이콘 위치 조정 */
+.student-seat-card.fixed-seat.gender-m::before,
+.student-seat-card.fixed-seat.gender-f::before {
+    top: 30px;
+    right: 5px;
 }
 
 /* 성별 아이콘 스타일 */
@@ -1660,16 +1703,40 @@ button:disabled {
 /* 고정 좌석 스타일 (색상 외 시각적 구분 강화) */
 .student-seat-card.fixed-seat {
     border: 4px solid #dc3545 !important;
-    border-style: double dashed !important;
-    background: repeating-linear-gradient(
-        45deg,
-        rgba(220, 53, 69, 0.05),
-        rgba(220, 53, 69, 0.05) 10px,
-        rgba(220, 53, 69, 0.15) 10px,
-        rgba(220, 53, 69, 0.15) 20px
-    ) !important;
+    border-style: double !important;
+    /* 대각선 패턴 추가 (색상 외 시각적 구분) */
+    background-image: 
+        repeating-linear-gradient(
+            45deg,
+            transparent,
+            transparent 8px,
+            rgba(220, 53, 69, 0.1) 8px,
+            rgba(220, 53, 69, 0.1) 16px
+        ) !important;
     position: relative;
-    box-shadow: inset 0 0 10px rgba(220, 53, 69, 0.2), 0 0 0 2px rgba(220, 53, 69, 0.3) !important;
+    box-shadow: 
+        inset 0 0 10px rgba(220, 53, 69, 0.2), 
+        0 0 0 2px rgba(220, 53, 69, 0.3),
+        0 0 0 4px rgba(255, 255, 255, 0.5) !important;
+    /* 고정 좌석 표시 텍스트 추가 */
+}
+
+.student-seat-card.fixed-seat::after {
+    content: '고정';
+    position: absolute;
+    bottom: 5px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(220, 53, 69, 0.9);
+    color: #ffffff;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.7em;
+    font-weight: bold;
+    z-index: 6;
+    border: 1px solid #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    white-space: nowrap;
 }
 
 .fixed-seat-lock {

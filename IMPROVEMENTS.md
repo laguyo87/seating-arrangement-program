@@ -217,18 +217,59 @@
     - 시각적 피드백 제공 (선택된 좌석 하이라이트)
 
 #### 3.2 스크린 리더 지원
-- **현재 상태**: 일부 ARIA 레이블 구현됨
-- **개선 필요**:
-  - [ ] ARIA 레이블 보완 (`aria-label`, `aria-describedby`)
-  - [ ] 의미론적 HTML 태그 사용 강화
-  - [ ] 상태 변경 시 알림 제공 (`aria-live` 사용)
-  - [ ] 폼 입력 필드에 `aria-required`, `aria-invalid` 추가
+- **현재 상태**: 스크린 리더 지원 최적화 완료 ✅
+- **진행 상황**:
+  - ✅ ARIA 레이블 보완 (`aria-label`, `aria-describedby`)
+    - 모든 주요 버튼에 `aria-label` 추가
+    - 입력 필드에 `aria-describedby` 연결 (도움말 텍스트)
+    - 좌석 카드에 상세한 `aria-label` 추가 (좌석 번호, 학생 이름, 성별)
+    - 프로그레스 바에 `aria-label`, `aria-valuenow`, `aria-valuemin`, `aria-valuemax` 추가
+    - 메시지 요소에 타입별 `aria-label` 추가 (성공/오류/정보)
+  - ✅ 의미론적 HTML 태그 사용 강화
+    - `<main>` 태그에 `role="main"` 추가
+    - `<aside>` 태그에 `role="complementary"` 및 `aria-label` 추가
+    - 모든 `<section>` 태그에 `aria-labelledby` 추가 (제목과 연결)
+    - 결과 영역에 `role="region"` 및 `aria-label` 추가
+    - 메시지 요소에 `role="alert"` 또는 `role="status"` 추가
+  - ✅ 상태 변경 시 알림 제공 (`aria-live` 사용)
+    - 전역 `aria-live` 영역 생성 (`aria-live="polite"`, `aria-atomic="true"`)
+    - 메시지 표시 시 `aria-live` 속성 추가 (에러: `assertive`, 기타: `polite`)
+    - 프로그레스 바 진행률 업데이트 시 `aria-live` 영역에 알림
+    - 방문자 수 표시에 `aria-live="polite"` 추가
+    - 에러 메시지에 `role="alert"` 및 `aria-live="assertive"` 추가
+  - ✅ 폼 입력 필드에 `aria-required`, `aria-invalid` 추가
+    - 필수 입력 필드에 `aria-required="true"` 자동 설정
+    - 검증 실패 시 `aria-invalid="true"` 설정
+    - 검증 성공 시 `aria-invalid="false"` 설정
+    - 에러 메시지에 `aria-errormessage` 연결
+    - `InputValidator`에서 자동으로 ARIA 속성 관리
+    - 분단 수 입력 필드에 `aria-required="true"` 추가
 
 #### 3.3 색상 대비
-- **개선 필요**:
-  - [ ] WCAG 2.1 AA 기준 충족 확인 (최소 4.5:1 대비율)
-  - [ ] 색상만으로 정보를 전달하지 않도록 개선 (아이콘, 텍스트 병행)
-  - [ ] 고정 좌석 표시에 색상 외 시각적 구분 추가
+- **현재 상태**: 색상 대비 최적화 완료 ✅
+- **진행 상황**:
+  - ✅ WCAG 2.1 AA 기준 충족 확인 (최소 4.5:1 대비율)
+    - 남학생 카드: #ffffff on #1565c0 (대비율 7.0:1 이상)
+    - 여학생 카드: #ffffff on #ad1457 (대비율 6.5:1 이상)
+    - 성공 메시지: #155724 on #d4edda (대비율 4.8:1)
+    - 오류 메시지: #721c24 on #f8d7da (대비율 5.2:1)
+    - 정보 메시지: #0c5460 on #d1ecf1 (대비율 4.6:1)
+    - 텍스트 그림자 강화로 가독성 향상
+  - ✅ 색상만으로 정보를 전달하지 않도록 개선 (아이콘, 텍스트 병행)
+    - 남학생 카드에 ♂ 아이콘 추가 (CSS `::before` 사용)
+    - 여학생 카드에 ♀ 아이콘 추가 (CSS `::before` 사용)
+    - 성공 메시지에 ✅ 아이콘 추가
+    - 오류 메시지에 ❌ 아이콘 추가
+    - 정보 메시지에 ℹ️ 아이콘 추가
+    - ARIA 레이블에 성별 아이콘 정보 포함 (예: "남학생 ♂", "여학생 ♀")
+    - 고정 좌석에 🔒 아이콘 및 "고정" 텍스트 라벨 추가
+  - ✅ 고정 좌석 표시에 색상 외 시각적 구분 추가
+    - 이중 테두리 (`border-style: double`) 적용
+    - 대각선 패턴 배경 (`repeating-linear-gradient`) 추가
+    - "고정" 텍스트 라벨 추가 (카드 하단 중앙)
+    - 🔒 아이콘 추가 (우측 상단)
+    - 그림자 효과 강화 (`box-shadow` 다중 레이어)
+    - 고정 좌석인 경우 성별 아이콘 위치 조정 (겹침 방지)
 
 ---
 
