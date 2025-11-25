@@ -56,6 +56,15 @@
         <div class="header-content">
             <h1><span class="title-icon" aria-hidden="true">🪑</span>교실 자리 배치 프로그램 <small style="font-size: 0.6em;">online</small></h1>
             <div class="header-info">
+                <div class="class-select-container" id="class-select-container">
+                    <label for="class-select" class="class-select-label" aria-label="반 선택">교과교실:</label>
+                    <select id="class-select" class="class-select" aria-label="반 선택 메뉴">
+                        <option value="">반 선택</option>
+                    </select>
+                    <button id="add-class-btn" class="icon-btn" title="새 반 추가" aria-label="새 반 추가">➕</button>
+                    <button id="delete-class-btn" class="icon-btn" title="선택한 반 삭제" aria-label="선택한 반 삭제" style="display: none;">🗑️</button>
+                    <button id="save-layout-btn" class="icon-btn" title="현재 반의 자리 배치도 저장" aria-label="현재 반의 자리 배치도 저장" style="display: none;">💾</button>
+                </div>
                 <button id="undo-layout" class="icon-btn" title="되돌리기 (Ctrl+Z / Cmd+Z)" aria-label="되돌리기 (Ctrl+Z 또는 Cmd+Z)">↶</button>
                 <button id="redo-layout" class="icon-btn" title="다시 실행하기 (Ctrl+Y / Cmd+Y)" aria-label="다시 실행하기 (Ctrl+Y 또는 Cmd+Y)">↷</button>
                 <div class="history-dropdown" id="history-dropdown">

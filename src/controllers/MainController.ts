@@ -26,6 +26,7 @@ import { ErrorCode } from '../types/errors.js';
 import { InputValidator, ValidationRules } from '../utils/inputValidator.js';
 import { KeyboardNavigation } from '../utils/keyboardNavigation.js';
 import { KeyboardDragDropManager } from '../managers/KeyboardDragDropManager.js';
+import { ClassManager, ClassManagerDependencies } from '../managers/ClassManager.js';
 
 /**
  * 히스토리 데이터 타입
@@ -115,6 +116,7 @@ export class MainController {
     private studentTableManager!: StudentTableManager;
     private inputValidator!: InputValidator;
     private keyboardDragDropManager!: KeyboardDragDropManager;
+    private classManager!: ClassManager;
     
     private students: Student[] = [];
     private seats: Seat[] = [];
@@ -264,6 +266,18 @@ export class MainController {
             // InputValidator 초기화
             this.inputValidator = new InputValidator();
             
+            // ClassManager 초기화
+            const classManagerDeps: ClassManagerDependencies = {
+                storageManager: this.storageManager,
+                outputModule: this.outputModule,
+                getCurrentSeats: () => this.seats,
+                getCurrentStudents: () => this.students,
+                setSeats: (seats) => { this.seats = seats; },
+                setStudents: (students) => { this.students = students; },
+                renderLayout: () => this.renderFinalLayout()
+            };
+            this.classManager = new ClassManager(classManagerDeps);
+            
             // 입력 필드 검증 설정
             this.setupInputValidation();
             
@@ -272,6 +286,9 @@ export class MainController {
             
             // 이력 드롭다운 초기화
             this.uiManager.initializeHistoryDropdown();
+            
+            // 반 관리 초기화
+            this.initializeClassManagement();
             
             // 모바일 반응형 초기화
             this.initializeMobileResponsive();
@@ -876,6 +893,21 @@ export class MainController {
             // 사용설명서 버튼 클릭
             if (target.id === 'user-manual-btn') {
                 this.showUserManual();
+            }
+            
+            // 반 추가 버튼 클릭
+            if (target.id === 'add-class-btn') {
+                this.handleAddClass();
+            }
+            
+            // 반 삭제 버튼 클릭
+            if (target.id === 'delete-class-btn') {
+                this.handleDeleteClass();
+            }
+            
+            // 자리 배치도 저장 버튼 클릭
+            if (target.id === 'save-layout-btn') {
+                this.handleSaveClassLayout();
             }
             
             // 사이드바 토글 버튼 클릭
@@ -6296,7 +6328,16 @@ export class MainController {
         const content = document.createElement('div');
         content.innerHTML = `
             <div style="line-height: 1.8; color: #444;">
-                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">1️⃣ 기본 사용 방법</h3>
+                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">1️⃣ 반 관리 기능</h3>
+                <ul style="padding-left: 25px; margin-bottom: 20px;">
+                    <li><strong>➕ 반 추가</strong>: 상단 바의 "반" 셀렉트 메뉴 옆 ➕ 버튼을 클릭하여 새 반을 추가할 수 있습니다</li>
+                    <li><strong>📚 반 선택</strong>: 셀렉트 메뉴에서 반을 선택하면 해당 반의 저장된 자리 배치도가 자동으로 불러와집니다</li>
+                    <li><strong>💾 자리 배치도 저장</strong>: 반을 선택한 후 💾 버튼을 클릭하면 현재 자리 배치도가 해당 반에 저장됩니다</li>
+                    <li><strong>🗑️ 반 삭제</strong>: 반을 선택한 후 🗑️ 버튼을 클릭하면 해당 반과 저장된 자리 배치도가 삭제됩니다</li>
+                    <li>각 반의 자리 배치도는 독립적으로 저장되므로, 여러 반의 자리 배치도를 관리할 수 있습니다</li>
+                </ul>
+
+                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">2️⃣ 기본 사용 방법</h3>
                 <ol style="padding-left: 25px; margin-bottom: 20px;">
                     <li><strong>📋 옵션1: 좌석 배치 형태</strong> - 원하는 배치 유형을 선택하세요
                         <ul style="padding-left: 20px; margin-top: 8px;">
@@ -6336,7 +6377,7 @@ export class MainController {
                     <li><strong>🪑 좌석 배치하기</strong> - "학생 이름 입력하기" 버튼을 클릭하여 학생 정보를 입력한 후, "자리 배치 실행하기" 버튼을 클릭하면 좌석에 학생들이 배치됩니다</li>
                 </ol>
 
-                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">2️⃣ 학생 정보 입력</h3>
+                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">3️⃣ 학생 정보 입력</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
                     <li><strong>📝 학생 이름 입력하기</strong>: 버튼을 클릭하여 학생 정보 입력 테이블을 생성하세요</li>
                     <li><strong>📊 학생 이름 엑셀파일에서 가져오기</strong>: 엑셀 파일을 업로드하여 학생 정보를 한 번에 입력할 수 있습니다</li>
@@ -6347,7 +6388,7 @@ export class MainController {
                     <li><strong>🗑️ 삭제</strong>: 각 행의 삭제 아이콘(🗑️)을 클릭하여 학생을 삭제할 수 있습니다</li>
                 </ul>
 
-                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">3️⃣ 고정 좌석 기능</h3>
+                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">4️⃣ 고정 좌석 기능</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
                     <li><strong>🔒 고정 좌석 지정</strong>: "옵션4: 맞춤 구성"에서 "고정 좌석 지정 후 랜덤 배치" 옵션을 선택하세요</li>
                     <li>미리보기 화면에서 원하는 좌석 카드를 클릭하면 🔒 아이콘과 빨간 테두리가 표시됩니다</li>
@@ -6356,14 +6397,14 @@ export class MainController {
                     <li>고정 좌석을 제외한 나머지 좌석에만 학생들이 랜덤 배치됩니다</li>
                 </ul>
 
-                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">4️⃣ 자리 배치 옵션</h3>
+                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">5️⃣ 자리 배치 옵션</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
                     <li><strong>🚫 이전 좌석 안 앉기</strong>: "확정된 자리 이력"에 저장된 이전 배치를 참고하여 같은 좌석에 배치되지 않도록 합니다</li>
                     <li><strong>👥 이전 짝 금지</strong>: "확정된 자리 이력"에 저장된 이전 배치를 참고하여 이전에 같은 짝이었던 학생과 다시 짝지어지지 않도록 합니다</li>
                     <li>두 옵션을 모두 체크하면 두 조건을 모두 만족하도록 배치됩니다</li>
                 </ul>
 
-                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">5️⃣ 확정된 자리 이력</h3>
+                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">6️⃣ 확정된 자리 이력</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
                     <li><strong>✅ 자리 확정</strong>: 자리 배치가 완료된 후 "✅ 자리 확정" 버튼을 클릭하면 현재 배치가 이력에 저장됩니다</li>
                     <li><strong>📋 확정된 자리 이력</strong>: 상단 바의 "📋 확정된 자리 이력" 드롭다운에서 저장된 배치를 확인할 수 있습니다</li>
@@ -6373,19 +6414,19 @@ export class MainController {
                     <li>드롭다운 외부를 클릭하면 드롭다운이 자동으로 닫힙니다</li>
                 </ul>
 
-                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">6️⃣ 옵션 설정 기억하기</h3>
+                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">7️⃣ 옵션 설정 기억하기</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
                     <li><strong>💾 옵션 설정 기억하기</strong>: "초기화" 버튼 위의 "옵션 설정 기억하기" 버튼을 클릭하면 현재 설정(옵션1~옵션4)이 저장됩니다</li>
                     <li>다음에 프로그램을 실행하면 저장된 설정이 자동으로 적용됩니다</li>
                 </ul>
 
-                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">7️⃣ 자리 바꾸기</h3>
+                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">8️⃣ 자리 바꾸기</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
                     <li>자리 배치가 완료된 후, 좌석 카드를 드래그하여 다른 좌석에 드롭하면 자리를 바꿀 수 있습니다</li>
                     <li>두 카드를 서로 드래그 & 드롭하면 위치가 교환됩니다</li>
                 </ul>
 
-                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">8️⃣ 공유 및 출력</h3>
+                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">9️⃣ 공유 및 출력</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
                     <li><strong>📤 공유하기</strong>: 공유 주소(URL)를 생성하여 다른 사람과 자리 배치도를 공유할 수 있습니다</li>
                     <li><strong>🖨️ 인쇄하기</strong>: 현재 자리 배치도를 인쇄합니다</li>
@@ -6393,6 +6434,7 @@ export class MainController {
 
                 <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">💡 유용한 팁</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
+                    <li><strong>📚 반 관리 팁</strong>: 여러 반을 관리할 때는 각 반의 자리 배치도를 저장해두면 나중에 쉽게 불러올 수 있습니다</li>
                     <li>📊 학생 정보 입력 테이블 하단의 통계를 확인하여 남학생/여학생 수와 고정 좌석 수를 확인할 수 있습니다</li>
                     <li>🔒 고정 좌석 모드에서는 미리보기 화면에서 좌석을 클릭하여 고정할 수 있습니다</li>
                     <li>🔄 자리 배치 후에는 드래그 & 드롭으로 자유롭게 자리를 조정할 수 있습니다</li>
@@ -6400,6 +6442,7 @@ export class MainController {
                     <li>📐 "1명씩 한 줄로 배치" 옵션에서 "남녀 순서 바꾸기" 체크박스를 사용하면 여학생을 먼저 배치할 수 있습니다</li>
                     <li>⚖️ "남녀 대칭 1줄 배치"는 남학생을 앞쪽 분단부터 배치하고, 여학생을 나머지 자리에 배치하는 대칭적인 배치 방식입니다</li>
                     <li>◀ 좌측 사이드바의 토글 버튼(◀)을 클릭하면 사이드바를 접거나 펼칠 수 있습니다</li>
+                    <li>↶↷ 상단 바의 되돌리기(↶)와 다시 실행하기(↷) 버튼으로 자리 배치 변경 이력을 관리할 수 있습니다</li>
                 </ul>
 
                 <div style="margin-top: 30px; padding: 15px; background: #f0f8ff; border-left: 4px solid #667eea; border-radius: 4px;">
@@ -6798,5 +6841,154 @@ export class MainController {
         }, 200);
     }
 
+    /**
+     * 반 관리 초기화
+     */
+    private initializeClassManagement(): void {
+        // 반 선택 셀렉트 메뉴 변경 이벤트
+        const classSelect = document.getElementById('class-select') as HTMLSelectElement;
+        if (classSelect) {
+            this.addEventListenerSafe(classSelect, 'change', (e) => {
+                const target = e.target as HTMLSelectElement;
+                const classId = target.value;
+                this.handleClassSelectChange(classId);
+            });
+        }
+
+        // 반 목록 업데이트
+        this.updateClassSelect();
+    }
+
+    /**
+     * 반 선택 셀렉트 메뉴 업데이트
+     */
+    private updateClassSelect(): void {
+        const classSelect = document.getElementById('class-select') as HTMLSelectElement;
+        const deleteBtn = document.getElementById('delete-class-btn') as HTMLButtonElement;
+        const saveBtn = document.getElementById('save-layout-btn') as HTMLButtonElement;
+        
+        if (!classSelect) return;
+
+        const classList = this.classManager.getClassList();
+        const currentClassId = this.classManager.getCurrentClassId();
+
+        // 기존 옵션 제거 (첫 번째 옵션 제외)
+        while (classSelect.options.length > 1) {
+            classSelect.remove(1);
+        }
+
+        // 반 목록 추가
+        classList.forEach(classInfo => {
+            const option = document.createElement('option');
+            option.value = classInfo.id;
+            option.textContent = classInfo.name;
+            classSelect.appendChild(option);
+        });
+
+        // 현재 선택된 반 설정
+        if (currentClassId) {
+            classSelect.value = currentClassId;
+        } else {
+            classSelect.value = '';
+        }
+
+        // 버튼 표시/숨김
+        const hasSelection = classSelect.value !== '';
+        if (deleteBtn) {
+            deleteBtn.style.display = hasSelection ? 'inline-block' : 'none';
+        }
+        if (saveBtn) {
+            saveBtn.style.display = hasSelection ? 'inline-block' : 'none';
+        }
+    }
+
+    /**
+     * 반 선택 변경 처리
+     */
+    private handleClassSelectChange(classId: string): void {
+        if (!classId || classId === '') {
+            // 선택 해제
+            this.classManager.selectClass(null);
+            this.updateClassSelect();
+            return;
+        }
+
+        // 반 선택
+        this.classManager.selectClass(classId);
+        this.updateClassSelect();
+
+        // 저장된 자리 배치도 불러오기
+        const loaded = this.classManager.loadLayout(classId);
+        if (!loaded) {
+            // 저장된 배치도가 없으면 현재 배치도 유지
+            this.outputModule.showInfo('저장된 자리 배치도가 없습니다. 새로 배치를 생성해주세요.');
+        }
+    }
+
+    /**
+     * 새 반 추가 처리
+     */
+    private handleAddClass(): void {
+        const className = prompt('반 이름을 입력하세요:');
+        if (!className) {
+            return;
+        }
+
+        const classId = this.classManager.addClass(className);
+        if (classId) {
+            // 반 목록 업데이트
+            this.updateClassSelect();
+            
+            // 새로 추가된 반 선택
+            const classSelect = document.getElementById('class-select') as HTMLSelectElement;
+            if (classSelect) {
+                classSelect.value = classId;
+                this.handleClassSelectChange(classId);
+            }
+        }
+    }
+
+    /**
+     * 반 삭제 처리
+     */
+    private handleDeleteClass(): void {
+        const currentClassId = this.classManager.getCurrentClassId();
+        if (!currentClassId) {
+            this.outputModule.showError('삭제할 반이 선택되지 않았습니다.');
+            return;
+        }
+
+        const className = this.classManager.getClassName(currentClassId);
+        if (!className) {
+            this.outputModule.showError('반 정보를 찾을 수 없습니다.');
+            return;
+        }
+
+        if (confirm(`"${className}" 반을 삭제하시겠습니까?\n저장된 자리 배치도도 함께 삭제됩니다.`)) {
+            const deleted = this.classManager.deleteClass(currentClassId);
+            if (deleted) {
+                // 반 목록 업데이트
+                this.updateClassSelect();
+                
+                // 현재 배치도 초기화
+                this.seats = [];
+                this.students = [];
+                const seatsArea = document.getElementById('seats-area');
+                if (seatsArea) {
+                    seatsArea.innerHTML = '';
+                }
+            }
+        }
+    }
+
+    /**
+     * 현재 반의 자리 배치도 저장 처리
+     */
+    private handleSaveClassLayout(): void {
+        const saved = this.classManager.saveCurrentLayout();
+        if (saved) {
+            // 저장 성공 메시지는 ClassManager에서 표시됨
+        }
+    }
 }
 
