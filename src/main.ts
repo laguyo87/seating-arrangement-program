@@ -58,12 +58,30 @@ function startApplication(): void {
 // 프로그램 시작
 init();
 
+// 콘솔 경고 필터링 (Firebase 인증 관련 경고 무시)
+const originalWarn = console.warn;
+console.warn = function(...args: any[]) {
+    const message = args.join(' ');
+    // Firebase 인증 관련 Cross-Origin-Opener-Policy 경고는 무시 (기능에 영향 없음)
+    if (message.includes('Cross-Origin-Opener-Policy') || message.includes('window.close')) {
+        return;
+    }
+    originalWarn.apply(console, args);
+};
+
 // 전역 에러 핸들러
 window.addEventListener('error', (event) => {
     // 브라우저 확장 프로그램 에러는 무시
     if (event.filename && (event.filename.includes('content.js') || event.filename.includes('extension'))) {
         return;
     }
+    
+    // Firebase 인증 관련 Cross-Origin-Opener-Policy 경고는 무시 (기능에 영향 없음)
+    const errorMessage = event.message || event.error?.message || '';
+    if (errorMessage.includes('Cross-Origin-Opener-Policy') || errorMessage.includes('window.close')) {
+        return;
+    }
+    
     logger.error('전역 오류 발생:', event.error);
 });
 

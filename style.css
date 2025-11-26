@@ -63,10 +63,9 @@ body {
 
 /* 처음 방문 사용자를 위한 하이라이트 애니메이션 */
 .class-select-container.first-visit-highlight {
-    animation: highlightPulse 2s ease-in-out infinite;
-    box-shadow: 0 0 20px rgba(255, 255, 0, 0.6), 0 0 40px rgba(255, 255, 0, 0.4);
-    background: rgba(255, 255, 0, 0.25);
-    border: 2px solid rgba(255, 255, 0, 0.8);
+    animation: highlightBorderBlink 1.5s ease-in-out infinite;
+    /* 배경은 변경하지 않음 */
+    background: rgba(255, 255, 255, 0.15);
 }
 
 .class-select-container.first-visit-highlight::before {
@@ -97,14 +96,14 @@ body {
     animation: tooltipFade 2s ease-in-out infinite;
 }
 
-@keyframes highlightPulse {
+@keyframes highlightBorderBlink {
     0%, 100% {
-        transform: scale(1);
-        box-shadow: 0 0 20px rgba(255, 255, 0, 0.6), 0 0 40px rgba(255, 255, 0, 0.4);
+        border: 2px solid rgba(255, 255, 0, 1);
+        box-shadow: 0 0 15px rgba(255, 255, 0, 0.8), 0 0 30px rgba(255, 255, 0, 0.5);
     }
     50% {
-        transform: scale(1.05);
-        box-shadow: 0 0 30px rgba(255, 255, 0, 0.8), 0 0 60px rgba(255, 255, 0, 0.6);
+        border: 2px solid rgba(255, 255, 0, 0.3);
+        box-shadow: 0 0 5px rgba(255, 255, 0, 0.3), 0 0 10px rgba(255, 255, 0, 0.2);
     }
 }
 
