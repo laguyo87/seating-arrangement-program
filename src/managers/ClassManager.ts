@@ -40,6 +40,7 @@ export interface ClassManagerDependencies {
     setSeats: (seats: Seat[]) => void;
     setStudents: (students: Student[]) => void;
     renderLayout: () => void;
+    firebaseStorageManager?: import('./FirebaseStorageManager.js').FirebaseStorageManager;
 }
 
 /**
@@ -76,13 +77,23 @@ export class ClassManager {
     /**
      * 반 목록 저장하기
      */
-    private saveClassList(classList: ClassInfo[]): boolean {
+    private async saveClassList(classList: ClassInfo[]): Promise<boolean> {
         try {
-            const success = this.deps.storageManager.safeSetItem(
+            // localStorage에 저장
+            const localSuccess = this.deps.storageManager.safeSetItem(
                 this.STORAGE_KEY_CLASSES,
                 JSON.stringify(classList)
             );
-            return success;
+
+            // Firebase에 저장 (로그인된 경우)
+            if (this.deps.firebaseStorageManager?.getIsAuthenticated()) {
+                const firebaseSuccess = await this.deps.firebaseStorageManager.saveClassList(classList);
+                if (firebaseSuccess) {
+                    logger.info('Firebase에 반 목록 저장 완료');
+                }
+            }
+
+            return localSuccess;
         } catch (error) {
             logger.error('반 목록 저장 중 오류:', error);
             this.deps.outputModule.showError('반 목록 저장 중 오류가 발생했습니다.');
@@ -93,7 +104,7 @@ export class ClassManager {
     /**
      * 새 반 추가
      */
-    public addClass(className: string): string | null {
+    public async addClass(className: string): Promise<string | null> {
         if (!className || className.trim() === '') {
             this.deps.outputModule.showError('반 이름을 입력해주세요.');
             return null;
@@ -117,7 +128,8 @@ export class ClassManager {
 
         classList.push(newClass);
         
-        if (this.saveClassList(classList)) {
+        const saved = await this.saveClassList(classList);
+        if (saved) {
             this.deps.outputModule.showInfo(`"${className}" 반이 추가되었습니다.`);
             return newClass.id;
         }
@@ -128,7 +140,7 @@ export class ClassManager {
     /**
      * 반 삭제
      */
-    public deleteClass(classId: string): boolean {
+    public async deleteClass(classId: string): Promise<boolean> {
         const classList = this.getClassList();
         const classIndex = classList.findIndex(c => c.id === classId);
         
@@ -149,7 +161,13 @@ export class ClassManager {
         // 목록에서 제거
         classList.splice(classIndex, 1);
         
-        if (this.saveClassList(classList)) {
+        // Firebase에서도 삭제
+        if (this.deps.firebaseStorageManager?.getIsAuthenticated()) {
+            await this.deps.firebaseStorageManager.deleteClass(classId);
+        }
+        
+        const saved = await this.saveClassList(classList);
+        if (saved) {
             // 현재 선택된 반이 삭제된 경우 선택 해제
             if (this.currentClassId === classId) {
                 this.currentClassId = null;
@@ -178,7 +196,7 @@ export class ClassManager {
     /**
      * 현재 반의 자리 배치도 저장
      */
-    public saveCurrentLayout(): boolean {
+    public async saveCurrentLayout(): Promise<boolean> {
         if (!this.currentClassId) {
             this.deps.outputModule.showError('반을 선택해주세요.');
             return false;
@@ -200,13 +218,25 @@ export class ClassManager {
                 className: this.getClassList().find(c => c.id === this.currentClassId)?.name || ''
             };
 
+            // localStorage에 저장
             const storageKey = `${this.STORAGE_KEY_PREFIX}${this.currentClassId}`;
-            const success = this.deps.storageManager.safeSetItem(
+            const localSuccess = this.deps.storageManager.safeSetItem(
                 storageKey,
                 JSON.stringify(layoutData)
             );
 
-            if (success) {
+            // Firebase에 저장 (로그인된 경우)
+            if (this.deps.firebaseStorageManager?.getIsAuthenticated()) {
+                const firebaseSuccess = await this.deps.firebaseStorageManager.saveClassLayout(
+                    this.currentClassId,
+                    layoutData
+                );
+                if (firebaseSuccess) {
+                    logger.info('Firebase에 자리 배치도 저장 완료');
+                }
+            }
+
+            if (localSuccess) {
                 // 마지막 수정 시간 업데이트
                 this.updateLastModified(this.currentClassId!);
                 this.deps.outputModule.showInfo('자리 배치도가 저장되었습니다.');
@@ -224,28 +254,40 @@ export class ClassManager {
     /**
      * 선택된 반의 자리 배치도 불러오기
      */
-    public loadLayout(classId: string): boolean {
+    public async loadLayout(classId: string): Promise<boolean> {
         if (!classId) {
             return false;
         }
 
         try {
-            const storageKey = `${this.STORAGE_KEY_PREFIX}${classId}`;
-            const layoutDataStr = this.deps.storageManager.safeGetItem(storageKey);
-            
-            if (!layoutDataStr) {
-                this.deps.outputModule.showInfo('저장된 자리 배치도가 없습니다.');
-                return false;
+            let layoutData: ClassLayoutData | null = null;
+
+            // Firebase에서 불러오기 시도 (로그인된 경우)
+            if (this.deps.firebaseStorageManager?.getIsAuthenticated()) {
+                layoutData = await this.deps.firebaseStorageManager.loadClassLayout(classId);
+                if (layoutData) {
+                    logger.info('Firebase에서 자리 배치도 불러오기 완료');
+                }
             }
 
-            // JSON 파싱 시도 (데이터 손상 처리)
-            let layoutData: ClassLayoutData;
-            try {
-                layoutData = JSON.parse(layoutDataStr) as ClassLayoutData;
-            } catch (parseError) {
-                this.deps.outputModule.showError('저장된 데이터가 손상되어 불러올 수 없습니다.');
-                logger.error('자리 배치도 파싱 오류:', parseError);
-                return false;
+            // Firebase에서 불러오지 못했으면 localStorage에서 불러오기
+            if (!layoutData) {
+                const storageKey = `${this.STORAGE_KEY_PREFIX}${classId}`;
+                const layoutDataStr = this.deps.storageManager.safeGetItem(storageKey);
+                
+                if (!layoutDataStr) {
+                    this.deps.outputModule.showInfo('저장된 자리 배치도가 없습니다.');
+                    return false;
+                }
+
+                // JSON 파싱 시도 (데이터 손상 처리)
+                try {
+                    layoutData = JSON.parse(layoutDataStr) as ClassLayoutData;
+                } catch (parseError) {
+                    this.deps.outputModule.showError('저장된 데이터가 손상되어 불러올 수 없습니다.');
+                    logger.error('자리 배치도 파싱 오류:', parseError);
+                    return false;
+                }
             }
 
             // 데이터 구조 검증

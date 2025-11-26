@@ -57,7 +57,7 @@
             <h1><span class="title-icon" aria-hidden="true">🪑</span>교실 자리 배치 프로그램 <small style="font-size: 0.6em;">online</small></h1>
             <div class="header-info">
                 <div class="class-select-container" id="class-select-container">
-                    <label for="class-select" class="class-select-label" aria-label="반 선택">교과교실:</label>
+                    <label for="class-select" class="class-select-label" aria-label="반 선택">반 만들기:</label>
                     <select id="class-select" class="class-select" aria-label="반 선택 메뉴">
                         <option value="">반 선택</option>
                     </select>
@@ -65,6 +65,8 @@
                     <button id="delete-class-btn" class="icon-btn" title="선택한 반 삭제" aria-label="선택한 반 삭제" style="display: none;">🗑️</button>
                     <button id="save-layout-btn" class="icon-btn" title="현재 반의 자리 배치도 저장" aria-label="현재 반의 자리 배치도 저장" style="display: none;">💾</button>
                 </div>
+                <button id="firebase-login-btn" class="login-btn" title="로그인 (클라우드 동기화)" aria-label="로그인">🔐 로그인</button>
+                <span id="firebase-status" class="firebase-status" style="display: none;" aria-live="polite"></span>
                 <button id="undo-layout" class="icon-btn" title="되돌리기 (Ctrl+Z / Cmd+Z)" aria-label="되돌리기 (Ctrl+Z 또는 Cmd+Z)">↶</button>
                 <button id="redo-layout" class="icon-btn" title="다시 실행하기 (Ctrl+Y / Cmd+Y)" aria-label="다시 실행하기 (Ctrl+Y 또는 Cmd+Y)">↷</button>
                 <div class="history-dropdown" id="history-dropdown">
@@ -307,7 +309,7 @@
                <!-- 자리 배치도 액션 버튼들 (초기에는 숨김) -->
                <div id="layout-action-buttons" style="display: none;">
                    <div style="display: flex; gap: 10px;">
-                       <button id="confirm-seats" class="primary-btn" aria-label="자리 확정 및 저장">✅ 자리 확정하기(저장)</button>
+                       <button id="confirm-seats" class="primary-btn" aria-label="자리 확정 및 저장">✅ 자리 확정하기</button>
                        <button id="share-layout" class="secondary-btn" style="white-space: nowrap;" aria-label="자리 배치도 공유">📤 공유하기</button>
                        <button id="print-layout" class="secondary-btn" style="white-space: nowrap;" aria-label="자리 배치도 인쇄">🖨️ 인쇄하기</button>
                        <button id="print-layout-teacher" class="secondary-btn" style="white-space: nowrap;" aria-label="교탁용 자리 배치도 인쇄">👨‍🏫 교탁용 인쇄하기</button>
@@ -342,6 +344,105 @@
     <!-- 방문자 수 카운터 -->
     <script type="module" src="visitor-counter.js"></script>
     <script type="module" src="/src/main.ts"></script>
+    <!-- Firebase 저장 상태 확인 스크립트 (개발 모드) -->
+    <script>
+        // 개발 모드에서만 로드
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            // checkFirebaseStorage 함수 정의
+            window.checkFirebaseStorage = async function() {
+                console.log('🔍 Firebase 저장 상태 확인 시작...\n');
+                
+                const mainController = window.mainController;
+                
+                if (!mainController) {
+                    console.error('❌ MainController를 찾을 수 없습니다.');
+                    console.log('💡 팁: 페이지를 새로고침한 후 다시 시도하세요.');
+                    return;
+                }
+                
+                const firebaseStorageManager = mainController.firebaseStorageManager;
+                
+                if (!firebaseStorageManager) {
+                    console.error('❌ FirebaseStorageManager를 찾을 수 없습니다.');
+                    return;
+                }
+                
+                const isAuthenticated = firebaseStorageManager.getIsAuthenticated();
+                const currentUser = firebaseStorageManager.getCurrentUser();
+                
+                console.log('📊 인증 상태:');
+                console.log('  - 로그인 여부:', isAuthenticated ? '✅ 로그인됨' : '❌ 로그인 안 됨');
+                console.log('  - 사용자:', currentUser ? currentUser.email : '없음');
+                console.log('  - 사용자 ID:', currentUser ? currentUser.uid : '없음');
+                console.log('');
+                
+                if (!isAuthenticated || !currentUser) {
+                    console.warn('⚠️ 로그인이 필요합니다. Firebase에 저장하려면 먼저 로그인하세요.');
+                    return;
+                }
+                
+                const classManager = mainController.classManager;
+                
+                if (!classManager) {
+                    console.error('❌ ClassManager를 찾을 수 없습니다.');
+                    return;
+                }
+                
+                const classList = classManager.getClassList();
+                const currentClassId = classManager.getCurrentClassId();
+                
+                console.log('📚 반 정보:');
+                console.log('  - 반 개수:', classList.length);
+                console.log('  - 현재 선택된 반:', currentClassId || '없음');
+                console.log('  - 반 목록:', classList);
+                console.log('');
+                
+                try {
+                    console.log('🔄 Firebase에서 데이터 불러오기 시도...');
+                    
+                    const firebaseClassList = await firebaseStorageManager.loadClassList();
+                    console.log('  - Firebase 반 목록:', firebaseClassList);
+                    console.log('  - Firebase 반 개수:', firebaseClassList.length);
+                    console.log('');
+                    
+                    if (firebaseClassList.length === 0 && classList.length > 0) {
+                        console.warn('⚠️ Firebase에 반 목록이 없습니다. 저장이 필요합니다.');
+                    } else if (firebaseClassList.length > 0) {
+                        console.log('✅ Firebase에 반 목록이 저장되어 있습니다!');
+                    }
+                    
+                    if (currentClassId) {
+                        console.log('🔄 현재 반의 자리 배치도 확인...');
+                        const layout = await firebaseStorageManager.loadClassLayout(currentClassId);
+                        
+                        if (layout) {
+                            console.log('✅ Firebase에 자리 배치도가 저장되어 있습니다!');
+                            console.log('  - 반 이름:', layout.className);
+                            console.log('  - 좌석 수:', layout.seats.length);
+                            console.log('  - 학생 수:', layout.students.length);
+                            console.log('  - 저장 시간:', layout.timestamp);
+                        } else {
+                            console.warn('⚠️ Firebase에 자리 배치도가 없습니다.');
+                        }
+                    }
+                    
+                } catch (error) {
+                    console.error('❌ Firebase 데이터 불러오기 실패:', error);
+                }
+                
+                console.log('\n📝 저장 테스트 방법:');
+                console.log('1. 반을 선택하세요');
+                console.log('2. 자리 배치하기 버튼을 클릭하세요');
+                console.log('3. ✅ 자리 확정하기 버튼을 클릭하세요');
+                console.log('   (또는 💾 저장하기 버튼 클릭)');
+                console.log('4. 콘솔에서 "✅ Firebase에" 로그를 확인하세요');
+                console.log('\n🌐 Firebase Console에서 확인:');
+                console.log(`https://console.firebase.google.com/project/seating-arrangement-back-7ffa1/firestore/data/~2Fusers~2F${currentUser.uid}`);
+            };
+            
+            console.log('💡 Firebase 저장 상태 확인: 브라우저 콘솔에서 checkFirebaseStorage() 실행');
+        }
+    </script>
 </body>
 </html>
 

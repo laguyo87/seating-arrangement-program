@@ -42,6 +42,12 @@ function startApplication(): void {
         const controller = new MainController();
         controller.run();
         
+        // 디버깅을 위해 전역 변수로 노출 (개발 모드에서만)
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            (window as any).mainController = controller;
+            console.log('💡 디버깅: MainController가 window.mainController로 노출되었습니다.');
+            console.log('💡 Firebase 저장 상태 확인: checkFirebaseStorage() 실행');
+        }
         
     } catch (error) {
         const userMessage = ErrorHandler.safeHandle(error, ErrorCode.INITIALIZATION_FAILED);

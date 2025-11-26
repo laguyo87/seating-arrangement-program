@@ -27,6 +27,9 @@ import { InputValidator, ValidationRules } from '../utils/inputValidator.js';
 import { KeyboardNavigation } from '../utils/keyboardNavigation.js';
 import { KeyboardDragDropManager } from '../managers/KeyboardDragDropManager.js';
 import { ClassManager, ClassManagerDependencies } from '../managers/ClassManager.js';
+import { FirebaseStorageManager, FirebaseStorageManagerDependencies } from '../managers/FirebaseStorageManager.js';
+import { LoginPageModule, LoginPageModuleDependencies } from '../modules/LoginPageModule.js';
+import { SignUpPageModule, SignUpPageModuleDependencies } from '../modules/SignUpPageModule.js';
 
 /**
  * 히스토리 데이터 타입
@@ -117,6 +120,9 @@ export class MainController {
     private inputValidator!: InputValidator;
     private keyboardDragDropManager!: KeyboardDragDropManager;
     private classManager!: ClassManager;
+    private firebaseStorageManager!: FirebaseStorageManager;
+    private loginPageModule!: LoginPageModule;
+    private signUpPageModule!: SignUpPageModule;
     
     private students: Student[] = [];
     private seats: Seat[] = [];
@@ -266,6 +272,13 @@ export class MainController {
             // InputValidator 초기화
             this.inputValidator = new InputValidator();
             
+            // FirebaseStorageManager 초기화
+            const firebaseStorageManagerDeps: FirebaseStorageManagerDependencies = {
+                outputModule: this.outputModule,
+                isDevelopmentMode: () => this.isDevelopmentMode()
+            };
+            this.firebaseStorageManager = new FirebaseStorageManager(firebaseStorageManagerDeps);
+            
             // ClassManager 초기화
             const classManagerDeps: ClassManagerDependencies = {
                 storageManager: this.storageManager,
@@ -274,9 +287,42 @@ export class MainController {
                 getCurrentStudents: () => this.students,
                 setSeats: (seats) => { this.seats = seats; },
                 setStudents: (students) => { this.students = students; },
-                renderLayout: () => this.renderFinalLayout()
+                renderLayout: () => this.renderFinalLayout(),
+                firebaseStorageManager: this.firebaseStorageManager
             };
             this.classManager = new ClassManager(classManagerDeps);
+            
+            // SignUpPageModule 초기화 (먼저 초기화하여 LoginPageModule에서 참조 가능하도록)
+            const signUpPageModuleDeps: SignUpPageModuleDependencies = {
+                firebaseStorageManager: this.firebaseStorageManager,
+                outputModule: this.outputModule,
+                onSignUpSuccess: () => {
+                    this.updateFirebaseStatus();
+                },
+                onClose: () => {
+                    // 회원가입 페이지 닫힘 처리
+                },
+                onBackToLogin: () => {
+                    this.loginPageModule.show();
+                }
+            };
+            this.signUpPageModule = new SignUpPageModule(signUpPageModuleDeps);
+            
+            // LoginPageModule 초기화
+            const loginPageModuleDeps: LoginPageModuleDependencies = {
+                firebaseStorageManager: this.firebaseStorageManager,
+                outputModule: this.outputModule,
+                onLoginSuccess: () => {
+                    this.updateFirebaseStatus();
+                },
+                onClose: () => {
+                    // 로그인 페이지 닫힘 처리
+                },
+                onShowSignUp: () => {
+                    this.signUpPageModule.show();
+                }
+            };
+            this.loginPageModule = new LoginPageModule(loginPageModuleDeps);
             
             // 입력 필드 검증 설정
             this.setupInputValidation();
@@ -289,6 +335,11 @@ export class MainController {
             
             // 반 관리 초기화
             this.initializeClassManagement();
+            
+            // Firebase 상태 업데이트
+            this.setTimeoutSafe(() => {
+                this.updateFirebaseStatus();
+            }, 1000);
             
             // 모바일 반응형 초기화
             this.initializeMobileResponsive();
@@ -5241,17 +5292,40 @@ export class MainController {
                 historyItem.pairInfo = pairInfo;
             }
 
-            // localStorage에 이력 저장
-            const existingHistory = this.getSeatHistory();
+            // 현재 선택된 반 ID 가져오기
+            const currentClassId = this.classManager?.getCurrentClassId();
+            if (!currentClassId) {
+                this.outputModule.showWarning('반이 선택되지 않아 이력이 저장되지 않습니다. 먼저 반을 선택하세요.');
+                return;
+            }
+            
+            // 반별 이력 키: seatHistory_${classId}
+            const historyKey = `seatHistory_${currentClassId}`;
+            const existingHistory = this.getSeatHistory(currentClassId);
             existingHistory.unshift(historyItem); // 최신 항목을 맨 앞에 추가
             // 최대 50개까지만 저장
             if (existingHistory.length > 50) {
                 existingHistory.splice(50);
             }
-            this.storageManager.safeSetItem('seatHistory', JSON.stringify(existingHistory));
+            this.storageManager.safeSetItem(historyKey, JSON.stringify(existingHistory));
 
             // 드롭다운 메뉴 업데이트
             this.updateHistoryDropdown();
+
+            // 반이 선택된 경우 Firebase에 자리 배치도 저장
+            if (this.classManager && this.classManager.getCurrentClassId()) {
+                // 현재 seats와 students를 화면 데이터로 업데이트한 후 저장
+                this.updateSeatsAndStudentsFromLayout(currentLayout);
+                this.classManager.saveCurrentLayout().then((saved) => {
+                    if (saved) {
+                        logger.info('✅ 자리 확정 시 Firebase에 자동 저장 완료');
+                    } else {
+                        logger.warn('⚠️ 자리 확정 시 Firebase 저장 실패');
+                    }
+                }).catch((error) => {
+                    logger.error('❌ 자리 확정 시 Firebase 저장 실패:', error);
+                });
+            }
 
             this.outputModule.showSuccess(`자리가 확정되었습니다! 날짜: ${dateString}`);
         } catch (error) {
@@ -5261,11 +5335,109 @@ export class MainController {
     }
 
     /**
-     * 좌석 이력 가져오기 (최신순으로 정렬)
+     * 자리 확정 시 수집한 데이터로 현재 seats와 students 업데이트
      */
-    private getSeatHistory(): SeatHistoryItem[] {
+    private updateSeatsAndStudentsFromLayout(
+        currentLayout: Array<{seatId: number, studentName: string, gender: 'M' | 'F'}>
+    ): void {
         try {
-            const historyStr = this.storageManager.safeGetItem('seatHistory');
+            if (!currentLayout || currentLayout.length === 0) {
+                logger.warn('자리 확정 데이터가 비어있습니다.');
+                return;
+            }
+
+            // 학생 목록 생성/업데이트
+            const studentMap = new Map<string, Student>();
+            currentLayout.forEach(layoutItem => {
+                if (layoutItem.studentName && !studentMap.has(layoutItem.studentName)) {
+                    const student = StudentModel.create(layoutItem.studentName, layoutItem.gender);
+                    studentMap.set(layoutItem.studentName, student);
+                }
+            });
+            
+            this.students = Array.from(studentMap.values());
+            
+            // 좌석 목록 업데이트 (기존 seats의 position 정보 유지)
+            const seatIds = currentLayout.map(l => l.seatId).filter(id => id > 0);
+            const maxSeatId = seatIds.length > 0 ? Math.max(...seatIds) : 0;
+            const updatedSeats: Seat[] = [];
+            
+            // 기존 seats에서 position 정보 가져오기
+            const existingSeatMap = new Map<number, Seat>();
+            if (this.seats && Array.isArray(this.seats)) {
+                this.seats.forEach(seat => {
+                    if (seat && seat.id) {
+                        existingSeatMap.set(seat.id, seat);
+                    }
+                });
+            }
+            
+            // maxSeatId가 0이면 빈 배열 반환
+            if (maxSeatId === 0) {
+                logger.warn('유효한 좌석 ID가 없어 seats를 초기화했습니다.');
+                this.seats = [];
+                return;
+            }
+            
+            for (let i = 1; i <= maxSeatId; i++) {
+                const layoutItem = currentLayout.find(l => l.seatId === i);
+                const existingSeat = existingSeatMap.get(i);
+                
+                if (layoutItem && layoutItem.studentName) {
+                    // 학생이 배치된 좌석
+                    const student = studentMap.get(layoutItem.studentName);
+                    if (student) {
+                        const seat: Seat = {
+                            id: i,
+                            position: existingSeat?.position || { x: 0, y: 0 },
+                            studentId: student.id,
+                            studentName: student.name,
+                            isFixed: existingSeat?.isFixed || false,
+                            isActive: existingSeat?.isActive !== false
+                        };
+                        updatedSeats.push(seat);
+                    }
+                } else {
+                    // 빈 좌석
+                    const seat: Seat = {
+                        id: i,
+                        position: existingSeat?.position || { x: 0, y: 0 },
+                        isFixed: existingSeat?.isFixed || false,
+                        isActive: existingSeat?.isActive !== false
+                    };
+                    updatedSeats.push(seat);
+                }
+            }
+            
+            this.seats = updatedSeats;
+            
+            logger.info('자리 확정 데이터로 seats와 students 업데이트 완료:', {
+                seatsCount: this.seats.length,
+                studentsCount: this.students.length
+            });
+        } catch (error) {
+            logger.error('자리 확정 데이터 업데이트 중 오류:', error);
+            // 오류 발생 시에도 프로그램이 계속 실행되도록 함
+        }
+    }
+
+    /**
+     * 좌석 이력 가져오기 (반별로 관리, 최신순으로 정렬)
+     * @param classId 반 ID (없으면 현재 선택된 반의 ID 사용)
+     */
+    private getSeatHistory(classId?: string): SeatHistoryItem[] {
+        try {
+            // 반 ID가 없으면 현재 선택된 반 ID 사용
+            const targetClassId = classId || this.classManager?.getCurrentClassId();
+            
+            // 반이 선택되지 않았으면 빈 배열 반환
+            if (!targetClassId) {
+                return [];
+            }
+            
+            // 반별 이력 키: seatHistory_${classId}
+            const historyKey = `seatHistory_${targetClassId}`;
+            const historyStr = this.storageManager.safeGetItem(historyKey);
             if (!historyStr) return [];
             
             // JSON 파싱 시도 (데이터 손상 처리)
@@ -5278,7 +5450,7 @@ export class MainController {
             } catch (parseError) {
                 // 데이터 손상 시 저장소에서 제거하고 빈 배열 반환
                 try {
-                    localStorage.removeItem('seatHistory');
+                    localStorage.removeItem(historyKey);
                 } catch {}
                 return [];
             }
@@ -5401,7 +5573,7 @@ export class MainController {
     }
 
     /**
-     * 이력 항목 삭제
+     * 이력 항목 삭제 (반별로 관리)
      */
     private deleteHistoryItem(historyId: string): void {
         if (!confirm('이 자리 이력을 삭제하시겠습니까?')) {
@@ -5409,9 +5581,16 @@ export class MainController {
         }
 
         try {
-            const history = this.getSeatHistory();
+            const currentClassId = this.classManager?.getCurrentClassId();
+            if (!currentClassId) {
+                this.outputModule.showError('반이 선택되지 않았습니다.');
+                return;
+            }
+            
+            const historyKey = `seatHistory_${currentClassId}`;
+            const history = this.getSeatHistory(currentClassId);
             const filteredHistory = history.filter(item => item.id !== historyId);
-            this.storageManager.safeSetItem('seatHistory', JSON.stringify(filteredHistory));
+            this.storageManager.safeSetItem(historyKey, JSON.stringify(filteredHistory));
             
             // 드롭다운 메뉴 업데이트
             this.updateHistoryDropdown();
@@ -5428,11 +5607,17 @@ export class MainController {
     }
 
     /**
-     * 이력 항목 불러오기
+     * 이력 항목 불러오기 (반별로 관리)
      */
     private loadHistoryItem(historyId: string): void {
         try {
-            const history = this.getSeatHistory();
+            const currentClassId = this.classManager?.getCurrentClassId();
+            if (!currentClassId) {
+                this.outputModule.showError('반이 선택되지 않았습니다.');
+                return;
+            }
+            
+            const history = this.getSeatHistory(currentClassId);
             const historyItem = history.find(item => item.id === historyId);
 
             if (!historyItem) {
@@ -6857,6 +7042,41 @@ export class MainController {
 
         // 반 목록 업데이트
         this.updateClassSelect();
+        
+        // 반이 없는 경우 '반 만들기' 하이라이트 애니메이션 적용
+        this.checkAndHighlightClassCreation();
+    }
+    
+    /**
+     * 반이 없는 경우 '반 만들기' 하이라이트 애니메이션 적용
+     * 처음 방문자뿐만 아니라 데이터가 없는 사용자도 하이라이트 표시
+     */
+    private checkAndHighlightClassCreation(): void {
+        const classList = this.classManager.getClassList();
+        const hasClasses = classList.length > 0;
+        
+        // 반이 있으면 하이라이트 제거
+        if (hasClasses) {
+            this.removeClassCreationHighlight();
+            return;
+        }
+        
+        // 반이 없으면 하이라이트 적용 (처음 방문자뿐만 아니라 데이터가 없는 모든 사용자)
+        const classSelectContainer = document.getElementById('class-select-container');
+        if (classSelectContainer) {
+            classSelectContainer.classList.add('first-visit-highlight');
+            logger.info('반이 없어서 반 만들기 하이라이트 적용');
+        }
+    }
+    
+    /**
+     * 반 만들기 하이라이트 애니메이션 제거
+     */
+    private removeClassCreationHighlight(): void {
+        const classSelectContainer = document.getElementById('class-select-container');
+        if (classSelectContainer) {
+            classSelectContainer.classList.remove('first-visit-highlight');
+        }
     }
 
     /**
@@ -6900,6 +7120,9 @@ export class MainController {
         if (saveBtn) {
             saveBtn.style.display = hasSelection ? 'inline-block' : 'none';
         }
+        
+        // 반 목록 업데이트 후 하이라이트 상태 확인 (반이 삭제된 경우를 대비)
+        this.checkAndHighlightClassCreation();
     }
 
     /**
@@ -6910,19 +7133,25 @@ export class MainController {
             // 선택 해제
             this.classManager.selectClass(null);
             this.updateClassSelect();
+            // 반이 선택되지 않았으므로 이력 드롭다운 업데이트 (빈 상태로)
+            this.updateHistoryDropdown();
             return;
         }
 
         // 반 선택
         this.classManager.selectClass(classId);
         this.updateClassSelect();
+        
+        // 반이 변경되었으므로 해당 반의 이력 드롭다운 업데이트
+        this.updateHistoryDropdown();
 
-        // 저장된 자리 배치도 불러오기
-        const loaded = this.classManager.loadLayout(classId);
-        if (!loaded) {
-            // 저장된 배치도가 없으면 현재 배치도 유지
-            this.outputModule.showInfo('저장된 자리 배치도가 없습니다. 새로 배치를 생성해주세요.');
-        }
+        // 저장된 자리 배치도 불러오기 (비동기)
+        this.classManager.loadLayout(classId).then((loaded) => {
+            if (!loaded) {
+                // 저장된 배치도가 없으면 현재 배치도 유지
+                this.outputModule.showInfo('저장된 자리 배치도가 없습니다. 새로 배치를 생성해주세요.');
+            }
+        });
     }
 
     /**
@@ -6934,18 +7163,26 @@ export class MainController {
             return;
         }
 
-        const classId = this.classManager.addClass(className);
-        if (classId) {
-            // 반 목록 업데이트
-            this.updateClassSelect();
-            
-            // 새로 추가된 반 선택
-            const classSelect = document.getElementById('class-select') as HTMLSelectElement;
-            if (classSelect) {
-                classSelect.value = classId;
-                this.handleClassSelectChange(classId);
+        // 비동기 처리
+        this.classManager.addClass(className).then((classId) => {
+            if (classId) {
+                // 반 목록 업데이트
+                this.updateClassSelect();
+                
+                // 새로 추가된 반 선택
+                const classSelect = document.getElementById('class-select') as HTMLSelectElement;
+                if (classSelect) {
+                    classSelect.value = classId;
+                    this.handleClassSelectChange(classId);
+                }
+                
+                // 방문 기록 저장 (하이라이트는 updateClassSelect에서 자동으로 제거됨)
+                this.storageManager.safeSetItem('hasVisitedBefore', 'true');
+                
+                // 사용자에게 안내 메시지 표시
+                this.outputModule.showSuccess(`"${className}" 반이 생성되었습니다! 이제 좌측 사이드바에서 학생 정보를 입력하고 자리 배치를 실행하세요.`);
             }
-        }
+        });
     }
 
     /**
@@ -6965,19 +7202,21 @@ export class MainController {
         }
 
         if (confirm(`"${className}" 반을 삭제하시겠습니까?\n저장된 자리 배치도도 함께 삭제됩니다.`)) {
-            const deleted = this.classManager.deleteClass(currentClassId);
-            if (deleted) {
-                // 반 목록 업데이트
-                this.updateClassSelect();
-                
-                // 현재 배치도 초기화
-                this.seats = [];
-                this.students = [];
-                const seatsArea = document.getElementById('seats-area');
-                if (seatsArea) {
-                    seatsArea.innerHTML = '';
+            // 비동기 처리
+            this.classManager.deleteClass(currentClassId).then((deleted) => {
+                if (deleted) {
+                    // 반 목록 업데이트
+                    this.updateClassSelect();
+                    
+                    // 현재 배치도 초기화
+                    this.seats = [];
+                    this.students = [];
+                    const seatsArea = document.getElementById('seats-area');
+                    if (seatsArea) {
+                        seatsArea.innerHTML = '';
+                    }
                 }
-            }
+            });
         }
     }
 
@@ -6985,9 +7224,56 @@ export class MainController {
      * 현재 반의 자리 배치도 저장 처리
      */
     private handleSaveClassLayout(): void {
-        const saved = this.classManager.saveCurrentLayout();
-        if (saved) {
+        // 비동기 처리
+        this.classManager.saveCurrentLayout().then((saved) => {
             // 저장 성공 메시지는 ClassManager에서 표시됨
+        });
+    }
+
+    /**
+     * Firebase 로그인 처리 (로그인 페이지 표시)
+     */
+    private handleFirebaseLogin(): void {
+        this.loginPageModule.show();
+    }
+
+    /**
+     * Firebase 로그아웃 처리
+     */
+    private async handleFirebaseLogout(): Promise<void> {
+        await this.firebaseStorageManager.signOut();
+        this.updateFirebaseStatus();
+    }
+
+    /**
+     * Firebase 상태 업데이트
+     */
+    private updateFirebaseStatus(): void {
+        const loginBtn = document.getElementById('firebase-login-btn') as HTMLButtonElement;
+        const statusSpan = document.getElementById('firebase-status') as HTMLSpanElement;
+        
+        if (!loginBtn || !statusSpan) return;
+
+        const isAuthenticated = this.firebaseStorageManager.getIsAuthenticated();
+        const currentUser = this.firebaseStorageManager.getCurrentUser();
+
+        if (isAuthenticated && currentUser) {
+            loginBtn.textContent = '🚪 로그아웃';
+            loginBtn.title = 'Firebase 로그아웃';
+            loginBtn.onclick = () => this.handleFirebaseLogout();
+            
+            // 사용자 이름 또는 이메일 표시
+            const displayName = currentUser.displayName || currentUser.email || '사용자';
+            statusSpan.textContent = `안녕하세요. ${displayName}님!`;
+            statusSpan.style.display = 'inline-block';
+            statusSpan.style.color = '#ffeb3b'; // 노란색
+            statusSpan.style.fontWeight = '500';
+        } else {
+            loginBtn.textContent = '🔐 로그인';
+            loginBtn.title = '로그인 (클라우드 동기화)';
+            loginBtn.onclick = () => this.handleFirebaseLogin();
+            statusSpan.textContent = '로그인 필요';
+            statusSpan.style.display = 'none';
         }
     }
 }
