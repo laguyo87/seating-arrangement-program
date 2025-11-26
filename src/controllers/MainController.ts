@@ -30,6 +30,7 @@ import { ClassManager, ClassManagerDependencies } from '../managers/ClassManager
 import { FirebaseStorageManager, FirebaseStorageManagerDependencies } from '../managers/FirebaseStorageManager.js';
 import { LoginPageModule, LoginPageModuleDependencies } from '../modules/LoginPageModule.js';
 import { SignUpPageModule, SignUpPageModuleDependencies } from '../modules/SignUpPageModule.js';
+import QRCode from 'qrcode';
 
 /**
  * 히스토리 데이터 타입
@@ -5839,7 +5840,6 @@ export class MainController {
             const shareUrl = this.generateShareUrl(seatsAreaHtml, currentGridTemplateColumns, dateString);
 
             // 모달 창으로 공유하기
-            
             this.showShareModal(shareUrl);
 
         } catch (error) {
@@ -5890,6 +5890,36 @@ export class MainController {
             // 데이터 검증
             if (!this.validateSharedData(shareInfo)) {
                 throw new Error('공유 데이터 검증에 실패했습니다.');
+            }
+            
+            // 만료 시간 확인
+            if (shareInfo.e) {
+                const expiresAt = shareInfo.e as number;
+                if (Date.now() > expiresAt) {
+                    throw new Error('이 공유 링크는 만료되었습니다.');
+                }
+            }
+            
+            // 비밀번호 확인
+            if (shareInfo.p) {
+                const passwordHash = shareInfo.p as string;
+                const userPassword = prompt('이 공유 링크는 비밀번호가 필요합니다. 비밀번호를 입력하세요:');
+                if (!userPassword) {
+                    throw new Error('비밀번호가 필요합니다.');
+                }
+                
+                // 비밀번호 해시 계산
+                let hash = 0;
+                for (let i = 0; i < userPassword.length; i++) {
+                    const char = userPassword.charCodeAt(i);
+                    hash = ((hash << 5) - hash) + char;
+                    hash = hash & hash;
+                }
+                const userPasswordHash = Math.abs(hash).toString(36);
+                
+                if (userPasswordHash !== passwordHash) {
+                    throw new Error('비밀번호가 올바르지 않습니다.');
+                }
             }
             
             // 학생 정보 추출
@@ -6280,8 +6310,13 @@ export class MainController {
 
     /**
      * 간단한 공유 주소(URL) 생성 (압축된 형식, 뷰어 모드)
+     * @param seatsHtml 좌석 HTML
+     * @param gridColumns 그리드 컬럼 설정
+     * @param dateString 날짜 문자열
+     * @param expiresIn 만료 시간 (시간 단위, 선택사항)
+     * @param password 비밀번호 (선택사항)
      */
-    private generateShareUrl(seatsHtml: string, gridColumns: string, dateString: string): string {
+    private generateShareUrl(seatsHtml: string, gridColumns: string, dateString: string, expiresIn?: number, password?: string): string {
         // 학생 정보 추출 (이름과 성별)
         const studentData: Array<{name: string, gender: 'M' | 'F'}> = [];
         const tempDiv = document.createElement('div');
@@ -6305,11 +6340,29 @@ export class MainController {
         const compressedStudents = studentData.map(s => [s.name, s.gender]);
         
         // 최소한의 데이터만 포함 (날짜 제거, 버전 제거)
-        const shareData = {
+        const shareData: any = {
             t: 'sa', // type: 'seating-arrangement' 축약
             s: compressedStudents, // students (압축된 형식)
             l: gridColumns || '' // layout (없으면 빈 문자열)
         };
+        
+        // 만료 시간 추가 (선택사항)
+        if (expiresIn && expiresIn > 0) {
+            const expiresAt = Date.now() + (expiresIn * 60 * 60 * 1000); // 시간을 밀리초로 변환
+            shareData.e = expiresAt; // expires (만료 시간)
+        }
+        
+        // 비밀번호 해시 추가 (선택사항, 간단한 해시 사용)
+        if (password && password.length > 0) {
+            // 간단한 해시 함수 (실제로는 더 강력한 해시가 필요하지만, URL 길이 제한을 고려)
+            let hash = 0;
+            for (let i = 0; i < password.length; i++) {
+                const char = password.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash; // 32bit 정수로 변환
+            }
+            shareData.p = Math.abs(hash).toString(36); // password hash (36진수로 변환하여 단축)
+        }
 
         // JSON 문자열 생성
         const jsonString = JSON.stringify(shareData);
@@ -6330,10 +6383,10 @@ export class MainController {
     }
 
     /**
-     * 모달 창으로 자리 배치도 공유하기
+     * 모달 창으로 자리 배치도 공유하기 (개선된 버전: QR 코드, 만료 시간, 비밀번호 지원)
      */
-    private showShareModal(content: string): void {
-        // 모달 창으로 텍스트 영역 표시
+    private async showShareModal(shareUrl: string, options?: {expiresIn?: number, password?: string}): Promise<void> {
+        // 모달 창 생성
         const modal = document.createElement('div');
         modal.style.cssText = `
             position: fixed;
@@ -6351,30 +6404,126 @@ export class MainController {
         const modalContent = document.createElement('div');
         modalContent.style.cssText = `
             background: white;
-            padding: 20px;
-            border-radius: 10px;
-            max-width: 80%;
-            max-height: 80%;
-            overflow: auto;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
         `;
 
         const title = document.createElement('h3');
         title.textContent = '📤 자리 배치도 공유';
-        title.style.marginTop = '0';
-        title.style.color = '#333';
+        title.style.cssText = 'margin-top: 0; margin-bottom: 20px; color: #333; font-size: 1.5em;';
 
+        // 옵션 설정 섹션
+        const optionsSection = document.createElement('div');
+        optionsSection.style.cssText = 'margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;';
+
+        // 만료 시간 설정
+        const expiresGroup = document.createElement('div');
+        expiresGroup.style.cssText = 'margin-bottom: 15px;';
+        const expiresLabel = document.createElement('label');
+        expiresLabel.innerHTML = '<strong>⏰ 만료 시간 설정 (선택사항):</strong>';
+        expiresLabel.style.cssText = 'display: block; margin-bottom: 5px; color: #555;';
+        const expiresSelect = document.createElement('select');
+        expiresSelect.id = 'share-expires-select';
+        expiresSelect.style.cssText = 'width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;';
+        expiresSelect.innerHTML = `
+            <option value="0">만료 시간 없음</option>
+            <option value="1">1시간 후</option>
+            <option value="6">6시간 후</option>
+            <option value="24">24시간 후</option>
+            <option value="72">3일 후</option>
+            <option value="168">7일 후</option>
+        `;
+        if (options?.expiresIn) {
+            expiresSelect.value = options.expiresIn.toString();
+        }
+        expiresGroup.appendChild(expiresLabel);
+        expiresGroup.appendChild(expiresSelect);
+
+        // 비밀번호 설정
+        const passwordGroup = document.createElement('div');
+        passwordGroup.style.cssText = 'margin-bottom: 15px;';
+        const passwordLabel = document.createElement('label');
+        passwordLabel.innerHTML = '<strong>🔒 비밀번호 보호 (선택사항):</strong>';
+        passwordLabel.style.cssText = 'display: block; margin-bottom: 5px; color: #555;';
+        const passwordInput = document.createElement('input');
+        passwordInput.type = 'password';
+        passwordInput.id = 'share-password-input';
+        passwordInput.placeholder = '비밀번호를 입력하세요 (4자 이상)';
+        passwordInput.style.cssText = 'width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;';
+        if (options?.password) {
+            passwordInput.value = options.password;
+        }
+        passwordGroup.appendChild(passwordLabel);
+        passwordGroup.appendChild(passwordInput);
+
+        // URL 재생성 버튼
+        const regenerateButton = document.createElement('button');
+        regenerateButton.textContent = '🔄 링크 재생성';
+        regenerateButton.className = 'secondary-btn';
+        regenerateButton.style.cssText = 'width: 100%; margin-top: 10px;';
+        
+        let currentShareUrl = shareUrl;
+        regenerateButton.onclick = async () => {
+            const expiresIn = parseInt(expiresSelect.value) || 0;
+            const password = passwordInput.value.trim();
+            
+            if (password && password.length < 4) {
+                this.outputModule.showError('비밀번호는 4자 이상이어야 합니다.');
+                return;
+            }
+            
+            // 현재 seatsArea에서 데이터 가져오기
+            const seatsArea = document.getElementById('seats-area');
+            const currentGridTemplateColumns = seatsArea?.style.gridTemplateColumns || '';
+            const seatsAreaHtml = seatsArea?.innerHTML || '';
+            const now = new Date();
+            const dateString = now.toLocaleDateString('ko-KR', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            
+            currentShareUrl = this.generateShareUrl(seatsAreaHtml, currentGridTemplateColumns, dateString, expiresIn > 0 ? expiresIn : undefined, password || undefined);
+            textarea.value = currentShareUrl;
+            
+            // QR 코드 재생성
+            await this.generateQRCode(currentShareUrl, qrCodeContainer);
+            
+            this.outputModule.showSuccess('링크가 재생성되었습니다.');
+        };
+
+        optionsSection.appendChild(expiresGroup);
+        optionsSection.appendChild(passwordGroup);
+        optionsSection.appendChild(regenerateButton);
+
+        // QR 코드 컨테이너
+        const qrCodeContainer = document.createElement('div');
+        qrCodeContainer.id = 'share-qrcode-container';
+        qrCodeContainer.style.cssText = 'text-align: center; margin: 20px 0;';
+        
+        // QR 코드 생성
+        await this.generateQRCode(currentShareUrl, qrCodeContainer);
+
+        // 공유 URL 텍스트 영역
         const instruction = document.createElement('div');
         instruction.innerHTML = `
-            <p style="margin-bottom: 10px; color: #666;">
+            <p style="margin-bottom: 15px; color: #666; font-size: 0.9em;">
                 <strong>사용 방법:</strong><br>
-                1. 아래 공유 주소를 복사하세요 (Ctrl+A → Ctrl+C 또는 '주소 복사' 버튼 클릭)<br>
+                1. 아래 공유 주소를 복사하세요<br>
                 2. 이메일, 메신저, 문서 등에 붙여넣기하세요<br>
-                3. 받는 사람이 이 주소를 클릭하면 동일한 배치를 볼 수 있습니다
+                3. QR 코드를 스캔하여 빠르게 공유할 수 있습니다
             </p>
         `;
 
         const textarea = document.createElement('textarea');
-        textarea.value = content;
+        textarea.value = currentShareUrl;
         textarea.id = 'share-url-textarea';
         textarea.readOnly = true;
         textarea.style.cssText = `
@@ -6388,15 +6537,18 @@ export class MainController {
             resize: none;
             background: #f8f9fa;
             word-break: break-all;
+            box-sizing: border-box;
         `;
 
         const buttonContainer = document.createElement('div');
         buttonContainer.style.cssText = `
             margin-top: 15px;
-            text-align: right;
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
         `;
 
-        // 모달 닫기 함수 (안전하게 처리)
+        // 모달 닫기 함수
         const closeModal = () => {
             try {
                 if (modal && modal.parentNode) {
@@ -6418,9 +6570,8 @@ export class MainController {
         const copyButton = document.createElement('button');
         copyButton.textContent = '📋 주소 복사';
         copyButton.className = 'primary-btn';
-        copyButton.style.marginRight = '10px';
         copyButton.onclick = async () => {
-            const success = await this.copyToClipboard(content);
+            const success = await this.copyToClipboard(currentShareUrl);
             if (success) {
                 const originalText = copyButton.textContent;
                 copyButton.textContent = '✅ 복사됨!';
@@ -6443,6 +6594,8 @@ export class MainController {
         buttonContainer.appendChild(closeButton);
 
         modalContent.appendChild(title);
+        modalContent.appendChild(optionsSection);
+        modalContent.appendChild(qrCodeContainer);
         modalContent.appendChild(instruction);
         modalContent.appendChild(textarea);
         modalContent.appendChild(buttonContainer);
@@ -6463,6 +6616,31 @@ export class MainController {
             textarea.focus();
             textarea.select();
         }, 100);
+    }
+
+    /**
+     * QR 코드 생성
+     */
+    private async generateQRCode(url: string, container: HTMLElement): Promise<void> {
+        try {
+            container.innerHTML = ''; // 기존 내용 제거
+            
+            const canvas = document.createElement('canvas');
+            await QRCode.toCanvas(canvas, url, {
+                width: 200,
+                margin: 2,
+                color: {
+                    dark: '#000000',
+                    light: '#FFFFFF'
+                }
+            });
+            
+            container.appendChild(canvas);
+            canvas.style.cssText = 'border: 2px solid #ddd; border-radius: 8px; padding: 10px; background: white;';
+        } catch (error) {
+            logger.error('QR 코드 생성 실패:', error);
+            container.innerHTML = '<p style="color: #dc3545;">QR 코드 생성에 실패했습니다.</p>';
+        }
     }
 
     /**
