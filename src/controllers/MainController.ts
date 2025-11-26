@@ -6513,16 +6513,28 @@ export class MainController {
         const content = document.createElement('div');
         content.innerHTML = `
             <div style="line-height: 1.8; color: #444;">
-                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">1️⃣ 반 관리 기능</h3>
+                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">1️⃣ 시작하기: 반 만들기 (필수)</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
-                    <li><strong>➕ 반 추가</strong>: 상단 바의 "반" 셀렉트 메뉴 옆 ➕ 버튼을 클릭하여 새 반을 추가할 수 있습니다</li>
+                    <li><strong>✨ 반 만들기</strong>: 프로그램을 처음 사용하시면 상단 바의 "반 만들기" 영역이 하이라이트됩니다</li>
+                    <li><strong>➕ 반 추가</strong>: 상단 바의 "반 만들기" 셀렉트 메뉴 옆 ➕ 버튼을 클릭하여 새 반을 추가하세요</li>
                     <li><strong>📚 반 선택</strong>: 셀렉트 메뉴에서 반을 선택하면 해당 반의 저장된 자리 배치도가 자동으로 불러와집니다</li>
-                    <li><strong>💾 자리 배치도 저장</strong>: 반을 선택한 후 💾 버튼을 클릭하면 현재 자리 배치도가 해당 반에 저장됩니다</li>
+                    <li><strong>💾 Firebase 저장</strong>: 반을 선택한 후 💾 버튼을 클릭하면 현재 자리 배치도가 Firebase 클라우드에 저장됩니다 (로그인 필요)</li>
                     <li><strong>🗑️ 반 삭제</strong>: 반을 선택한 후 🗑️ 버튼을 클릭하면 해당 반과 저장된 자리 배치도가 삭제됩니다</li>
                     <li>각 반의 자리 배치도는 독립적으로 저장되므로, 여러 반의 자리 배치도를 관리할 수 있습니다</li>
+                    <li><strong>⚠️ 중요</strong>: 반을 먼저 만들지 않으면 자리 배치 기능을 사용할 수 없습니다</li>
                 </ul>
 
-                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">2️⃣ 기본 사용 방법</h3>
+                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">2️⃣ 로그인 및 클라우드 저장</h3>
+                <ul style="padding-left: 25px; margin-bottom: 20px;">
+                    <li><strong>🔐 로그인</strong>: 상단 바의 "🔐 로그인" 버튼을 클릭하여 로그인하세요</li>
+                    <li><strong>구글 로그인</strong>: Google 계정으로 간편하게 로그인할 수 있습니다</li>
+                    <li><strong>이메일 회원가입</strong>: 로그인 페이지에서 "회원가입" 버튼을 클릭하여 이메일과 비밀번호로 계정을 만들 수 있습니다</li>
+                    <li><strong>로그인 상태 표시</strong>: 로그인 후 상단 바에 "안녕하세요. [이름/이메일]님!"이 노란색으로 표시됩니다</li>
+                    <li><strong>💾 Firebase 저장</strong>: 로그인 후 반을 선택하고 💾 버튼을 클릭하면 자리 배치도가 클라우드에 저장되어 다른 기기에서도 접근할 수 있습니다</li>
+                    <li><strong>🚪 로그아웃</strong>: 상단 바의 "🚪 로그아웃" 버튼을 클릭하여 로그아웃할 수 있습니다</li>
+                </ul>
+
+                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">3️⃣ 기본 사용 방법</h3>
                 <ol style="padding-left: 25px; margin-bottom: 20px;">
                     <li><strong>📋 옵션1: 좌석 배치 형태</strong> - 원하는 배치 유형을 선택하세요
                         <ul style="padding-left: 20px; margin-top: 8px;">
@@ -6562,7 +6574,7 @@ export class MainController {
                     <li><strong>🪑 좌석 배치하기</strong> - "학생 이름 입력하기" 버튼을 클릭하여 학생 정보를 입력한 후, "자리 배치 실행하기" 버튼을 클릭하면 좌석에 학생들이 배치됩니다</li>
                 </ol>
 
-                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">3️⃣ 학생 정보 입력</h3>
+                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">4️⃣ 학생 정보 입력</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
                     <li><strong>📝 학생 이름 입력하기</strong>: 버튼을 클릭하여 학생 정보 입력 테이블을 생성하세요</li>
                     <li><strong>📊 학생 이름 엑셀파일에서 가져오기</strong>: 엑셀 파일을 업로드하여 학생 정보를 한 번에 입력할 수 있습니다</li>
@@ -6573,7 +6585,7 @@ export class MainController {
                     <li><strong>🗑️ 삭제</strong>: 각 행의 삭제 아이콘(🗑️)을 클릭하여 학생을 삭제할 수 있습니다</li>
                 </ul>
 
-                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">4️⃣ 고정 좌석 기능</h3>
+                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">5️⃣ 고정 좌석 기능</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
                     <li><strong>🔒 고정 좌석 지정</strong>: "옵션4: 맞춤 구성"에서 "고정 좌석 지정 후 랜덤 배치" 옵션을 선택하세요</li>
                     <li>미리보기 화면에서 원하는 좌석 카드를 클릭하면 🔒 아이콘과 빨간 테두리가 표시됩니다</li>
@@ -6582,36 +6594,38 @@ export class MainController {
                     <li>고정 좌석을 제외한 나머지 좌석에만 학생들이 랜덤 배치됩니다</li>
                 </ul>
 
-                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">5️⃣ 자리 배치 옵션</h3>
+                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">6️⃣ 자리 배치 옵션</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
                     <li><strong>🚫 이전 좌석 안 앉기</strong>: "확정된 자리 이력"에 저장된 이전 배치를 참고하여 같은 좌석에 배치되지 않도록 합니다</li>
                     <li><strong>👥 이전 짝 금지</strong>: "확정된 자리 이력"에 저장된 이전 배치를 참고하여 이전에 같은 짝이었던 학생과 다시 짝지어지지 않도록 합니다</li>
                     <li>두 옵션을 모두 체크하면 두 조건을 모두 만족하도록 배치됩니다</li>
                 </ul>
 
-                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">6️⃣ 확정된 자리 이력</h3>
+                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">7️⃣ 확정된 자리 이력 (반별 관리)</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
-                    <li><strong>✅ 자리 확정</strong>: 자리 배치가 완료된 후 "✅ 자리 확정" 버튼을 클릭하면 현재 배치가 이력에 저장됩니다</li>
-                    <li><strong>📋 확정된 자리 이력</strong>: 상단 바의 "📋 확정된 자리 이력" 드롭다운에서 저장된 배치를 확인할 수 있습니다</li>
+                    <li><strong>✅ 자리 확정하기</strong>: 자리 배치가 완료된 후 "✅ 자리 확정하기" 버튼을 클릭하면 현재 배치가 해당 반의 이력에 저장됩니다</li>
+                    <li><strong>⚠️ 중요</strong>: "자리 확정하기" 버튼을 클릭하지 않으면 이력에 기록되지 않습니다</li>
+                    <li><strong>📋 확정된 자리 이력</strong>: 상단 바의 "📋 확정된 자리 이력" 드롭다운에서 현재 선택된 반의 저장된 배치를 확인할 수 있습니다</li>
+                    <li><strong>반별 이력 관리</strong>: 각 반의 확정된 자리 이력은 독립적으로 관리됩니다. 반을 변경하면 해당 반의 이력이 자동으로 표시됩니다</li>
                     <li>같은 날짜에 여러 개의 배치가 저장되면 번호가 표시됩니다 (예: 25-11-10 확정자리 (3), (2), (1))</li>
                     <li>이력 항목을 클릭하면 해당 배치를 불러올 수 있습니다</li>
                     <li>이력 항목 옆의 삭제 아이콘(🗑️)을 클릭하면 해당 이력을 삭제할 수 있습니다</li>
                     <li>드롭다운 외부를 클릭하면 드롭다운이 자동으로 닫힙니다</li>
                 </ul>
 
-                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">7️⃣ 옵션 설정 기억하기</h3>
+                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">8️⃣ 옵션 설정 기억하기</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
                     <li><strong>💾 옵션 설정 기억하기</strong>: "초기화" 버튼 위의 "옵션 설정 기억하기" 버튼을 클릭하면 현재 설정(옵션1~옵션4)이 저장됩니다</li>
                     <li>다음에 프로그램을 실행하면 저장된 설정이 자동으로 적용됩니다</li>
                 </ul>
 
-                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">8️⃣ 자리 바꾸기</h3>
+                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">9️⃣ 자리 바꾸기</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
                     <li>자리 배치가 완료된 후, 좌석 카드를 드래그하여 다른 좌석에 드롭하면 자리를 바꿀 수 있습니다</li>
                     <li>두 카드를 서로 드래그 & 드롭하면 위치가 교환됩니다</li>
                 </ul>
 
-                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">9️⃣ 공유 및 출력</h3>
+                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">🔟 공유 및 출력</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
                     <li><strong>📤 공유하기</strong>: 공유 주소(URL)를 생성하여 다른 사람과 자리 배치도를 공유할 수 있습니다</li>
                     <li><strong>🖨️ 인쇄하기</strong>: 현재 자리 배치도를 인쇄합니다</li>
@@ -6619,7 +6633,9 @@ export class MainController {
 
                 <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">💡 유용한 팁</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
-                    <li><strong>📚 반 관리 팁</strong>: 여러 반을 관리할 때는 각 반의 자리 배치도를 저장해두면 나중에 쉽게 불러올 수 있습니다</li>
+                    <li><strong>📚 반 관리 팁</strong>: 여러 반을 관리할 때는 각 반의 자리 배치도를 Firebase에 저장해두면 나중에 쉽게 불러올 수 있습니다</li>
+                    <li><strong>🔐 클라우드 저장</strong>: 로그인 후 💾 버튼을 클릭하면 자리 배치도가 클라우드에 저장되어 다른 기기에서도 접근할 수 있습니다</li>
+                    <li><strong>📋 반별 이력 관리</strong>: 각 반의 확정된 자리 이력은 독립적으로 관리되므로, 반을 변경하면 해당 반의 이력이 자동으로 표시됩니다</li>
                     <li>📊 학생 정보 입력 테이블 하단의 통계를 확인하여 남학생/여학생 수와 고정 좌석 수를 확인할 수 있습니다</li>
                     <li>🔒 고정 좌석 모드에서는 미리보기 화면에서 좌석을 클릭하여 고정할 수 있습니다</li>
                     <li>🔄 자리 배치 후에는 드래그 & 드롭으로 자유롭게 자리를 조정할 수 있습니다</li>
@@ -6628,6 +6644,7 @@ export class MainController {
                     <li>⚖️ "남녀 대칭 1줄 배치"는 남학생을 앞쪽 분단부터 배치하고, 여학생을 나머지 자리에 배치하는 대칭적인 배치 방식입니다</li>
                     <li>◀ 좌측 사이드바의 토글 버튼(◀)을 클릭하면 사이드바를 접거나 펼칠 수 있습니다</li>
                     <li>↶↷ 상단 바의 되돌리기(↶)와 다시 실행하기(↷) 버튼으로 자리 배치 변경 이력을 관리할 수 있습니다</li>
+                    <li><strong>✨ 반 만들기 하이라이트</strong>: 반이 없으면 상단 바의 "반 만들기" 영역이 하이라이트되어 먼저 반을 만들어야 함을 알려줍니다</li>
                 </ul>
 
                 <div style="margin-top: 30px; padding: 15px; background: #f0f8ff; border-left: 4px solid #667eea; border-radius: 4px;">
