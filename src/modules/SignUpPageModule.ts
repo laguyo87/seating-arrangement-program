@@ -87,12 +87,12 @@ export class SignUpPageModule {
                     </div>
                     <form id="signup-form" class="signup-form">
                         <div class="signup-form-group">
-                            <label for="signup-name" class="signup-form-label">이름</label>
+                            <label for="signup-name" class="signup-form-label">닉네임</label>
                             <input 
                                 type="text" 
                                 id="signup-name" 
                                 class="signup-form-input" 
-                                placeholder="이름을 입력하세요"
+                                placeholder="닉네임을 입력하세요"
                                 required
                                 autocomplete="name"
                                 minlength="2"
@@ -283,11 +283,11 @@ export class SignUpPageModule {
         const email = emailInput.value.trim();
         const password = passwordInput.value;
 
-        // 이름 검증
+        // 닉네임 검증
         if (name.length < 2) {
             const nameError = this.signUpPageContainer.querySelector('#signup-name-error') as HTMLSpanElement;
             if (nameError) {
-                nameError.textContent = '이름은 최소 2자 이상이어야 합니다.';
+                nameError.textContent = '닉네임은 최소 2자 이상이어야 합니다.';
                 nameError.style.display = 'block';
             }
             return;
