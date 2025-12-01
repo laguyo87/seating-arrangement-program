@@ -428,10 +428,7 @@ export class OutputModule {
             this.container.appendChild(loadingElement);
         }
     }
-}
-
-
-     */
+    
     public clear(): void {
         // card-layout-container는 보존하고 메시지만 제거
         const cardContainer = this.container.querySelector('#card-layout-container');

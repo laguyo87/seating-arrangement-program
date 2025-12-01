@@ -357,8 +357,3 @@ export class ValidationRules {
     }
 }
 
-
-        };
-    }
-}
-
