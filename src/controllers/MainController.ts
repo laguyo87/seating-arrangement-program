@@ -30,6 +30,7 @@ import { ClassManager, ClassManagerDependencies } from '../managers/ClassManager
 import { FirebaseStorageManager, FirebaseStorageManagerDependencies } from '../managers/FirebaseStorageManager.js';
 import { LoginPageModule, LoginPageModuleDependencies } from '../modules/LoginPageModule.js';
 import { SignUpPageModule, SignUpPageModuleDependencies } from '../modules/SignUpPageModule.js';
+import { VisitorCounterModule, VisitorCounterModuleDependencies } from '../modules/VisitorCounterModule.js';
 import QRCode from 'qrcode';
 
 /**
@@ -124,6 +125,7 @@ export class MainController {
     private firebaseStorageManager!: FirebaseStorageManager;
     private loginPageModule!: LoginPageModule;
     private signUpPageModule!: SignUpPageModule;
+    private visitorCounterModule!: VisitorCounterModule;
     
     private students: Student[] = [];
     private seats: Seat[] = [];
@@ -324,6 +326,13 @@ export class MainController {
                 }
             };
             this.loginPageModule = new LoginPageModule(loginPageModuleDeps);
+            
+            // VisitorCounterModule 초기화
+            const visitorCounterModuleDeps: VisitorCounterModuleDependencies = {
+                firebaseStorageManager: this.firebaseStorageManager
+            };
+            this.visitorCounterModule = new VisitorCounterModule(visitorCounterModuleDeps);
+            this.visitorCounterModule.init();
             
             // 입력 필드 검증 설정
             this.setupInputValidation();

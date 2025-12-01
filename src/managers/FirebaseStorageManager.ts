@@ -14,7 +14,9 @@ import {
   where,
   Timestamp,
   onSnapshot,
-  Unsubscribe
+  Unsubscribe,
+  runTransaction,
+  increment
 } from 'firebase/firestore';
 import { signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, User, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { FirebaseService } from '../services/FirebaseService.js';
@@ -501,6 +503,117 @@ export class FirebaseStorageManager {
       logger.info('Firebase 실시간 리스너 해제:', { key });
     });
     this.snapshotUnsubscribes.clear();
+  }
+
+  /**
+   * 방문자 수 증가 (트랜잭션 사용)
+   */
+  public async incrementVisitorCount(): Promise<number | null> {
+    try {
+      const firestore = this.firebaseService.getFirestore();
+      if (!firestore) {
+        logger.warn('Firestore가 초기화되지 않았습니다.');
+        return null;
+      }
+
+      const statsDocRef = doc(firestore, 'globalStats', 'visitorCount');
+      
+      // 트랜잭션을 사용하여 원자적으로 증가
+      const newCount = await runTransaction(firestore, async (transaction) => {
+        const statsDoc = await transaction.get(statsDocRef);
+        
+        let currentCount = 0;
+        if (statsDoc.exists()) {
+          currentCount = statsDoc.data().count || 0;
+        }
+        
+        const newCount = currentCount + 1;
+        transaction.set(statsDocRef, {
+          count: newCount,
+          lastUpdated: Timestamp.now()
+        }, { merge: true });
+        
+        return newCount;
+      });
+
+      logger.info('✅ 방문자 수 증가 완료:', { count: newCount });
+      return newCount;
+    } catch (error) {
+      logger.error('❌ 방문자 수 증가 실패:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 현재 방문자 수 가져오기
+   */
+  public async getVisitorCount(): Promise<number> {
+    try {
+      const firestore = this.firebaseService.getFirestore();
+      if (!firestore) {
+        logger.warn('Firestore가 초기화되지 않았습니다.');
+        return 0;
+      }
+
+      const statsDocRef = doc(firestore, 'globalStats', 'visitorCount');
+      const statsDoc = await getDoc(statsDocRef);
+      
+      if (statsDoc.exists()) {
+        const count = statsDoc.data().count || 0;
+        return count;
+      }
+      
+      return 0;
+    } catch (error) {
+      logger.error('방문자 수 가져오기 실패:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * 방문자 수 실시간 리스너 설정
+   */
+  public setupVisitorCountListener(
+    onUpdate: (count: number) => void,
+    onError?: (error: Error) => void
+  ): Unsubscribe | null {
+    try {
+      const firestore = this.firebaseService.getFirestore();
+      if (!firestore) {
+        logger.warn('Firestore가 초기화되지 않았습니다.');
+        return null;
+      }
+
+      const statsDocRef = doc(firestore, 'globalStats', 'visitorCount');
+      
+      logger.info('방문자 수 실시간 리스너 설정');
+      
+      const unsubscribe = onSnapshot(
+        statsDocRef,
+        (docSnapshot) => {
+          if (docSnapshot.exists()) {
+            const count = docSnapshot.data().count || 0;
+            logger.info('🔄 방문자 수 실시간 업데이트:', { count });
+            onUpdate(count);
+          } else {
+            logger.info('방문자 수 문서가 존재하지 않음');
+            onUpdate(0);
+          }
+        },
+        (error) => {
+          logger.error('❌ 방문자 수 리스너 오류:', error);
+          if (onError) {
+            onError(error);
+          }
+        }
+      );
+
+      this.snapshotUnsubscribes.set('visitorCount', unsubscribe);
+      return unsubscribe;
+    } catch (error) {
+      logger.error('방문자 수 리스너 설정 실패:', error);
+      return null;
+    }
   }
 }
 
