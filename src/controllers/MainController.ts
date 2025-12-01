@@ -6130,12 +6130,47 @@ export class MainController {
                 throw new Error('교실 레이아웃을 찾을 수 없습니다.');
             }
             
-            // 전체 크기 계산 (실제 콘텐츠 크기)
+            // 전체 크기 계산 (실제 콘텐츠 크기 - 칠판, 교탁, 좌석 모두 포함)
             // 요소의 실제 크기를 정확히 계산
             const rect = classroomLayout.getBoundingClientRect();
-            const scrollWidth = Math.max(classroomLayout.scrollWidth, rect.width);
-            const scrollHeight = Math.max(classroomLayout.scrollHeight, rect.height);
-            const maxWidth = 1200; // 스마트폰 최적화를 위한 최대 너비
+            
+            // 모든 자식 요소의 실제 크기를 계산하여 전체 영역 파악
+            const seatsArea = document.getElementById('seats-area');
+            const blackboardArea = document.getElementById('blackboard-area');
+            const teacherDeskArea = document.getElementById('teacher-desk-area');
+            
+            // 좌석 영역의 실제 크기 계산
+            let seatsAreaHeight = 0;
+            let seatsAreaWidth = 0;
+            if (seatsArea) {
+                const seatsRect = seatsArea.getBoundingClientRect();
+                seatsAreaHeight = seatsArea.scrollHeight || seatsRect.height;
+                seatsAreaWidth = seatsArea.scrollWidth || seatsRect.width;
+            }
+            
+            // 칠판과 교탁 영역 고려 (절대 위치이므로 포함)
+            const blackboardHeight = blackboardArea ? (blackboardArea.getBoundingClientRect().height || 40) : 40;
+            const teacherDeskHeight = teacherDeskArea ? (teacherDeskArea.getBoundingClientRect().height || 40) : 40;
+            
+            // 전체 높이 계산: 칠판(20px top) + 칠판 높이 + 교탁(84px top - 20px - 칠판 높이) + 교탁 높이 + 좌석 영역(margin-top 140px + 실제 높이)
+            const totalHeight = Math.max(
+                classroomLayout.scrollHeight,
+                classroomLayout.offsetHeight,
+                140 + seatsAreaHeight, // 좌석 영역 시작 위치 + 높이
+                rect.height
+            );
+            
+            // 전체 너비 계산
+            const totalWidth = Math.max(
+                classroomLayout.scrollWidth,
+                classroomLayout.offsetWidth,
+                seatsAreaWidth,
+                rect.width
+            );
+            
+            // 스마트폰 화면 크기에 맞게 최대 너비 설정 (viewport width 고려)
+            const viewportWidth = window.innerWidth || 375; // 기본값: iPhone SE 크기
+            const maxWidth = Math.min(viewportWidth - 20, 800); // 패딩 고려
             
             // 전체 영역을 캡처하기 위해 스크롤 위치 저장 및 리셋
             const originalScrollX = window.scrollX;
@@ -6146,6 +6181,7 @@ export class MainController {
             const originalOverflow = classroomLayout.style.overflow;
             const originalPosition = classroomLayout.style.position;
             const originalMaxHeight = classroomLayout.style.maxHeight;
+            const originalMinHeight = classroomLayout.style.minHeight;
             
             // 전체 영역이 보이도록 스타일 조정
             classroomLayout.style.overflow = 'visible';
@@ -6153,20 +6189,27 @@ export class MainController {
             if (classroomLayout.style.maxHeight) {
                 classroomLayout.style.maxHeight = 'none';
             }
+            // 최소 높이를 실제 높이로 설정하여 전체 영역 확보
+            classroomLayout.style.minHeight = `${totalHeight}px`;
             
             // html2canvas로 이미지 변환 (전체 캡처, 스마트폰 최적화)
             const canvas = await html2canvas(classroomLayout, {
                 backgroundColor: '#ffffff',
                 scale: 2, // 고해상도 (스마트폰에서도 선명하게)
-                width: scrollWidth,
-                height: scrollHeight,
+                width: totalWidth,
+                height: totalHeight,
                 logging: false,
                 useCORS: true,
                 allowTaint: false,
                 scrollX: 0,
                 scrollY: 0,
                 x: 0,
-                y: 0
+                y: 0,
+                ignoreElements: (element) => {
+                    // 숨겨진 요소는 제외
+                    const style = window.getComputedStyle(element);
+                    return style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0';
+                }
             });
             
             // 스타일 복원
@@ -6174,6 +6217,9 @@ export class MainController {
             classroomLayout.style.position = originalPosition;
             if (originalMaxHeight) {
                 classroomLayout.style.maxHeight = originalMaxHeight;
+            }
+            if (originalMinHeight) {
+                classroomLayout.style.minHeight = originalMinHeight;
             }
             
             // 스크롤 위치 복원
@@ -6189,6 +6235,9 @@ export class MainController {
                 resizedCanvas.height = newHeight;
                 const ctx = resizedCanvas.getContext('2d');
                 if (ctx) {
+                    // 고품질 리사이징
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
                     ctx.drawImage(canvas, 0, 0, newWidth, newHeight);
                     finalCanvas = resizedCanvas;
                 }
@@ -6197,16 +6246,17 @@ export class MainController {
             // 이미지 데이터 URL 생성 (품질 조정)
             const imageDataUrl = finalCanvas.toDataURL('image/png', 0.95);
             
-            // 모든 UI 숨기고 이미지만 표시
+            // 모든 UI 숨기고 이미지만 표시 (스마트폰 화면에 맞게)
             document.body.innerHTML = '';
-            document.body.style.cssText = 'margin: 0; padding: 10px; background: #f5f5f5; display: flex; justify-content: center; align-items: center; min-height: 100vh;';
+            document.body.style.cssText = 'margin: 0; padding: 10px; background: #f5f5f5; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; overflow-x: hidden;';
             
             const imageContainer = document.createElement('div');
-            imageContainer.style.cssText = 'text-align: center; max-width: 100%; width: 100%;';
+            imageContainer.style.cssText = 'text-align: center; max-width: 100%; width: 100%; display: flex; flex-direction: column; align-items: center;';
             
             const img = document.createElement('img');
             img.src = imageDataUrl;
-            img.style.cssText = 'max-width: 100%; width: 100%; height: auto; border: 2px solid #ddd; border-radius: 8px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); background: white; display: block;';
+            // 스마트폰 화면 크기에 딱 맞게 조절
+            img.style.cssText = 'max-width: 100%; width: 100%; height: auto; border: 2px solid #ddd; border-radius: 8px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); background: white; display: block; object-fit: contain;';
             img.alt = '자리 배치도';
             
             imageContainer.appendChild(img);
