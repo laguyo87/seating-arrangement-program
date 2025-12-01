@@ -83,17 +83,50 @@ export class FirebaseStorageManager {
         return false;
       }
 
+      // GoogleAuthProvider 설정
       const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({
+        prompt: 'select_account' // 계정 선택 화면 표시
+      });
+      provider.addScope('profile');
+      provider.addScope('email');
+
+      logger.info('Google 로그인 팝업 시작');
       const result = await signInWithPopup(auth, provider);
       
       this.currentUser = result.user;
       this.isAuthenticated = true;
       
+      logger.info('Google 로그인 성공:', { 
+        email: result.user.email, 
+        displayName: result.user.displayName 
+      });
+      
       this.deps.outputModule.showInfo('Google 로그인이 완료되었습니다.');
       return true;
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Google 로그인 실패:', error);
-      this.deps.outputModule.showError('로그인에 실패했습니다. 다시 시도해주세요.');
+      
+      let errorMessage = '로그인에 실패했습니다.';
+      
+      // Firebase Auth 에러 코드에 따른 구체적인 메시지
+      if (error?.code === 'auth/popup-blocked') {
+        errorMessage = '팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해주세요.';
+      } else if (error?.code === 'auth/popup-closed-by-user') {
+        errorMessage = '로그인 창이 닫혔습니다. 다시 시도해주세요.';
+      } else if (error?.code === 'auth/cancelled-popup-request') {
+        errorMessage = '로그인 요청이 취소되었습니다. 잠시 후 다시 시도해주세요.';
+      } else if (error?.code === 'auth/unauthorized-domain') {
+        errorMessage = '이 도메인은 승인되지 않았습니다. Firebase Console에서 도메인을 추가해주세요.';
+      } else if (error?.code === 'auth/operation-not-allowed') {
+        errorMessage = 'Google 로그인이 활성화되지 않았습니다. Firebase Console에서 Google 로그인을 활성화해주세요.';
+      } else if (error?.code === 'auth/network-request-failed') {
+        errorMessage = '네트워크 오류가 발생했습니다. 인터넷 연결을 확인해주세요.';
+      } else if (error?.message) {
+        errorMessage = `로그인 오류: ${error.message}`;
+      }
+      
+      this.deps.outputModule.showError(errorMessage);
       return false;
     }
   }
@@ -156,26 +189,47 @@ export class FirebaseStorageManager {
         return false;
       }
 
+      logger.info('이메일/비밀번호 로그인 시도:', { email });
       const result = await signInWithEmailAndPassword(auth, email, password);
       
       this.currentUser = result.user;
       this.isAuthenticated = true;
       
+      logger.info('이메일/비밀번호 로그인 성공:', { 
+        email: result.user.email, 
+        displayName: result.user.displayName 
+      });
+      
       this.deps.outputModule.showInfo('로그인이 완료되었습니다.');
       return true;
     } catch (error: any) {
-      logger.error('로그인 실패:', error);
+      logger.error('이메일/비밀번호 로그인 실패:', error);
       
       let errorMessage = '로그인에 실패했습니다.';
+      
+      // Firebase Auth 에러 코드에 따른 구체적인 메시지
       if (error?.code === 'auth/user-not-found') {
         errorMessage = '등록되지 않은 이메일입니다.';
       } else if (error?.code === 'auth/wrong-password') {
         errorMessage = '비밀번호가 올바르지 않습니다.';
       } else if (error?.code === 'auth/invalid-email') {
         errorMessage = '올바른 이메일 형식이 아닙니다.';
+      } else if (error?.code === 'auth/invalid-credential') {
+        errorMessage = '이메일 또는 비밀번호가 올바르지 않습니다.';
+      } else if (error?.code === 'auth/user-disabled') {
+        errorMessage = '이 계정은 비활성화되었습니다.';
+      } else if (error?.code === 'auth/too-many-requests') {
+        errorMessage = '너무 많은 로그인 시도가 있었습니다. 잠시 후 다시 시도해주세요.';
+      } else if (error?.code === 'auth/network-request-failed') {
+        errorMessage = '네트워크 오류가 발생했습니다. 인터넷 연결을 확인해주세요.';
+      } else if (error?.code === 'auth/operation-not-allowed') {
+        errorMessage = '이메일/비밀번호 로그인이 활성화되지 않았습니다. Firebase Console에서 활성화해주세요.';
+      } else if (error?.message) {
+        errorMessage = `로그인 오류: ${error.message}`;
       }
       
-      this.deps.outputModule.showError(errorMessage);
+      // outputModule에 에러 표시는 하지 않음 (LoginPageModule에서 처리)
+      // this.deps.outputModule.showError(errorMessage);
       return false;
     }
   }

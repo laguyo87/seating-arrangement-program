@@ -83,12 +83,46 @@ export class LoginPageModule {
                 </div>
                 <div class="login-page-body">
                     <div class="login-page-description">
-                        <p>Google 계정으로 로그인하여 클라우드에 데이터를 동기화할 수 있습니다.</p>
+                        <p>로그인하여 클라우드에 데이터를 동기화할 수 있습니다.</p>
                         <ul class="login-page-features">
                             <li>📱 여러 기기에서 동일한 데이터 사용</li>
                             <li>☁️ 클라우드에 자동 백업</li>
                             <li>🔄 실시간 동기화</li>
                         </ul>
+                    </div>
+                    <form id="login-form" class="login-form">
+                        <div class="login-form-group">
+                            <label for="login-email" class="login-form-label">이메일</label>
+                            <input 
+                                type="email" 
+                                id="login-email" 
+                                class="login-form-input" 
+                                placeholder="example@email.com"
+                                required
+                                autocomplete="email"
+                            />
+                            <span class="login-form-error" id="login-email-error"></span>
+                        </div>
+                        <div class="login-form-group">
+                            <label for="login-password" class="login-form-label">비밀번호</label>
+                            <input 
+                                type="password" 
+                                id="login-password" 
+                                class="login-form-input" 
+                                placeholder="비밀번호"
+                                required
+                                autocomplete="current-password"
+                            />
+                            <span class="login-form-error" id="login-password-error"></span>
+                        </div>
+                        <div class="login-page-actions">
+                            <button type="submit" id="login-submit-btn" class="login-submit-btn">
+                                이메일로 로그인
+                            </button>
+                        </div>
+                    </form>
+                    <div class="login-page-divider">
+                        <span>또는</span>
                     </div>
                     <div class="login-page-actions">
                         <button id="login-page-google-btn" class="login-page-google-btn">
@@ -100,9 +134,6 @@ export class LoginPageModule {
                             </svg>
                             Google로 로그인
                         </button>
-                        <div class="login-page-divider">
-                            <span>또는</span>
-                        </div>
                         <button id="login-page-signup-btn" class="login-page-signup-btn">
                             회원가입
                         </button>
@@ -166,6 +197,15 @@ export class LoginPageModule {
                 if (this.deps.onShowSignUp) {
                     this.deps.onShowSignUp();
                 }
+            });
+        }
+
+        // 이메일/비밀번호 로그인 폼
+        const form = this.loginPageContainer.querySelector('#login-form') as HTMLFormElement;
+        if (form) {
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.handleEmailLogin();
             });
         }
 
@@ -249,6 +289,120 @@ export class LoginPageModule {
                 </svg>
                 Google로 로그인
             `;
+        }
+    }
+
+    /**
+     * 이메일/비밀번호 로그인 처리
+     */
+    private async handleEmailLogin(): Promise<void> {
+        const emailInput = this.loginPageContainer?.querySelector('#login-email') as HTMLInputElement;
+        const passwordInput = this.loginPageContainer?.querySelector('#login-password') as HTMLInputElement;
+        const submitBtn = this.loginPageContainer?.querySelector('#login-submit-btn') as HTMLButtonElement;
+        const statusDiv = this.loginPageContainer?.querySelector('#login-page-status') as HTMLDivElement;
+
+        if (!emailInput || !passwordInput || !submitBtn || !statusDiv) return;
+
+        const email = emailInput.value.trim();
+        const password = passwordInput.value;
+
+        // 이메일 형식 검증
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            const emailError = this.loginPageContainer?.querySelector('#login-email-error') as HTMLSpanElement;
+            if (emailError) {
+                emailError.textContent = '올바른 이메일 형식이 아닙니다.';
+                emailError.style.display = 'block';
+            }
+            return;
+        }
+
+        // 비밀번호 검증
+        if (!password || password.length < 6) {
+            const passwordError = this.loginPageContainer?.querySelector('#login-password-error') as HTMLSpanElement;
+            if (passwordError) {
+                passwordError.textContent = '비밀번호를 입력해주세요.';
+                passwordError.style.display = 'block';
+            }
+            return;
+        }
+
+        // 에러 메시지 초기화
+        const emailError = this.loginPageContainer?.querySelector('#login-email-error') as HTMLSpanElement;
+        const passwordError = this.loginPageContainer?.querySelector('#login-password-error') as HTMLSpanElement;
+        if (emailError) emailError.style.display = 'none';
+        if (passwordError) passwordError.style.display = 'none';
+
+        // 버튼 비활성화
+        submitBtn.disabled = true;
+        submitBtn.textContent = '로그인 중...';
+        statusDiv.style.display = 'none';
+
+        try {
+            const success = await this.deps.firebaseStorageManager.signInWithEmailAndPassword(email, password);
+            
+            if (success) {
+                // 로그인 성공
+                statusDiv.textContent = '로그인 성공!';
+                statusDiv.className = 'login-page-status login-page-status-success';
+                statusDiv.style.display = 'block';
+
+                // 잠시 후 페이지 닫기
+                setTimeout(() => {
+                    this.hide();
+                    if (this.deps.onLoginSuccess) {
+                        this.deps.onLoginSuccess();
+                    }
+                }, 1000);
+            } else {
+                // 로그인 실패
+                statusDiv.textContent = '로그인에 실패했습니다. 이메일과 비밀번호를 확인해주세요.';
+                statusDiv.className = 'login-page-status login-page-status-error';
+                statusDiv.style.display = 'block';
+                
+                submitBtn.disabled = false;
+                submitBtn.textContent = '이메일로 로그인';
+            }
+        } catch (error: any) {
+            logger.error('이메일 로그인 처리 중 오류:', error);
+            
+            let errorMessage = '로그인에 실패했습니다.';
+            
+            // Firebase 에러 코드에 따른 메시지
+            if (error?.code === 'auth/user-not-found') {
+                errorMessage = '등록되지 않은 이메일입니다.';
+                if (emailError) {
+                    emailError.textContent = errorMessage;
+                    emailError.style.display = 'block';
+                }
+            } else if (error?.code === 'auth/wrong-password') {
+                errorMessage = '비밀번호가 올바르지 않습니다.';
+                if (passwordError) {
+                    passwordError.textContent = errorMessage;
+                    passwordError.style.display = 'block';
+                }
+            } else if (error?.code === 'auth/invalid-email') {
+                errorMessage = '올바른 이메일 형식이 아닙니다.';
+                if (emailError) {
+                    emailError.textContent = errorMessage;
+                    emailError.style.display = 'block';
+                }
+            } else if (error?.code === 'auth/invalid-credential') {
+                errorMessage = '이메일 또는 비밀번호가 올바르지 않습니다.';
+                statusDiv.textContent = errorMessage;
+            } else if (error?.code === 'auth/too-many-requests') {
+                errorMessage = '너무 많은 로그인 시도가 있었습니다. 잠시 후 다시 시도해주세요.';
+                statusDiv.textContent = errorMessage;
+            } else if (error?.message) {
+                errorMessage = `로그인 오류: ${error.message}`;
+                statusDiv.textContent = errorMessage;
+            }
+            
+            statusDiv.className = 'login-page-status login-page-status-error';
+            statusDiv.style.display = 'block';
+            
+            submitBtn.disabled = false;
+            submitBtn.textContent = '이메일로 로그인';
         }
     }
 
