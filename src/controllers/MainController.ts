@@ -928,12 +928,6 @@ export class MainController {
                 this.handleSaveStudentTable();
             }
             
-            // 공유하기 버튼 클릭
-            if (target.id === 'share-layout') {
-                
-                this.handleShareLayout();
-            }
-            
             // 인쇄하기 버튼 클릭
             if (target.id === 'print-layout') {
                 this.printExportManager.printLayout();
@@ -5823,47 +5817,6 @@ export class MainController {
         this.printExportManager.saveLayoutAsHtml();
     }
 
-    /**
-     * 자리 배치도 공유하기
-     */
-    private handleShareLayout(): void {
-        
-        try {
-            const seatsArea = document.getElementById('seats-area');
-            const classroomLayout = document.getElementById('classroom-layout');
-            
-            
-            
-            
-            if (!seatsArea || !classroomLayout) {
-                
-                this.outputModule.showError('공유할 자리 배치도를 찾을 수 없습니다.');
-                return;
-            }
-
-            const currentGridTemplateColumns = seatsArea.style.gridTemplateColumns;
-            const seatsAreaHtml = seatsArea.innerHTML;
-
-            const now = new Date();
-            const dateString = now.toLocaleDateString('ko-KR', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-
-            // 공유 주소(URL) 생성
-            const shareUrl = this.generateShareUrl(seatsAreaHtml, currentGridTemplateColumns, dateString);
-
-            // 모달 창으로 공유하기
-            this.showShareModal(shareUrl);
-
-        } catch (error) {
-            logger.error('공유 중 오류:', error);
-            this.outputModule.showError('공유 중 오류가 발생했습니다.');
-        }
-    }
 
     /**
      * 뷰어 모드 활성화 (자리 배치도만 표시)
@@ -6791,8 +6744,11 @@ export class MainController {
      * @param dateString 날짜 문자열
      * @param expiresIn 만료 시간 (시간 단위, 선택사항)
      * @param password 비밀번호 (선택사항)
+     * @deprecated 공유 기능이 제거되었습니다. 이 메서드는 더 이상 사용되지 않습니다.
      */
     private generateShareUrl(seatsHtml: string, gridColumns: string, dateString: string, expiresIn?: number, password?: string): string {
+        // 공유 기능이 제거되었으므로 빈 문자열 반환
+        return '';
         // 학생 정보 추출 (이름과 성별)
         const studentData: Array<{name: string, gender: 'M' | 'F'}> = [];
         const tempDiv = document.createElement('div');
@@ -6894,8 +6850,11 @@ export class MainController {
 
     /**
      * 모달 창으로 자리 배치도 공유하기 (개선된 버전: QR 코드, 만료 시간, 비밀번호 지원)
+     * @deprecated 공유 기능이 제거되었습니다. 이 메서드는 더 이상 사용되지 않습니다.
      */
     private async showShareModal(shareUrl: string, options?: {expiresIn?: number, password?: string}): Promise<void> {
+        // 공유 기능이 제거되었으므로 아무 작업도 하지 않음
+        return;
         // 모달 창 생성
         const modal = document.createElement('div');
         modal.style.cssText = `
@@ -7091,8 +7050,11 @@ export class MainController {
 
     /**
      * QR 코드 인쇄
+     * @deprecated 공유 기능이 제거되었습니다. 이 메서드는 더 이상 사용되지 않습니다.
      */
     private printQRCode(url: string, qrContainer: HTMLElement): void {
+        // 공유 기능이 제거되었으므로 아무 작업도 하지 않음
+        return;
         try {
             // QR 코드 이미지 찾기
             const qrCanvas = qrContainer.querySelector('canvas') as HTMLCanvasElement;
@@ -7188,7 +7150,13 @@ export class MainController {
     /**
      * QR 코드 생성
      */
+    /**
+     * QR 코드 생성
+     * @deprecated 공유 기능이 제거되었습니다. 이 메서드는 더 이상 사용되지 않습니다.
+     */
     private async generateQRCode(url: string, container: HTMLElement): Promise<void> {
+        // 공유 기능이 제거되었으므로 아무 작업도 하지 않음
+        return;
         try {
             container.innerHTML = ''; // 기존 내용 제거
             
@@ -7372,7 +7340,6 @@ export class MainController {
 
                 <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">🔟 공유 및 출력</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
-                    <li><strong>📤 공유하기</strong>: 공유 주소(URL)를 생성하여 다른 사람과 자리 배치도를 공유할 수 있습니다</li>
                     <li><strong>🖨️ 인쇄하기</strong>: 현재 자리 배치도를 인쇄합니다</li>
                 </ul>
 
