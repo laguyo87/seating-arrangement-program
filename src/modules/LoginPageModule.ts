@@ -257,8 +257,9 @@ export class LoginPageModule {
                     }
                 }, 1000);
             } else {
-                // 로그인 실패
-                statusDiv.textContent = '로그인에 실패했습니다. 다시 시도해주세요.';
+                // 로그인 실패 - FirebaseStorageManager에서 이미 에러 메시지를 표시했으므로
+                // 여기서는 간단한 메시지만 표시
+                statusDiv.textContent = '로그인에 실패했습니다. 아래 에러 메시지를 확인해주세요.';
                 statusDiv.className = 'login-page-status login-page-status-error';
                 statusDiv.style.display = 'block';
                 

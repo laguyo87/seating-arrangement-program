@@ -149,7 +149,18 @@ export class FirebaseStorageManager {
         errorMessage = '로그인 요청이 취소되었습니다. 잠시 후 다시 시도해주세요.';
       } else if (error?.code === 'auth/unauthorized-domain') {
         const currentDomain = window.location.hostname;
-        errorMessage = `현재 도메인(${currentDomain})이 승인되지 않았습니다.\n\n해결 방법:\n1. Firebase Console 접속: https://console.firebase.google.com/\n2. 프로젝트 선택: seating-arrangement-back-7ffa1\n3. Authentication → Settings → Authorized domains\n4. "Add domain" 클릭 후 "${currentDomain}" 추가\n5. 저장 후 페이지 새로고침`;
+        const firebaseConsoleUrl = `https://console.firebase.google.com/project/seating-arrangement-back-7ffa1/authentication/settings`;
+        
+        // 콘솔에 상세 안내 출력
+        console.error('🚨 도메인 미승인 에러 발생!');
+        console.error(`현재 도메인: ${currentDomain}`);
+        console.error('해결 방법:');
+        console.error(`1. Firebase Console 접속: ${firebaseConsoleUrl}`);
+        console.error('2. "Authorized domains" 탭 클릭');
+        console.error(`3. "Add domain" 클릭 후 "${currentDomain}" 추가`);
+        console.error('4. 저장 후 페이지 새로고침');
+        
+        errorMessage = `현재 도메인(${currentDomain})이 승인되지 않았습니다.\n\n해결 방법:\n1. Firebase Console 접속: ${firebaseConsoleUrl}\n2. "Authorized domains" 탭 클릭\n3. "Add domain" 클릭 후 "${currentDomain}" 추가\n4. 저장 후 페이지 새로고침\n\n(브라우저 콘솔에 더 자세한 안내가 출력되었습니다.)`;
       } else if (error?.code === 'auth/operation-not-allowed') {
         errorMessage = 'Google 로그인이 활성화되지 않았습니다. Firebase Console → Authentication → Sign-in method에서 Google을 활성화해주세요.';
       } else if (error?.code === 'auth/network-request-failed') {

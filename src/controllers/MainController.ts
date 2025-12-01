@@ -32,6 +32,7 @@ import { LoginPageModule, LoginPageModuleDependencies } from '../modules/LoginPa
 import { SignUpPageModule, SignUpPageModuleDependencies } from '../modules/SignUpPageModule.js';
 import { VisitorCounterModule, VisitorCounterModuleDependencies } from '../modules/VisitorCounterModule.js';
 import QRCode from 'qrcode';
+import html2canvas from 'html2canvas';
 
 /**
  * 히스토리 데이터 타입
@@ -5963,9 +5964,6 @@ export class MainController {
                 }
             });
             
-            // 뷰어 모드 UI 설정
-            this.setupViewerModeUI();
-            
             // 성별별 학생 수 계산
             let maleCount = 0;
             let femaleCount = 0;
@@ -6032,6 +6030,11 @@ export class MainController {
                             nameDiv.textContent = '';
                         }
                     }
+                    
+                    // 자리 배치도가 렌더링된 후 이미지로 변환
+                    this.setTimeoutSafe(async () => {
+                        await this.convertLayoutToImage();
+                    }, 500);
                 }, 100);
             }, 300);
             
@@ -6048,6 +6051,56 @@ export class MainController {
             errorDiv.appendChild(p);
             document.body.innerHTML = '';
             document.body.appendChild(errorDiv);
+        }
+    }
+    
+    /**
+     * 자리 배치도를 이미지로 변환하여 이미지만 표시
+     */
+    private async convertLayoutToImage(): Promise<void> {
+        try {
+            // 먼저 UI 숨기기 (이미지 변환 전)
+            this.setupViewerModeUI();
+            
+            // 잠시 대기 (UI 숨김 적용 대기)
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            const seatsArea = document.getElementById('seats-area');
+            if (!seatsArea) {
+                throw new Error('좌석 영역을 찾을 수 없습니다.');
+            }
+            
+            // html2canvas로 이미지 변환
+            const canvas = await html2canvas(seatsArea, {
+                backgroundColor: '#ffffff',
+                scale: 2, // 고해상도
+                logging: false,
+                useCORS: true,
+                allowTaint: false
+            });
+            
+            // 이미지 데이터 URL 생성
+            const imageDataUrl = canvas.toDataURL('image/png', 1.0);
+            
+            // 모든 UI 숨기고 이미지만 표시
+            document.body.innerHTML = '';
+            document.body.style.cssText = 'margin: 0; padding: 20px; background: #f5f5f5; display: flex; justify-content: center; align-items: center; min-height: 100vh;';
+            
+            const imageContainer = document.createElement('div');
+            imageContainer.style.cssText = 'text-align: center; max-width: 100%;';
+            
+            const img = document.createElement('img');
+            img.src = imageDataUrl;
+            img.style.cssText = 'max-width: 100%; height: auto; border: 2px solid #ddd; border-radius: 8px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); background: white;';
+            img.alt = '자리 배치도';
+            
+            imageContainer.appendChild(img);
+            document.body.appendChild(imageContainer);
+            
+            logger.info('자리 배치도 이미지 변환 완료');
+        } catch (error) {
+            logger.error('이미지 변환 실패:', error);
+            // 이미지 변환 실패 시 원래 뷰어 모드 유지
         }
     }
     
