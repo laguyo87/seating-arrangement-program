@@ -18,7 +18,7 @@ import {
   runTransaction,
   increment
 } from 'firebase/firestore';
-import { signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged, User, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, onAuthStateChanged, User, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { FirebaseService } from '../services/FirebaseService.js';
 import { OutputModule } from '../modules/OutputModule.js';
 import { logger } from '../utils/logger.js';
@@ -73,13 +73,14 @@ export class FirebaseStorageManager {
   }
 
   /**
-   * Google 로그인
+   * Google 로그인 (팝업 방식, 실패 시 리다이렉트 방식으로 자동 전환)
    */
   public async signInWithGoogle(): Promise<boolean> {
     try {
       const auth = this.firebaseService.getAuth();
       if (!auth) {
         this.deps.outputModule.showError('Firebase가 초기화되지 않았습니다.');
+        logger.error('Firebase Auth가 초기화되지 않음');
         return false;
       }
 
@@ -91,42 +92,111 @@ export class FirebaseStorageManager {
       provider.addScope('profile');
       provider.addScope('email');
 
-      logger.info('Google 로그인 팝업 시작');
-      const result = await signInWithPopup(auth, provider);
+      logger.info('Google 로그인 팝업 시도 시작');
       
-      this.currentUser = result.user;
-      this.isAuthenticated = true;
-      
-      logger.info('Google 로그인 성공:', { 
-        email: result.user.email, 
-        displayName: result.user.displayName 
-      });
-      
-      this.deps.outputModule.showInfo('Google 로그인이 완료되었습니다.');
-      return true;
+      try {
+        // 먼저 팝업 방식 시도
+        const result = await signInWithPopup(auth, provider);
+        
+        this.currentUser = result.user;
+        this.isAuthenticated = true;
+        
+        logger.info('Google 로그인 성공 (팝업):', { 
+          email: result.user.email, 
+          displayName: result.user.displayName,
+          uid: result.user.uid
+        });
+        
+        this.deps.outputModule.showInfo('Google 로그인이 완료되었습니다.');
+        return true;
+      } catch (popupError: any) {
+        logger.warn('팝업 로그인 실패, 리다이렉트 방식으로 전환:', popupError);
+        
+        // 팝업이 차단된 경우 리다이렉트 방식으로 자동 전환
+        if (popupError?.code === 'auth/popup-blocked' || 
+            popupError?.code === 'auth/popup-closed-by-user' ||
+            popupError?.code === 'auth/cancelled-popup-request') {
+          
+          logger.info('리다이렉트 방식으로 Google 로그인 시도');
+          this.deps.outputModule.showInfo('팝업이 차단되어 리다이렉트 방식으로 로그인합니다...');
+          
+          // 리다이렉트 방식으로 로그인
+          await signInWithRedirect(auth, provider);
+          
+          // 리다이렉트는 페이지가 이동하므로 여기서는 true 반환
+          // 실제 로그인 결과는 getRedirectResult에서 확인
+          return true;
+        } else {
+          // 다른 에러는 그대로 throw
+          throw popupError;
+        }
+      }
     } catch (error: any) {
-      logger.error('Google 로그인 실패:', error);
+      logger.error('Google 로그인 실패:', {
+        code: error?.code,
+        message: error?.message,
+        stack: error?.stack
+      });
       
       let errorMessage = '로그인에 실패했습니다.';
       
       // Firebase Auth 에러 코드에 따른 구체적인 메시지
       if (error?.code === 'auth/popup-blocked') {
-        errorMessage = '팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해주세요.';
+        errorMessage = '팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용하거나, 페이지를 새로고침하여 다시 시도해주세요.';
       } else if (error?.code === 'auth/popup-closed-by-user') {
         errorMessage = '로그인 창이 닫혔습니다. 다시 시도해주세요.';
       } else if (error?.code === 'auth/cancelled-popup-request') {
         errorMessage = '로그인 요청이 취소되었습니다. 잠시 후 다시 시도해주세요.';
       } else if (error?.code === 'auth/unauthorized-domain') {
-        errorMessage = '이 도메인은 승인되지 않았습니다. Firebase Console에서 도메인을 추가해주세요.';
+        errorMessage = '이 도메인은 승인되지 않았습니다. Firebase Console → Authentication → Settings → Authorized domains에서 도메인을 추가해주세요.';
       } else if (error?.code === 'auth/operation-not-allowed') {
-        errorMessage = 'Google 로그인이 활성화되지 않았습니다. Firebase Console에서 Google 로그인을 활성화해주세요.';
+        errorMessage = 'Google 로그인이 활성화되지 않았습니다. Firebase Console → Authentication → Sign-in method에서 Google을 활성화해주세요.';
       } else if (error?.code === 'auth/network-request-failed') {
         errorMessage = '네트워크 오류가 발생했습니다. 인터넷 연결을 확인해주세요.';
+      } else if (error?.code === 'auth/internal-error') {
+        errorMessage = '내부 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
       } else if (error?.message) {
         errorMessage = `로그인 오류: ${error.message}`;
+        // 콘솔에 상세 에러 출력
+        console.error('Google 로그인 상세 에러:', error);
+      } else {
+        errorMessage = `로그인 오류가 발생했습니다. (코드: ${error?.code || 'unknown'})`;
+        console.error('Google 로그인 알 수 없는 에러:', error);
       }
       
       this.deps.outputModule.showError(errorMessage);
+      return false;
+    }
+  }
+
+  /**
+   * 리다이렉트 로그인 결과 확인 (페이지 로드 시 호출)
+   */
+  public async checkRedirectResult(): Promise<boolean> {
+    try {
+      const auth = this.firebaseService.getAuth();
+      if (!auth) {
+        return false;
+      }
+
+      const result = await getRedirectResult(auth);
+      if (result) {
+        this.currentUser = result.user;
+        this.isAuthenticated = true;
+        
+        logger.info('Google 로그인 성공 (리다이렉트):', { 
+          email: result.user.email, 
+          displayName: result.user.displayName,
+          uid: result.user.uid
+        });
+        
+        this.deps.outputModule.showInfo('Google 로그인이 완료되었습니다.');
+        return true;
+      }
+      
+      return false;
+    } catch (error: any) {
+      logger.error('리다이렉트 로그인 결과 확인 실패:', error);
       return false;
     }
   }

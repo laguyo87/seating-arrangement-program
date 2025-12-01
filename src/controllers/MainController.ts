@@ -346,6 +346,13 @@ export class MainController {
             // 반 관리 초기화
             this.initializeClassManagement();
             
+            // Firebase 리다이렉트 로그인 결과 확인
+            this.firebaseStorageManager.checkRedirectResult().then((success) => {
+                if (success) {
+                    this.updateFirebaseStatus();
+                }
+            });
+            
             // Firebase 상태 업데이트
             this.setTimeoutSafe(() => {
                 this.updateFirebaseStatus();
