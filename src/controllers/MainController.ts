@@ -6139,21 +6139,56 @@ export class MainController {
             const blackboardArea = document.getElementById('blackboard-area');
             const teacherDeskArea = document.getElementById('teacher-desk-area');
             
-            // 좌석 영역의 실제 크기 계산
+            // 좌석 영역의 실제 크기 계산 (모든 좌석 카드 포함)
             let seatsAreaHeight = 0;
             let seatsAreaWidth = 0;
+            let maxBottom = 0;
+            
             if (seatsArea) {
-                const seatsRect = seatsArea.getBoundingClientRect();
-                seatsAreaHeight = seatsArea.scrollHeight || seatsRect.height;
-                seatsAreaWidth = seatsArea.scrollWidth || seatsRect.width;
+                // 모든 좌석 카드의 실제 위치 계산
+                const seatCards = seatsArea.querySelectorAll('.student-seat-card');
+                if (seatCards.length > 0) {
+                    // 각 카드의 bottom 위치를 찾아서 가장 아래쪽 위치 계산
+                    seatCards.forEach((card) => {
+                        const cardRect = card.getBoundingClientRect();
+                        const seatsRect = seatsArea.getBoundingClientRect();
+                        // 상대 위치 계산 (seatsArea 기준)
+                        const relativeBottom = (cardRect.bottom - seatsRect.top) + (cardRect.height || 0);
+                        maxBottom = Math.max(maxBottom, relativeBottom);
+                    });
+                    
+                    // 좌석 영역의 실제 높이 = 가장 아래쪽 카드의 bottom + 여유 공간
+                    seatsAreaHeight = Math.max(
+                        maxBottom + 20, // 여유 공간 추가
+                        seatsArea.scrollHeight,
+                        seatsArea.offsetHeight,
+                        seatsArea.getBoundingClientRect().height
+                    );
+                } else {
+                    // 카드가 없으면 기본 높이 사용
+                    seatsAreaHeight = seatsArea.scrollHeight || seatsArea.offsetHeight || seatsArea.getBoundingClientRect().height;
+                }
+                
+                seatsAreaWidth = Math.max(
+                    seatsArea.scrollWidth,
+                    seatsArea.offsetWidth,
+                    seatsArea.getBoundingClientRect().width
+                );
             }
             
             // 칠판과 교탁 영역 고려 (절대 위치이므로 포함)
             const blackboardHeight = blackboardArea ? (blackboardArea.getBoundingClientRect().height || 40) : 40;
             const teacherDeskHeight = teacherDeskArea ? (teacherDeskArea.getBoundingClientRect().height || 40) : 40;
             
-            // 전체 높이 계산: 칠판(20px top) + 칠판 높이 + 교탁(84px top - 20px - 칠판 높이) + 교탁 높이 + 좌석 영역(margin-top 140px + 실제 높이)
+            // 전체 높이 계산: 상단 패딩(20px) + 칠판(20px top + 높이) + 교탁(84px top + 높이) + 좌석 영역(margin-top 140px + 실제 높이) + 하단 패딩(20px)
+            // 좌석 영역은 margin-top 140px부터 시작하므로, 전체 높이는 140 + seatsAreaHeight
+            const calculatedHeight = 20 + // 상단 패딩
+                Math.max(20 + blackboardHeight, 84 + teacherDeskHeight) + // 칠판/교탁 영역
+                seatsAreaHeight + // 좌석 영역 높이
+                20; // 하단 패딩
+            
             const totalHeight = Math.max(
+                calculatedHeight,
                 classroomLayout.scrollHeight,
                 classroomLayout.offsetHeight,
                 140 + seatsAreaHeight, // 좌석 영역 시작 위치 + 높이
@@ -6164,7 +6199,7 @@ export class MainController {
             const totalWidth = Math.max(
                 classroomLayout.scrollWidth,
                 classroomLayout.offsetWidth,
-                seatsAreaWidth,
+                seatsAreaWidth + 40, // 좌석 영역 너비 + 좌우 패딩
                 rect.width
             );
             
@@ -6193,23 +6228,28 @@ export class MainController {
             classroomLayout.style.minHeight = `${totalHeight}px`;
             
             // html2canvas로 이미지 변환 (전체 캡처, 스마트폰 최적화)
+            // width와 height를 명시하지 않으면 자동으로 전체 영역을 캡처
             const canvas = await html2canvas(classroomLayout, {
                 backgroundColor: '#ffffff',
                 scale: 2, // 고해상도 (스마트폰에서도 선명하게)
-                width: totalWidth,
-                height: totalHeight,
                 logging: false,
                 useCORS: true,
                 allowTaint: false,
                 scrollX: 0,
                 scrollY: 0,
-                x: 0,
-                y: 0,
                 ignoreElements: (element) => {
                     // 숨겨진 요소는 제외
                     const style = window.getComputedStyle(element);
                     return style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0';
                 }
+            });
+            
+            logger.info('이미지 캡처 완료', {
+                canvasWidth: canvas.width,
+                canvasHeight: canvas.height,
+                expectedWidth: totalWidth,
+                expectedHeight: totalHeight,
+                seatsAreaHeight
             });
             
             // 스타일 복원
