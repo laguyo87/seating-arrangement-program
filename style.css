@@ -2790,3 +2790,29 @@ button:disabled {
         transform: translate(var(--dx), var(--dy)) scale(0.2) rotate(360deg);
     }
 }
+
+
+/* 인쇄 스타일 */
+@media print {
+    body {
+        background: white;
+        padding: 0;
+        margin: 0;
+    }
+    
+    /* 인쇄 시 컨트롤 바 숨기기 */
+    button {
+        display: none !important;
+    }
+    
+    /* 인쇄 시 자리 배치도 최적화 */
+    #classroom-layout {
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+    
+    .student-seat-card {
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
+}

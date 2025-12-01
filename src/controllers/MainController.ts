@@ -6044,13 +6044,19 @@ export class MainController {
                         this.renderExampleCards();
                         this.setTimeoutSafe(() => {
                             this.updateSeatsFromCards();
-                            this.convertLayoutToImageAfterDelay();
+                            // 인쇄용 화면 표시
+                            this.setTimeoutSafe(() => {
+                                this.showPrintView();
+                            }, 500);
                         }, 500);
                         return;
                     }
                     
                     this.updateSeatsFromCards();
-                    this.convertLayoutToImageAfterDelay();
+                    // 인쇄용 화면 표시 (이미지 변환 대신)
+                    this.setTimeoutSafe(() => {
+                        this.showPrintView();
+                    }, 500);
                 }, 500);
             }, 500);
             
@@ -6105,12 +6111,81 @@ export class MainController {
     }
     
     /**
-     * 이미지 변환을 지연 실행
+     * 인쇄용 화면 표시 (QR 스캔 시 사용)
      */
-    private async convertLayoutToImageAfterDelay(): Promise<void> {
-        // 충분한 대기 시간 (렌더링 완료 보장)
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        await this.convertLayoutToImage();
+    private showPrintView(): void {
+        try {
+            // UI 숨기기
+            this.setupViewerModeUI();
+            
+            // 잠시 대기 (렌더링 완료 보장)
+            setTimeout(() => {
+                // classroom-layout 가져오기
+                const classroomLayout = document.getElementById('classroom-layout');
+                if (!classroomLayout) {
+                    throw new Error('교실 레이아웃을 찾을 수 없습니다.');
+                }
+                
+                // 모든 UI 숨기고 인쇄용 화면만 표시
+                document.body.innerHTML = '';
+                document.body.style.cssText = 'margin: 0; padding: 0; background: #f5f5f5; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; min-height: 100vh; overflow-x: hidden;';
+                
+                // 상단 컨트롤 바 (인쇄 버튼)
+                const controlBar = document.createElement('div');
+                controlBar.style.cssText = 'width: 100%; background: #fff; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; justify-content: center; gap: 10px; position: sticky; top: 0; z-index: 1000;';
+                
+                const printBtn = document.createElement('button');
+                printBtn.textContent = '🖨️ 인쇄하기';
+                printBtn.style.cssText = 'padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; font-weight: bold;';
+                printBtn.onclick = () => window.print();
+                
+                const closeBtn = document.createElement('button');
+                closeBtn.textContent = '✕ 닫기';
+                closeBtn.style.cssText = 'padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer;';
+                closeBtn.onclick = () => window.location.href = window.location.pathname;
+                
+                controlBar.appendChild(printBtn);
+                controlBar.appendChild(closeBtn);
+                
+                // 컨테이너 생성
+                const container = document.createElement('div');
+                container.style.cssText = 'width: 100%; max-width: 100%; padding: 20px; box-sizing: border-box; flex: 1;';
+                
+                // classroom-layout 복사 및 스타일 조정
+                const printLayout = classroomLayout.cloneNode(true) as HTMLElement;
+                printLayout.style.cssText = `
+                    min-height: auto;
+                    background: #ffffff;
+                    border: 2px solid #ddd;
+                    border-radius: 10px;
+                    padding: 20px;
+                    position: relative;
+                    width: 100%;
+                    max-width: 100%;
+                    box-sizing: border-box;
+                    margin: 0 auto;
+                `;
+                
+                // 스마트폰 화면에 맞게 조절
+                const viewportWidth = window.innerWidth || 375;
+                const maxContentWidth = Math.min(viewportWidth - 40, 800);
+                printLayout.style.maxWidth = `${maxContentWidth}px`;
+                
+                container.appendChild(printLayout);
+                document.body.appendChild(controlBar);
+                document.body.appendChild(container);
+                
+                logger.info('인쇄용 화면 표시 완료');
+            }, 500);
+        } catch (error) {
+            logger.error('인쇄용 화면 표시 실패:', error);
+            // 실패 시 에러 메시지 표시
+            const errorDiv = document.createElement('div');
+            errorDiv.style.cssText = 'padding: 20px; text-align: center; color: #dc3545;';
+            errorDiv.innerHTML = '<h2>화면 표시 실패</h2><p>자리 배치도를 표시할 수 없습니다.</p>';
+            document.body.innerHTML = '';
+            document.body.appendChild(errorDiv);
+        }
     }
     
     /**
