@@ -2714,3 +2714,79 @@ button:disabled {
         transform: translate(var(--dx), var(--dy)) scale(0.2) rotate(360deg);
     }
 }
+
+.curtain-overlay.closing .curtain-right {
+    transform: translateX(0) !important;
+}
+
+/* 커튼 열기 애니메이션 */
+.curtain-overlay.opening .curtain-left {
+    transform: translateX(-100%);
+}
+
+.curtain-overlay.opening .curtain-right {
+    transform: translateX(100%);
+}
+
+/* 폭죽 애니메이션 */
+.fireworks-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 10002; /* 커튼(10001)보다 위에 표시 */
+    overflow: hidden;
+    display: none;
+}
+
+.fireworks-container.active {
+    display: block;
+}
+
+.firework {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    animation: firework-explode 1s ease-out forwards;
+}
+
+.firework-particle {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    animation: firework-particle 1.2s ease-out forwards;
+}
+
+@keyframes firework-explode {
+    0% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.5);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(0);
+    }
+}
+
+@keyframes firework-particle {
+    0% {
+        opacity: 1;
+        transform: translate(0, 0) scale(1) rotate(0deg);
+    }
+    50% {
+        opacity: 1;
+        transform: translate(calc(var(--dx) * 0.5), calc(var(--dy) * 0.5)) scale(1.2) rotate(180deg);
+    }
+    100% {
+        opacity: 0;
+        transform: translate(var(--dx), var(--dy)) scale(0.2) rotate(360deg);
+    }
+}

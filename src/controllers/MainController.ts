@@ -5909,9 +5909,16 @@ export class MainController {
                 throw new Error('공유 데이터 검증에 실패했습니다.');
             }
             
-            // 만료 시간 확인
+            // 만료 시간 확인 (36진수로 저장된 경우 파싱)
             if (shareInfo.e) {
-                const expiresAt = shareInfo.e as number;
+                let expiresAt: number;
+                if (typeof shareInfo.e === 'string') {
+                    // 36진수로 저장된 경우
+                    expiresAt = parseInt(shareInfo.e, 36);
+                } else {
+                    // 숫자로 저장된 경우 (이전 형식 호환)
+                    expiresAt = shareInfo.e as number;
+                }
                 if (Date.now() > expiresAt) {
                     throw new Error('이 공유 링크는 만료되었습니다.');
                 }
@@ -5939,21 +5946,45 @@ export class MainController {
                 }
             }
             
-            // 학생 정보 추출
+            // 학생 정보 추출 (새로운 압축 형식 지원)
             const studentDataList = shareInfo.s || shareInfo.students || [];
+            const nameArray = shareInfo.n || shareInfo.names || [];
             const gridColumns = shareInfo.l || shareInfo.layout || '';
             
-            // 학생 데이터 생성
+            // 만료 시간 처리 (상대 시간을 절대 시간으로 변환)
+            if (shareInfo.e && typeof shareInfo.e === 'number') {
+                // 상대 시간(시간 단위)인 경우 절대 시간으로 변환
+                if (shareInfo.e < 1000000000000) { // 밀리초가 아닌 경우 (상대 시간)
+                    const expiresAt = Date.now() + (shareInfo.e * 60 * 60 * 1000);
+                    shareInfo.e = expiresAt;
+                }
+            }
+            
+            // 학생 데이터 생성 (새로운 압축 형식: [이름ID, 성별])
             this.students = studentDataList.map((student: SharedStudentData, index: number) => {
                 if (Array.isArray(student)) {
-                    const name = String(student[0] || '').trim();
-                    const gender = (student[1] === 'F' ? 'F' : 'M') as 'M' | 'F';
-                    return {
-                        id: index + 1,
-                        name: name || `학생${index + 1}`,
-                        gender: gender
-                    };
+                    // 새로운 형식: [이름ID, 성별]
+                    if (nameArray.length > 0 && typeof student[0] === 'number') {
+                        const nameId = student[0] as number;
+                        const name = nameArray[nameId] || `학생${index + 1}`;
+                        const gender = (student[1] === 'F' ? 'F' : 'M') as 'M' | 'F';
+                        return {
+                            id: index + 1,
+                            name: String(name).trim() || `학생${index + 1}`,
+                            gender: gender
+                        };
+                    } else {
+                        // 이전 형식: [이름, 성별]
+                        const name = String(student[0] || '').trim();
+                        const gender = (student[1] === 'F' ? 'F' : 'M') as 'M' | 'F';
+                        return {
+                            id: index + 1,
+                            name: name || `학생${index + 1}`,
+                            gender: gender
+                        };
+                    }
                 } else {
+                    // 객체 형식: {name: string, gender: 'M' | 'F'}
                     const name = String(student.name || '').trim();
                     const gender = (student.gender === 'F' ? 'F' : 'M') as 'M' | 'F';
                     return {
@@ -6063,7 +6094,7 @@ export class MainController {
             this.setupViewerModeUI();
             
             // 잠시 대기 (UI 숨김 적용 대기)
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await new Promise(resolve => setTimeout(resolve, 200));
             
             // classroom-layout 전체를 캡처 (칠판, 교탁, 좌석 모두 포함)
             const classroomLayout = document.getElementById('classroom-layout');
@@ -6071,48 +6102,45 @@ export class MainController {
                 throw new Error('교실 레이아웃을 찾을 수 없습니다.');
             }
             
-            // 전체 영역의 크기 계산
+            // 전체 크기 계산 및 스마트폰 최적화
             const rect = classroomLayout.getBoundingClientRect();
-            const scrollWidth = classroomLayout.scrollWidth;
-            const scrollHeight = classroomLayout.scrollHeight;
+            const maxWidth = 800; // 스마트폰 최적화를 위한 최대 너비
+            const targetScale = rect.width > maxWidth ? maxWidth / rect.width : 1;
             
-            // html2canvas로 이미지 변환 (전체 영역 캡처)
+            // html2canvas로 이미지 변환 (전체 캡처, 스마트폰 최적화)
             const canvas = await html2canvas(classroomLayout, {
-                backgroundColor: '#f8f9fa',
-                scale: 1.5, // 적절한 해상도 (스마트폰 최적화)
+                backgroundColor: '#ffffff',
+                scale: targetScale * 2, // 스마트폰에 맞게 축소하되 선명도 유지 (2배 스케일)
                 logging: false,
                 useCORS: true,
                 allowTaint: false,
-                width: scrollWidth,
-                height: scrollHeight,
-                windowWidth: scrollWidth,
-                windowHeight: scrollHeight,
                 scrollX: 0,
-                scrollY: 0
+                scrollY: 0,
+                width: rect.width,
+                height: rect.height,
+                windowWidth: window.innerWidth,
+                windowHeight: window.innerHeight,
+                x: 0,
+                y: 0
             });
             
-            // 스마트폰에 맞게 이미지 크기 조정 (최대 너비 800px)
-            const maxWidth = 800;
-            let finalWidth = canvas.width;
-            let finalHeight = canvas.height;
-            
-            if (finalWidth > maxWidth) {
-                const ratio = maxWidth / finalWidth;
-                finalWidth = maxWidth;
-                finalHeight = Math.round(finalHeight * ratio);
+            // 캔버스 크기를 스마트폰에 맞게 조정
+            let finalCanvas = canvas;
+            if (rect.width > maxWidth) {
+                const newWidth = maxWidth;
+                const newHeight = (canvas.height * maxWidth) / canvas.width;
+                const resizedCanvas = document.createElement('canvas');
+                resizedCanvas.width = newWidth;
+                resizedCanvas.height = newHeight;
+                const ctx = resizedCanvas.getContext('2d');
+                if (ctx) {
+                    ctx.drawImage(canvas, 0, 0, newWidth, newHeight);
+                    finalCanvas = resizedCanvas;
+                }
             }
             
-            // 리사이즈된 캔버스 생성
-            const resizedCanvas = document.createElement('canvas');
-            resizedCanvas.width = finalWidth;
-            resizedCanvas.height = finalHeight;
-            const ctx = resizedCanvas.getContext('2d');
-            if (ctx) {
-                ctx.drawImage(canvas, 0, 0, finalWidth, finalHeight);
-            }
-            
-            // 이미지 데이터 URL 생성
-            const imageDataUrl = resizedCanvas.toDataURL('image/png', 0.9);
+            // 이미지 데이터 URL 생성 (품질 조정)
+            const imageDataUrl = finalCanvas.toDataURL('image/png', 0.9);
             
             // 모든 UI 숨기고 이미지만 표시
             document.body.innerHTML = '';
@@ -6123,7 +6151,7 @@ export class MainController {
             
             const img = document.createElement('img');
             img.src = imageDataUrl;
-            img.style.cssText = 'max-width: 100%; height: auto; border: 2px solid #ddd; border-radius: 8px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); background: white; display: block; margin: 0 auto;';
+            img.style.cssText = 'max-width: 100%; width: 100%; height: auto; border: 2px solid #ddd; border-radius: 8px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); background: white; display: block;';
             img.alt = '자리 배치도';
             
             imageContainer.appendChild(img);
@@ -6235,11 +6263,38 @@ export class MainController {
             return false;
         }
         
+        // 이름 배열 검증 (새로운 압축 형식)
+        const nameArray = shareInfo.n || shareInfo.names || [];
+        if (nameArray.length > 0) {
+            if (!Array.isArray(nameArray)) {
+                return false;
+            }
+            for (const name of nameArray) {
+                if (typeof name !== 'string' || name.length > 50) {
+                    return false;
+                }
+            }
+        }
+        
         // 각 학생 데이터 검증
         for (const student of studentDataList) {
             if (Array.isArray(student)) {
-                // 압축된 형식: [이름, 성별]
-                if (student.length < 2 || typeof student[0] !== 'string' || student[0].length > 50) {
+                // 새로운 압축 형식: [이름ID, 성별] 또는 이전 형식: [이름, 성별]
+                if (student.length < 2) {
+                    return false;
+                }
+                // 이름ID가 숫자인 경우 (새로운 형식)
+                if (typeof student[0] === 'number') {
+                    const nameId = student[0] as number;
+                    if (nameId < 0 || (nameArray.length > 0 && nameId >= nameArray.length)) {
+                        return false;
+                    }
+                } else if (typeof student[0] === 'string') {
+                    // 이전 형식: [이름, 성별]
+                    if (student[0].length > 50) {
+                        return false;
+                    }
+                } else {
                     return false;
                 }
                 if (student[1] !== 'M' && student[1] !== 'F') {
@@ -6314,21 +6369,34 @@ export class MainController {
             
             // 학생 정보로부터 배치 복원 (압축된 형식과 이전 형식 모두 지원)
             const studentDataList = shareInfo.s || shareInfo.students || [];
+            const nameArray = shareInfo.n || shareInfo.names || [];
             const gridColumns = shareInfo.l || shareInfo.layout || '';
             
-            // 학생 데이터 생성 (압축된 형식 [이름, 성별] 또는 객체 형식 지원)
+            // 학생 데이터 생성 (새로운 압축 형식: [이름ID, 성별] 또는 이전 형식 지원)
             this.students = studentDataList.map((student: SharedStudentData, index: number) => {
                 if (Array.isArray(student)) {
-                    // 압축된 형식: [이름, 성별]
-                    const name = String(student[0] || '').trim();
-                    const gender = (student[1] === 'F' ? 'F' : 'M') as 'M' | 'F';
-                    return {
-                        id: index + 1,
-                        name: name || `학생${index + 1}`,
-                        gender: gender
-                    };
+                    // 새로운 형식: [이름ID, 성별]
+                    if (nameArray.length > 0 && typeof student[0] === 'number') {
+                        const nameId = student[0] as number;
+                        const name = nameArray[nameId] || `학생${index + 1}`;
+                        const gender = (student[1] === 'F' ? 'F' : 'M') as 'M' | 'F';
+                        return {
+                            id: index + 1,
+                            name: String(name).trim() || `학생${index + 1}`,
+                            gender: gender
+                        };
+                    } else {
+                        // 이전 형식: [이름, 성별]
+                        const name = String(student[0] || '').trim();
+                        const gender = (student[1] === 'F' ? 'F' : 'M') as 'M' | 'F';
+                        return {
+                            id: index + 1,
+                            name: name || `학생${index + 1}`,
+                            gender: gender
+                        };
+                    }
                 } else {
-                    // 이전 형식: {name: string, gender: 'M' | 'F'}
+                    // 객체 형식: {name: string, gender: 'M' | 'F'}
                     const name = String(student.name || '').trim();
                     const gender = (student.gender === 'F' ? 'F' : 'M') as 'M' | 'F';
                     return {
@@ -6437,35 +6505,69 @@ export class MainController {
         });
 
         // 공유 데이터 생성 (최적화된 형식 - 더 짧게 압축)
-        // 학생 데이터를 배열로 압축: [이름, 성별] 형식
-        const compressedStudents = studentData.map(s => [s.name, s.gender]);
+        // 학생 데이터를 더 짧게 압축: [이름축약, 성별] 형식
+        // 이름을 숫자로 매핑하여 더 짧게 만들기
+        const nameMap = new Map<string, number>();
+        let nameIndex = 0;
+        const compressedStudents = studentData.map(s => {
+            let nameId: number;
+            if (nameMap.has(s.name)) {
+                nameId = nameMap.get(s.name)!;
+            } else {
+                nameId = nameIndex++;
+                nameMap.set(s.name, nameId);
+            }
+            return [nameId, s.gender];
+        });
         
-        // 최소한의 데이터만 포함 (날짜 제거, 버전 제거)
-        const shareData: any = {
-            t: 'sa', // type: 'seating-arrangement' 축약
-            s: compressedStudents, // students (압축된 형식)
-            l: gridColumns || '' // layout (없으면 빈 문자열)
-        };
+        // 이름 맵을 배열로 변환 (인덱스 순서대로)
+        const nameArray: string[] = [];
+        nameMap.forEach((id, name) => {
+            nameArray[id] = name;
+        });
         
-        // 만료 시간 추가 (선택사항)
-        if (expiresIn && expiresIn > 0) {
-            const expiresAt = Date.now() + (expiresIn * 60 * 60 * 1000); // 시간을 밀리초로 변환
-            shareData.e = expiresAt; // expires (만료 시간)
+        // 그리드 컬럼을 더 짧게 압축
+        let compressedLayout = gridColumns || '';
+        if (compressedLayout.includes('repeat')) {
+            // 'repeat(6, 1fr)' -> 'r6' 같은 형식으로 압축
+            compressedLayout = compressedLayout.replace(/repeat\((\d+),\s*1fr\)/g, 'r$1');
+            compressedLayout = compressedLayout.replace(/repeat\((\d+),\s*(\d+)px\)/g, 'r$1-$2px');
+        }
+        // 빈 문자열이면 생략
+        if (!compressedLayout) {
+            compressedLayout = undefined;
         }
         
-        // 비밀번호 해시 추가 (선택사항, 간단한 해시 사용)
+        // 최소한의 데이터만 포함
+        const shareData: any = {
+            t: 'sa', // type
+            n: nameArray, // names
+            s: compressedStudents // students
+        };
+        
+        // 레이아웃이 있으면 추가
+        if (compressedLayout) {
+            shareData.l = compressedLayout;
+        }
+        
+        // 만료 시간 추가 (선택사항) - 36진수로 변환하여 짧게 저장
+        if (expiresIn && expiresIn > 0) {
+            const expiresAt = Date.now() + (expiresIn * 60 * 60 * 1000);
+            shareData.e = expiresAt.toString(36); // 36진수로 변환하여 단축
+        }
+        
+        // 비밀번호 해시 추가 (선택사항)
         if (password && password.length > 0) {
-            // 간단한 해시 함수 (실제로는 더 강력한 해시가 필요하지만, URL 길이 제한을 고려)
             let hash = 0;
             for (let i = 0; i < password.length; i++) {
                 const char = password.charCodeAt(i);
                 hash = ((hash << 5) - hash) + char;
-                hash = hash & hash; // 32bit 정수로 변환
+                hash = hash & hash;
             }
-            shareData.p = Math.abs(hash).toString(36); // password hash (36진수로 변환하여 단축)
+            shareData.p = Math.abs(hash).toString(36); // 36진수로 단축
         }
 
-        // JSON 문자열 생성 및 압축 (공백 제거)
+        // JSON 문자열 생성 (공백 제거하여 더 짧게)
         const jsonString = JSON.stringify(shareData);
         
         // Base64 URL-safe 인코딩 (+, /, = 문자를 URL-safe 문자로 변환)
@@ -6516,64 +6618,18 @@ export class MainController {
 
         const title = document.createElement('h3');
         title.textContent = '📤 자리 배치도 공유';
-        title.style.cssText = 'margin-top: 0; margin-bottom: 15px; color: #333; font-size: 1.3em; text-align: center;';
+        title.style.cssText = 'margin-top: 0; margin-bottom: 20px; color: #333; font-size: 1.5em;';
 
-        // QR 코드 컨테이너 (먼저 표시)
-        const qrCodeContainer = document.createElement('div');
-        qrCodeContainer.id = 'share-qrcode-container';
-        qrCodeContainer.style.cssText = 'text-align: center; margin: 20px 0;';
-        
-        // QR 코드 생성
-        await this.generateQRCode(shareUrl, qrCodeContainer);
-
-        // 공유 URL 표시 (간단한 형태)
-        const urlContainer = document.createElement('div');
-        urlContainer.style.cssText = 'margin: 15px 0; padding: 12px; background: #f8f9fa; border-radius: 8px; border: 1px solid #ddd;';
-        
-        const urlLabel = document.createElement('div');
-        urlLabel.textContent = '공유 주소:';
-        urlLabel.style.cssText = 'font-size: 0.85em; color: #666; margin-bottom: 8px; font-weight: bold;';
-        
-        const urlText = document.createElement('div');
-        urlText.textContent = shareUrl;
-        urlText.style.cssText = `
-            font-family: monospace;
-            font-size: 11px;
-            color: #333;
-            word-break: break-all;
-            line-height: 1.4;
-            padding: 8px;
-            background: white;
-            border-radius: 4px;
-            border: 1px solid #ccc;
-        `;
-        
-        urlContainer.appendChild(urlLabel);
-        urlContainer.appendChild(urlText);
-
-        // 옵션 설정 섹션 (접을 수 있게)
-        const optionsToggle = document.createElement('button');
-        optionsToggle.textContent = '⚙️ 고급 옵션';
-        optionsToggle.className = 'secondary-btn';
-        optionsToggle.style.cssText = 'width: 100%; margin: 10px 0; font-size: 0.9em;';
-        
+        // 옵션 설정 섹션
         const optionsSection = document.createElement('div');
-        optionsSection.id = 'share-options-section';
-        optionsSection.style.cssText = 'margin: 10px 0; padding: 15px; background: #f8f9fa; border-radius: 8px; display: none;';
-
-        let isOptionsVisible = false;
-        optionsToggle.onclick = () => {
-            isOptionsVisible = !isOptionsVisible;
-            optionsSection.style.display = isOptionsVisible ? 'block' : 'none';
-            optionsToggle.textContent = isOptionsVisible ? '⚙️ 고급 옵션 숨기기' : '⚙️ 고급 옵션';
-        };
+        optionsSection.style.cssText = 'margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;';
 
         // 만료 시간 설정
         const expiresGroup = document.createElement('div');
         expiresGroup.style.cssText = 'margin-bottom: 15px;';
         const expiresLabel = document.createElement('label');
-        expiresLabel.innerHTML = '<strong>⏰ 만료 시간:</strong>';
-        expiresLabel.style.cssText = 'display: block; margin-bottom: 5px; color: #555; font-size: 0.9em;';
+        expiresLabel.innerHTML = '<strong>⏰ 만료 시간 설정 (선택사항):</strong>';
+        expiresLabel.style.cssText = 'display: block; margin-bottom: 5px; color: #555;';
         const expiresSelect = document.createElement('select');
         expiresSelect.id = 'share-expires-select';
         expiresSelect.style.cssText = 'width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;';
@@ -6595,12 +6651,12 @@ export class MainController {
         const passwordGroup = document.createElement('div');
         passwordGroup.style.cssText = 'margin-bottom: 15px;';
         const passwordLabel = document.createElement('label');
-        passwordLabel.innerHTML = '<strong>🔒 비밀번호:</strong>';
-        passwordLabel.style.cssText = 'display: block; margin-bottom: 5px; color: #555; font-size: 0.9em;';
+        passwordLabel.innerHTML = '<strong>🔒 비밀번호 보호 (선택사항):</strong>';
+        passwordLabel.style.cssText = 'display: block; margin-bottom: 5px; color: #555;';
         const passwordInput = document.createElement('input');
         passwordInput.type = 'password';
         passwordInput.id = 'share-password-input';
-        passwordInput.placeholder = '비밀번호 (4자 이상)';
+        passwordInput.placeholder = '비밀번호를 입력하세요 (4자 이상)';
         passwordInput.style.cssText = 'width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;';
         if (options?.password) {
             passwordInput.value = options.password;
@@ -6638,7 +6694,7 @@ export class MainController {
             });
             
             currentShareUrl = this.generateShareUrl(seatsAreaHtml, currentGridTemplateColumns, dateString, expiresIn > 0 ? expiresIn : undefined, password || undefined);
-            urlText.textContent = currentShareUrl;
+            textarea.value = currentShareUrl;
             
             // QR 코드 재생성
             await this.generateQRCode(currentShareUrl, qrCodeContainer);
@@ -6649,6 +6705,43 @@ export class MainController {
         optionsSection.appendChild(expiresGroup);
         optionsSection.appendChild(passwordGroup);
         optionsSection.appendChild(regenerateButton);
+
+        // QR 코드 컨테이너
+        const qrCodeContainer = document.createElement('div');
+        qrCodeContainer.id = 'share-qrcode-container';
+        qrCodeContainer.style.cssText = 'text-align: center; margin: 20px 0;';
+        
+        // QR 코드 생성
+        await this.generateQRCode(currentShareUrl, qrCodeContainer);
+
+        // 공유 URL 텍스트 영역
+        const instruction = document.createElement('div');
+        instruction.innerHTML = `
+            <p style="margin-bottom: 15px; color: #666; font-size: 0.9em;">
+                <strong>사용 방법:</strong><br>
+                1. 아래 공유 주소를 복사하세요<br>
+                2. 이메일, 메신저, 문서 등에 붙여넣기하세요<br>
+                3. QR 코드를 스캔하여 빠르게 공유할 수 있습니다
+            </p>
+        `;
+
+        const textarea = document.createElement('textarea');
+        textarea.value = currentShareUrl;
+        textarea.id = 'share-url-textarea';
+        textarea.readOnly = true;
+        textarea.style.cssText = `
+            width: 100%;
+            height: 100px;
+            font-family: monospace;
+            font-size: 13px;
+            border: 2px solid #007bff;
+            border-radius: 8px;
+            padding: 12px;
+            resize: none;
+            background: #f8f9fa;
+            word-break: break-all;
+            box-sizing: border-box;
+        `;
 
         const buttonContainer = document.createElement('div');
         buttonContainer.style.cssText = `
@@ -6680,7 +6773,6 @@ export class MainController {
         const copyButton = document.createElement('button');
         copyButton.textContent = '📋 주소 복사';
         copyButton.className = 'primary-btn';
-        copyButton.style.cssText = 'width: 100%; margin-top: 10px;';
         copyButton.onclick = async () => {
             const success = await this.copyToClipboard(currentShareUrl);
             if (success) {
@@ -6697,18 +6789,19 @@ export class MainController {
         };
 
         const closeButton = document.createElement('button');
-        closeButton.textContent = '닫기';
+        closeButton.textContent = '❌ 닫기';
         closeButton.className = 'secondary-btn';
-        closeButton.style.cssText = 'width: 100%; margin-top: 10px;';
         closeButton.onclick = closeModal;
 
+        buttonContainer.appendChild(copyButton);
+        buttonContainer.appendChild(closeButton);
+
         modalContent.appendChild(title);
-        modalContent.appendChild(qrCodeContainer);
-        modalContent.appendChild(urlContainer);
-        modalContent.appendChild(copyButton);
-        modalContent.appendChild(optionsToggle);
         modalContent.appendChild(optionsSection);
-        modalContent.appendChild(closeButton);
+        modalContent.appendChild(qrCodeContainer);
+        modalContent.appendChild(instruction);
+        modalContent.appendChild(textarea);
+        modalContent.appendChild(buttonContainer);
         modal.appendChild(modalContent);
         document.body.appendChild(modal);
 
@@ -6721,6 +6814,11 @@ export class MainController {
             }
         };
 
+        // 텍스트 영역에 포커스하고 전체 선택
+        this.setTimeoutSafe(() => {
+            textarea.focus();
+            textarea.select();
+        }, 100);
     }
 
     /**
@@ -6732,8 +6830,8 @@ export class MainController {
             
             const canvas = document.createElement('canvas');
             await QRCode.toCanvas(canvas, url, {
-                width: 180,
-                margin: 1,
+                width: 200,
+                margin: 2,
                 color: {
                     dark: '#000000',
                     light: '#FFFFFF'
@@ -6741,10 +6839,10 @@ export class MainController {
             });
             
             container.appendChild(canvas);
-            canvas.style.cssText = 'border: 1px solid #ddd; border-radius: 8px; padding: 8px; background: white; display: block; margin: 0 auto;';
+            canvas.style.cssText = 'border: 2px solid #ddd; border-radius: 8px; padding: 10px; background: white;';
         } catch (error) {
             logger.error('QR 코드 생성 실패:', error);
-            container.innerHTML = '<p style="color: #dc3545; font-size: 0.9em;">QR 코드 생성에 실패했습니다.</p>';
+            container.innerHTML = '<p style="color: #dc3545;">QR 코드 생성에 실패했습니다.</p>';
         }
     }
 
@@ -7107,6 +7205,478 @@ export class MainController {
     /**
      * Tab 순서 최적화
      */
+    private optimizeTabOrder(): void {
+        // 주요 버튼들에 Tab 순서 설정
+        const primaryButtons = [
+            document.getElementById('arrange-seats'),
+            document.getElementById('reset-app'),
+            document.getElementById('save-options'),
+            document.getElementById('sidebar-toggle-btn'),
+            document.getElementById('user-manual-btn')
+        ].filter(Boolean) as HTMLElement[];
+
+        KeyboardNavigation.setTabOrder(primaryButtons, 1);
+
+        // 입력 필드들에 Tab 순서 설정
+        const inputFields = [
+            document.getElementById('male-students'),
+            document.getElementById('female-students'),
+            document.getElementById('number-of-partitions')
+        ].filter(Boolean) as HTMLElement[];
+
+        KeyboardNavigation.setTabOrder(inputFields, 10);
+    }
+
+    /**
+     * 포커스 표시 개선
+     */
+    private enhanceFocusStyles(): void {
+        // 모든 포커스 가능한 요소에 접근성 속성 추가
+        const focusableElements = document.querySelectorAll(
+            'button, a, input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        ) as NodeListOf<HTMLElement>;
+
+        focusableElements.forEach((element) => {
+            // aria-label이 없으면 title에서 가져오기
+            if (!element.hasAttribute('aria-label') && element.hasAttribute('title')) {
+                element.setAttribute('aria-label', element.getAttribute('title') || '');
+            }
+        });
+    }
+
+    /**
+     * 키보드 드래그&드롭 설정
+     */
+    private setupKeyboardDragDrop(): void {
+        const seatsArea = document.getElementById('seats-area');
+        if (!seatsArea) return;
+
+        // 키보드 드래그&드롭 매니저 초기화
+        this.keyboardDragDropManager = new KeyboardDragDropManager(
+            'seats-area',
+            (sourceCard: HTMLElement, direction: 'up' | 'down' | 'left' | 'right') => {
+                this.handleKeyboardSeatMove(sourceCard, direction);
+            },
+            (seatId: number) => this.fixedSeatIds.has(seatId)
+        );
+
+        // 좌석 카드가 생성될 때마다 활성화
+        const observer = new MutationObserver(() => {
+            const cards = seatsArea.querySelectorAll('.student-seat-card');
+            if (cards.length > 0) {
+                this.keyboardDragDropManager.enable();
+            }
+        });
+
+        observer.observe(seatsArea, {
+            childList: true,
+            subtree: true
+        });
+
+        // 초기 활성화
+        if (seatsArea.querySelectorAll('.student-seat-card').length > 0) {
+            this.keyboardDragDropManager.enable();
+        }
+    }
+
+    /**
+     * 키보드로 좌석 이동 처리
+     */
+    private handleKeyboardSeatMove(sourceCard: HTMLElement, direction: 'up' | 'down' | 'left' | 'right'): void {
+        const sourceSeatIdStr = sourceCard.getAttribute('data-seat-id');
+        if (!sourceSeatIdStr) return;
+
+        const sourceSeatId = parseInt(sourceSeatIdStr, 10);
+        if (isNaN(sourceSeatId)) return;
+
+        // 방향에 따라 인접한 좌석 찾기
+        const targetCard = this.findAdjacentSeat(sourceCard, direction);
+        if (!targetCard) return;
+
+        const targetSeatIdStr = targetCard.getAttribute('data-seat-id');
+        if (!targetSeatIdStr) return;
+
+        const targetSeatId = parseInt(targetSeatIdStr, 10);
+        if (isNaN(targetSeatId)) return;
+
+        // 고정 좌석은 이동 불가
+        if (this.fixedSeatIds.has(targetSeatId)) {
+            return;
+        }
+
+        // 좌석 교환
+        this.swapSeats(sourceCard, targetCard);
+
+        // 히스토리 저장
+        this.setTimeoutSafe(() => {
+            this.saveLayoutToHistory();
+        }, 50);
+    }
+
+    /**
+     * 인접한 좌석 찾기
+     */
+    private findAdjacentSeat(card: HTMLElement, direction: 'up' | 'down' | 'left' | 'right'): HTMLElement | null {
+        const seatsArea = document.getElementById('seats-area');
+        if (!seatsArea) return null;
+
+        const allCards = Array.from(seatsArea.querySelectorAll('.student-seat-card')) as HTMLElement[];
+        if (allCards.length === 0) return null;
+
+        const cardRect = card.getBoundingClientRect();
+        const cardCenterX = cardRect.left + cardRect.width / 2;
+        const cardCenterY = cardRect.top + cardRect.height / 2;
+
+        let bestMatch: HTMLElement | null = null;
+        let minDistance = Infinity;
+
+        allCards.forEach((otherCard) => {
+            if (otherCard === card || otherCard.classList.contains('fixed-seat')) return;
+
+            const otherRect = otherCard.getBoundingClientRect();
+            const otherCenterX = otherRect.left + otherRect.width / 2;
+            const otherCenterY = otherRect.top + otherRect.height / 2;
+
+            let isInDirection = false;
+            let distance = 0;
+
+            switch (direction) {
+                case 'up':
+                    isInDirection = otherCenterY < cardCenterY;
+                    distance = Math.abs(otherCenterX - cardCenterX) + (cardCenterY - otherCenterY);
+                    break;
+                case 'down':
+                    isInDirection = otherCenterY > cardCenterY;
+                    distance = Math.abs(otherCenterX - cardCenterX) + (otherCenterY - cardCenterY);
+                    break;
+                case 'left':
+                    isInDirection = otherCenterX < cardCenterX;
+                    distance = Math.abs(otherCenterY - cardCenterY) + (cardCenterX - otherCenterX);
+                    break;
+                case 'right':
+                    isInDirection = otherCenterX > cardCenterX;
+                    distance = Math.abs(otherCenterY - cardCenterY) + (otherCenterX - cardCenterX);
+                    break;
+            }
+
+            if (isInDirection && distance < minDistance) {
+                minDistance = distance;
+                bestMatch = otherCard;
+            }
+        });
+
+        return bestMatch;
+    }
+
+    /**
+     * 좌석 교환
+     */
+    private swapSeats(sourceCard: HTMLElement, targetCard: HTMLElement): void {
+        const srcNameEl = sourceCard.querySelector('.student-name') as HTMLElement | null;
+        const tgtNameEl = targetCard.querySelector('.student-name') as HTMLElement | null;
+        
+        if (!srcNameEl || !tgtNameEl) return;
+
+        // 이름 스왑
+        const tmpName = srcNameEl.textContent || '';
+        srcNameEl.textContent = tgtNameEl.textContent || '';
+        tgtNameEl.textContent = tmpName;
+
+        // 성별 배경 클래스 스왑
+        const srcIsM = sourceCard.classList.contains('gender-m');
+        const srcIsF = sourceCard.classList.contains('gender-f');
+        const tgtIsM = targetCard.classList.contains('gender-m');
+        const tgtIsF = targetCard.classList.contains('gender-f');
+
+        sourceCard.classList.toggle('gender-m', tgtIsM);
+        sourceCard.classList.toggle('gender-f', tgtIsF);
+        targetCard.classList.toggle('gender-m', srcIsM);
+        targetCard.classList.toggle('gender-f', srcIsF);
+
+        // ARIA 레이블 업데이트 (성별 정보 포함)
+        const srcSeatId = sourceCard.getAttribute('data-seat-id');
+        const tgtSeatId = targetCard.getAttribute('data-seat-id');
+        const srcName = srcNameEl.textContent || '빈 좌석';
+        const tgtName = tgtNameEl.textContent || '빈 좌석';
+        
+        // 성별 정보 가져오기
+        const srcIsMale = sourceCard.classList.contains('gender-m');
+        const srcIsFemale = sourceCard.classList.contains('gender-f');
+        const tgtIsMale = targetCard.classList.contains('gender-m');
+        const tgtIsFemale = targetCard.classList.contains('gender-f');
+        
+        const srcGenderLabel = srcIsMale ? '남학생 ♂' : (srcIsFemale ? '여학생 ♀' : '');
+        const tgtGenderLabel = tgtIsMale ? '남학생 ♂' : (tgtIsFemale ? '여학생 ♀' : '');
+
+        if (srcSeatId) {
+            const genderInfo = srcGenderLabel ? ` (${srcGenderLabel})` : '';
+            sourceCard.setAttribute('aria-label', `좌석 ${srcSeatId}: ${tgtName}${genderInfo}. 화살표 키로 이동, Enter로 선택`);
+        }
+        if (tgtSeatId) {
+            const genderInfo = tgtGenderLabel ? ` (${tgtGenderLabel})` : '';
+            targetCard.setAttribute('aria-label', `좌석 ${tgtSeatId}: ${srcName}${genderInfo}. 화살표 키로 이동, Enter로 선택`);
+        }
+
+        // 성공 피드백
+        targetCard.style.transform = 'scale(1.05)';
+        setTimeout(() => {
+            targetCard.style.transform = '';
+        }, 200);
+    }
+
+    /**
+     * 반 관리 초기화
+     */
+    private initializeClassManagement(): void {
+        // 반 선택 셀렉트 메뉴 변경 이벤트
+        const classSelect = document.getElementById('class-select') as HTMLSelectElement;
+        if (classSelect) {
+            this.addEventListenerSafe(classSelect, 'change', (e) => {
+                const target = e.target as HTMLSelectElement;
+                const classId = target.value;
+                this.handleClassSelectChange(classId);
+            });
+        }
+
+        // 반 목록 업데이트
+        this.updateClassSelect();
+        
+        // 반이 없는 경우 '반 만들기' 하이라이트 애니메이션 적용
+        this.checkAndHighlightClassCreation();
+    }
+    
+    /**
+     * 반이 없는 경우 '반 만들기' 하이라이트 애니메이션 적용
+     * 처음 방문자뿐만 아니라 데이터가 없는 사용자도 하이라이트 표시
+     */
+    private checkAndHighlightClassCreation(): void {
+        const classList = this.classManager.getClassList();
+        const hasClasses = classList.length > 0;
+        
+        // 반이 있으면 하이라이트 제거
+        if (hasClasses) {
+            this.removeClassCreationHighlight();
+            return;
+        }
+        
+        // 반이 없으면 하이라이트 적용 (처음 방문자뿐만 아니라 데이터가 없는 모든 사용자)
+        const classSelectContainer = document.getElementById('class-select-container');
+        if (classSelectContainer) {
+            classSelectContainer.classList.add('first-visit-highlight');
+            logger.info('반이 없어서 반 만들기 하이라이트 적용');
+        }
+    }
+    
+    /**
+     * 반 만들기 하이라이트 애니메이션 제거
+     */
+    private removeClassCreationHighlight(): void {
+        const classSelectContainer = document.getElementById('class-select-container');
+        if (classSelectContainer) {
+            classSelectContainer.classList.remove('first-visit-highlight');
+        }
+    }
+
+    /**
+     * 반 선택 셀렉트 메뉴 업데이트
+     */
+    private updateClassSelect(): void {
+        const classSelect = document.getElementById('class-select') as HTMLSelectElement;
+        const deleteBtn = document.getElementById('delete-class-btn') as HTMLButtonElement;
+        const saveBtn = document.getElementById('save-layout-btn') as HTMLButtonElement;
+        
+        if (!classSelect) return;
+
+        const classList = this.classManager.getClassList();
+        const currentClassId = this.classManager.getCurrentClassId();
+
+        // 기존 옵션 제거 (첫 번째 옵션 제외)
+        while (classSelect.options.length > 1) {
+            classSelect.remove(1);
+        }
+
+        // 반 목록 추가
+        classList.forEach(classInfo => {
+            const option = document.createElement('option');
+            option.value = classInfo.id;
+            option.textContent = classInfo.name;
+            classSelect.appendChild(option);
+        });
+
+        // 현재 선택된 반 설정
+        if (currentClassId) {
+            classSelect.value = currentClassId;
+        } else {
+            classSelect.value = '';
+        }
+
+        // 버튼 표시/숨김
+        const hasSelection = classSelect.value !== '';
+        if (deleteBtn) {
+            deleteBtn.style.display = hasSelection ? 'inline-block' : 'none';
+        }
+        if (saveBtn) {
+            saveBtn.style.display = hasSelection ? 'inline-block' : 'none';
+        }
+        
+        // 반 목록 업데이트 후 하이라이트 상태 확인 (반이 삭제된 경우를 대비)
+        this.checkAndHighlightClassCreation();
+    }
+
+    /**
+     * 반 선택 변경 처리
+     */
+    private handleClassSelectChange(classId: string): void {
+        if (!classId || classId === '') {
+            // 선택 해제
+            this.classManager.selectClass(null);
+            this.updateClassSelect();
+            // 반이 선택되지 않았으므로 이력 드롭다운 업데이트 (빈 상태로)
+            this.updateHistoryDropdown();
+            return;
+        }
+
+        // 반 선택
+        this.classManager.selectClass(classId);
+        this.updateClassSelect();
+        
+        // 반이 변경되었으므로 해당 반의 이력 드롭다운 업데이트
+        this.updateHistoryDropdown();
+
+        // 저장된 자리 배치도 불러오기 (비동기)
+        this.classManager.loadLayout(classId).then((loaded) => {
+            if (!loaded) {
+                // 저장된 배치도가 없으면 현재 배치도 유지
+                this.outputModule.showInfo('저장된 자리 배치도가 없습니다. 새로 배치를 생성해주세요.');
+            }
+        });
+    }
+
+    /**
+     * 새 반 추가 처리
+     */
+    private handleAddClass(): void {
+        const className = prompt('반 이름을 입력하세요:');
+        if (!className) {
+            return;
+        }
+
+        // 비동기 처리
+        this.classManager.addClass(className).then((classId) => {
+            if (classId) {
+                // 반 목록 업데이트
+                this.updateClassSelect();
+                
+                // 새로 추가된 반 선택
+                const classSelect = document.getElementById('class-select') as HTMLSelectElement;
+                if (classSelect) {
+                    classSelect.value = classId;
+                    this.handleClassSelectChange(classId);
+                }
+                
+                // 방문 기록 저장 (하이라이트는 updateClassSelect에서 자동으로 제거됨)
+                this.storageManager.safeSetItem('hasVisitedBefore', 'true');
+                
+                // 사용자에게 안내 메시지 표시
+                this.outputModule.showSuccess(`"${className}" 반이 생성되었습니다! 이제 좌측 사이드바에서 학생 정보를 입력하고 자리 배치를 실행하세요.`);
+            }
+        });
+    }
+
+    /**
+     * 반 삭제 처리
+     */
+    private handleDeleteClass(): void {
+        const currentClassId = this.classManager.getCurrentClassId();
+        if (!currentClassId) {
+            this.outputModule.showError('삭제할 반이 선택되지 않았습니다.');
+            return;
+        }
+
+        const className = this.classManager.getClassName(currentClassId);
+        if (!className) {
+            this.outputModule.showError('반 정보를 찾을 수 없습니다.');
+            return;
+        }
+
+        if (confirm(`"${className}" 반을 삭제하시겠습니까?\n저장된 자리 배치도도 함께 삭제됩니다.`)) {
+            // 비동기 처리
+            this.classManager.deleteClass(currentClassId).then((deleted) => {
+                if (deleted) {
+                    // 반 목록 업데이트
+                    this.updateClassSelect();
+                    
+                    // 현재 배치도 초기화
+                    this.seats = [];
+                    this.students = [];
+                    const seatsArea = document.getElementById('seats-area');
+                    if (seatsArea) {
+                        seatsArea.innerHTML = '';
+                    }
+                }
+            });
+        }
+    }
+
+    /**
+     * 현재 반의 자리 배치도 저장 처리
+     */
+    private handleSaveClassLayout(): void {
+        // 비동기 처리
+        this.classManager.saveCurrentLayout().then((saved) => {
+            // 저장 성공 메시지는 ClassManager에서 표시됨
+        });
+    }
+
+    /**
+     * Firebase 로그인 처리 (로그인 페이지 표시)
+     */
+    private handleFirebaseLogin(): void {
+        this.loginPageModule.show();
+    }
+
+    /**
+     * Firebase 로그아웃 처리
+     */
+    private async handleFirebaseLogout(): Promise<void> {
+        await this.firebaseStorageManager.signOut();
+        this.updateFirebaseStatus();
+    }
+
+    /**
+     * Firebase 상태 업데이트
+     */
+    private updateFirebaseStatus(): void {
+        const loginBtn = document.getElementById('firebase-login-btn') as HTMLButtonElement;
+        const statusSpan = document.getElementById('firebase-status') as HTMLSpanElement;
+        
+        if (!loginBtn || !statusSpan) return;
+
+        const isAuthenticated = this.firebaseStorageManager.getIsAuthenticated();
+        const currentUser = this.firebaseStorageManager.getCurrentUser();
+
+        if (isAuthenticated && currentUser) {
+            loginBtn.textContent = '🚪 로그아웃';
+            loginBtn.title = 'Firebase 로그아웃';
+            loginBtn.onclick = () => this.handleFirebaseLogout();
+            
+            // 사용자 이름 또는 이메일 표시
+            const displayName = currentUser.displayName || currentUser.email || '사용자';
+            statusSpan.textContent = `안녕하세요. ${displayName}님!`;
+            statusSpan.style.display = 'inline-block';
+            statusSpan.style.color = '#ffeb3b'; // 노란색
+            statusSpan.style.fontWeight = '500';
+        } else {
+            loginBtn.textContent = '🔐 로그인';
+            loginBtn.title = '로그인 (클라우드 동기화)';
+            loginBtn.onclick = () => this.handleFirebaseLogin();
+            statusSpan.textContent = '로그인 필요';
+            statusSpan.style.display = 'none';
+        }
+    }
+}
+
+
     private optimizeTabOrder(): void {
         // 주요 버튼들에 Tab 순서 설정
         const primaryButtons = [

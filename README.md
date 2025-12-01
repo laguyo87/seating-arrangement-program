@@ -222,3 +222,38 @@ node generate-og-image.js
 ---
 
 **교실 자리 배치 프로그램**으로 더 체계적이고 효율적인 교실 환경을 만들어보세요! 🎓✨
+- Edge 80+
+
+## 🤝 기여하기
+
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 📄 라이선스
+
+이 프로젝트는 MIT 라이선스 하에 배포됩니다. 자세한 내용은 `LICENSE` 파일을 참조하세요.
+
+## 📞 문의
+
+프로젝트에 대한 문의사항이나 버그 리포트는 [Issues](https://github.com/laguyo87/seating-arrangement-program/issues)를 통해 제출해 주세요.
+
+## 🎯 최근 업데이트
+
+- ✅ 반별 자리 배치도 관리
+- ✅ Firebase 클라우드 저장 기능
+- ✅ Google 로그인 및 이메일 회원가입
+- ✅ 반별 확정된 자리 이력 관리
+- ✅ 반 만들기 하이라이트 가이드
+
+## 🎯 향후 계획
+
+- [ ] 모둠 배치 기능 완성
+- [ ] ㄷ자 2명 짝꿍 배치 기능 완성
+- [ ] 다국어 지원
+
+---
+
+**교실 자리 배치 프로그램**으로 더 체계적이고 효율적인 교실 환경을 만들어보세요! 🎓✨

@@ -96,3 +96,27 @@ window.addEventListener('unhandledrejection', (event) => {
     event.preventDefault(); // 에러가 콘솔에 표시되지 않도록
 });
 
+
+        return;
+    }
+    
+    // Firebase 인증 관련 Cross-Origin-Opener-Policy 경고는 무시 (기능에 영향 없음)
+    const errorMessage = event.message || event.error?.message || '';
+    if (errorMessage.includes('Cross-Origin-Opener-Policy') || errorMessage.includes('window.close')) {
+        return;
+    }
+    
+    logger.error('전역 오류 발생:', event.error);
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+    // 메시지 포트 관련 에러는 브라우저 확장 프로그램에서 발생하는 것으로 무시
+    const errorMessage = event.reason?.message || event.reason?.toString() || '';
+    if (errorMessage.includes('message port') || errorMessage.includes('chrome-extension')) {
+        event.preventDefault(); // 기본 에러 처리 방지
+        return;
+    }
+    logger.error('처리되지 않은 Promise 거부:', event.reason);
+    event.preventDefault(); // 에러가 콘솔에 표시되지 않도록
+});
+
