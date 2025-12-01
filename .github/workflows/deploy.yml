@@ -37,7 +37,6 @@ jobs:
       - name: Copy static files to dist
         run: |
           cp browser-compatibility-check.js dist/ 2>/dev/null || true
-          cp visitor-counter.js dist/ 2>/dev/null || true
           cp style.css dist/ 2>/dev/null || true
           cp og-image.png dist/ 2>/dev/null || true
           cp robots.txt dist/ 2>/dev/null || true
@@ -45,8 +44,8 @@ jobs:
       
       - name: Add static script tags to dist/index.html
         run: |
-          # dist/index.html에 browser-compatibility-check.js와 visitor-counter.js 스크립트 태그 추가
-          sed -i.bak 's|</body>|    <script type="module" src="browser-compatibility-check.js"></script>\n    <script type="module" src="visitor-counter.js"></script>\n</body>|' dist/index.html
+          # dist/index.html에 browser-compatibility-check.js 스크립트 태그 추가
+          sed -i.bak 's|</body>|    <script type="module" src="browser-compatibility-check.js"></script>\n</body>|' dist/index.html
           rm -f dist/index.html.bak
 
       - name: Setup Pages
