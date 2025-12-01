@@ -6062,8 +6062,10 @@ export class MainController {
                         }
                     }
                     
-                    // 자리 배치도가 렌더링된 후 이미지로 변환
+                    // 자리 배치도가 렌더링된 후 이미지로 변환 (충분한 대기 시간)
                     this.setTimeoutSafe(async () => {
+                        // 추가 대기 시간 (렌더링 완료 보장)
+                        await new Promise(resolve => setTimeout(resolve, 1000));
                         await this.convertLayoutToImage();
                     }, 500);
                 }, 100);
@@ -6093,8 +6095,8 @@ export class MainController {
             // 먼저 UI 숨기기 (이미지 변환 전)
             this.setupViewerModeUI();
             
-            // 잠시 대기 (UI 숨김 적용 대기)
-            await new Promise(resolve => setTimeout(resolve, 200));
+            // 렌더링 완료를 기다림 (충분한 시간 확보)
+            await new Promise(resolve => setTimeout(resolve, 1000));
             
             // classroom-layout 전체를 캡처 (칠판, 교탁, 좌석 모두 포함)
             const classroomLayout = document.getElementById('classroom-layout');
@@ -6102,26 +6104,51 @@ export class MainController {
                 throw new Error('교실 레이아웃을 찾을 수 없습니다.');
             }
             
-            // 전체 크기 계산 및 스마트폰 최적화
+            // 전체 크기 계산 (실제 콘텐츠 크기)
+            // 요소의 실제 크기를 정확히 계산
             const rect = classroomLayout.getBoundingClientRect();
-            const maxWidth = 800; // 스마트폰 최적화를 위한 최대 너비
-            const targetScale = rect.width > maxWidth ? maxWidth / rect.width : 1;
+            const scrollWidth = Math.max(classroomLayout.scrollWidth, rect.width);
+            const scrollHeight = Math.max(classroomLayout.scrollHeight, rect.height);
+            const maxWidth = 1200; // 스마트폰 최적화를 위한 최대 너비
             
             // 전체 영역을 캡처하기 위해 스크롤 위치 저장 및 리셋
             const originalScrollX = window.scrollX;
             const originalScrollY = window.scrollY;
             window.scrollTo(0, 0);
             
+            // 요소의 원래 스타일 저장
+            const originalOverflow = classroomLayout.style.overflow;
+            const originalPosition = classroomLayout.style.position;
+            const originalMaxHeight = classroomLayout.style.maxHeight;
+            
+            // 전체 영역이 보이도록 스타일 조정
+            classroomLayout.style.overflow = 'visible';
+            classroomLayout.style.position = 'relative';
+            if (classroomLayout.style.maxHeight) {
+                classroomLayout.style.maxHeight = 'none';
+            }
+            
             // html2canvas로 이미지 변환 (전체 캡처, 스마트폰 최적화)
             const canvas = await html2canvas(classroomLayout, {
                 backgroundColor: '#ffffff',
-                scale: 1, // 기본 스케일
+                scale: 2, // 고해상도 (스마트폰에서도 선명하게)
+                width: scrollWidth,
+                height: scrollHeight,
                 logging: false,
                 useCORS: true,
                 allowTaint: false,
                 scrollX: 0,
-                scrollY: 0
+                scrollY: 0,
+                x: 0,
+                y: 0
             });
+            
+            // 스타일 복원
+            classroomLayout.style.overflow = originalOverflow;
+            classroomLayout.style.position = originalPosition;
+            if (originalMaxHeight) {
+                classroomLayout.style.maxHeight = originalMaxHeight;
+            }
             
             // 스크롤 위치 복원
             window.scrollTo(originalScrollX, originalScrollY);
@@ -6142,7 +6169,7 @@ export class MainController {
             }
             
             // 이미지 데이터 URL 생성 (품질 조정)
-            const imageDataUrl = finalCanvas.toDataURL('image/png', 0.9);
+            const imageDataUrl = finalCanvas.toDataURL('image/png', 0.95);
             
             // 모든 UI 숨기고 이미지만 표시
             document.body.innerHTML = '';
@@ -6159,10 +6186,15 @@ export class MainController {
             imageContainer.appendChild(img);
             document.body.appendChild(imageContainer);
             
-            logger.info('자리 배치도 이미지 변환 완료');
+            logger.info('자리 배치도 이미지 변환 완료', { width: finalCanvas.width, height: finalCanvas.height });
         } catch (error) {
             logger.error('이미지 변환 실패:', error);
             // 이미지 변환 실패 시 원래 뷰어 모드 유지
+            const errorDiv = document.createElement('div');
+            errorDiv.style.cssText = 'padding: 20px; text-align: center; color: #dc3545;';
+            errorDiv.innerHTML = '<h2>이미지 변환 실패</h2><p>자리 배치도를 이미지로 변환할 수 없습니다.</p>';
+            document.body.innerHTML = '';
+            document.body.appendChild(errorDiv);
         }
     }
     
