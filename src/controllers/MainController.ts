@@ -6171,6 +6171,88 @@ export class MainController {
                 const maxContentWidth = Math.min(viewportWidth - 40, 800);
                 printLayout.style.maxWidth = `${maxContentWidth}px`;
                 
+                // 인쇄용 화면에서 좌석 카드 크기를 반응형으로 조절
+                const style = document.createElement('style');
+                style.id = 'print-view-responsive-style';
+                
+                // 기존 그리드 레이아웃 가져오기
+                const seatsArea = printLayout.querySelector('#seats-area') as HTMLElement;
+                const originalGridTemplate = seatsArea ? window.getComputedStyle(seatsArea).gridTemplateColumns : '';
+                
+                // 화면 크기에 따라 카드 크기 계산
+                const calcViewportWidth = window.innerWidth || 375;
+                const containerPadding = 40; // 좌우 패딩
+                const availableWidth = Math.min(calcViewportWidth - containerPadding, maxContentWidth - containerPadding);
+                
+                // 카드 개수 추정 (기존 그리드 컬럼 수 유지)
+                const cardCount = seatsArea ? seatsArea.querySelectorAll('.student-seat-card').length : 0;
+                let estimatedColumns = 6; // 기본값
+                
+                if (originalGridTemplate && originalGridTemplate !== 'none') {
+                    // 기존 그리드 컬럼 수 추출
+                    const match = originalGridTemplate.match(/repeat\((\d+)/);
+                    if (match) {
+                        estimatedColumns = parseInt(match[1], 10);
+                    }
+                }
+                
+                // 카드 크기 계산 (그리드 컬럼 수 유지하면서 화면에 맞게)
+                const gap = 8;
+                const cardSize = Math.floor((availableWidth - (gap * (estimatedColumns - 1))) / estimatedColumns);
+                const minCardSize = Math.max(50, cardSize); // 최소 50px
+                const maxCardSize = 120; // 최대 120px
+                const finalCardSize = Math.min(maxCardSize, Math.max(minCardSize, cardSize));
+                
+                style.textContent = `
+                    /* 인쇄용 화면에서 좌석 카드 반응형 크기 조절 */
+                    .student-seat-card {
+                        width: ${finalCardSize}px !important;
+                        height: ${finalCardSize}px !important;
+                        min-width: ${finalCardSize}px !important;
+                        max-width: ${finalCardSize}px !important;
+                        flex-shrink: 0 !important;
+                    }
+                    
+                    /* 좌석 영역 그리드 간격 조절 */
+                    #seats-area {
+                        gap: ${gap}px !important;
+                    }
+                    
+                    /* 작은 화면에서는 더 작은 카드 */
+                    @media (max-width: 480px) {
+                        .student-seat-card {
+                            width: 50px !important;
+                            height: 50px !important;
+                            min-width: 50px !important;
+                            max-width: 50px !important;
+                            padding: 3px !important;
+                        }
+                        
+                        .student-name {
+                            font-size: 0.75em !important;
+                        }
+                        
+                        #seats-area {
+                            gap: 5px !important;
+                        }
+                    }
+                    
+                    /* 중간 화면 */
+                    @media (min-width: 481px) and (max-width: 768px) {
+                        .student-seat-card {
+                            width: 70px !important;
+                            height: 70px !important;
+                            min-width: 70px !important;
+                            max-width: 70px !important;
+                        }
+                        
+                        #seats-area {
+                            gap: 6px !important;
+                        }
+                    }
+                `;
+                document.head.appendChild(style);
+                
                 container.appendChild(printLayout);
                 document.body.appendChild(controlBar);
                 document.body.appendChild(container);
