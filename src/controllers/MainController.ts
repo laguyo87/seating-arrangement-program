@@ -6034,42 +6034,25 @@ export class MainController {
                     this.renderExampleCards();
                 }
                 
-                // 학생들을 좌석에 배치
+                // 학생들을 좌석에 배치 (더 긴 대기 시간)
                 this.setTimeoutSafe(() => {
                     const cards = seatsArea.querySelectorAll('.student-seat-card');
-                    let cardIndex = 0;
                     
-                    this.students.forEach((student) => {
-                        if (cardIndex < cards.length) {
-                            const card = cards[cardIndex] as HTMLElement;
-                            const nameDiv = card.querySelector('.student-name') as HTMLElement;
-                            if (nameDiv) {
-                                nameDiv.textContent = student.name;
-                                // 성별 클래스 설정
-                                card.classList.remove('gender-m', 'gender-f');
-                                card.classList.add(`gender-${student.gender.toLowerCase()}`);
-                            }
-                            cardIndex++;
-                        }
-                    });
-                    
-                    // 빈 좌석 초기화
-                    for (let i = cardIndex; i < cards.length; i++) {
-                        const card = cards[i] as HTMLElement;
-                        const nameDiv = card.querySelector('.student-name') as HTMLElement;
-                        if (nameDiv) {
-                            nameDiv.textContent = '';
-                        }
+                    // 카드가 없으면 다시 렌더링 시도
+                    if (cards.length === 0) {
+                        logger.warn('좌석 카드가 없습니다. 다시 렌더링 시도...');
+                        this.renderExampleCards();
+                        this.setTimeoutSafe(() => {
+                            this.updateSeatsFromCards();
+                            this.convertLayoutToImageAfterDelay();
+                        }, 500);
+                        return;
                     }
                     
-                    // 자리 배치도가 렌더링된 후 이미지로 변환 (충분한 대기 시간)
-                    this.setTimeoutSafe(async () => {
-                        // 추가 대기 시간 (렌더링 완료 보장)
-                        await new Promise(resolve => setTimeout(resolve, 1000));
-                        await this.convertLayoutToImage();
-                    }, 500);
-                }, 100);
-            }, 300);
+                    this.updateSeatsFromCards();
+                    this.convertLayoutToImageAfterDelay();
+                }, 500);
+            }, 500);
             
         } catch (error) {
             logger.error('뷰어 모드 로드 실패:', error);
@@ -6085,6 +6068,49 @@ export class MainController {
             document.body.innerHTML = '';
             document.body.appendChild(errorDiv);
         }
+    }
+    
+    /**
+     * 좌석 카드에서 학생 정보 업데이트
+     */
+    private updateSeatsFromCards(): void {
+        const seatsArea = document.getElementById('seats-area');
+        if (!seatsArea) return;
+        
+        const cards = seatsArea.querySelectorAll('.student-seat-card');
+        let cardIndex = 0;
+        
+        this.students.forEach((student) => {
+            if (cardIndex < cards.length) {
+                const card = cards[cardIndex] as HTMLElement;
+                const nameDiv = card.querySelector('.student-name') as HTMLElement;
+                if (nameDiv) {
+                    nameDiv.textContent = student.name;
+                    // 성별 클래스 설정
+                    card.classList.remove('gender-m', 'gender-f');
+                    card.classList.add(`gender-${student.gender.toLowerCase()}`);
+                }
+                cardIndex++;
+            }
+        });
+        
+        // 빈 좌석 초기화
+        for (let i = cardIndex; i < cards.length; i++) {
+            const card = cards[i] as HTMLElement;
+            const nameDiv = card.querySelector('.student-name') as HTMLElement;
+            if (nameDiv) {
+                nameDiv.textContent = '';
+            }
+        }
+    }
+    
+    /**
+     * 이미지 변환을 지연 실행
+     */
+    private async convertLayoutToImageAfterDelay(): Promise<void> {
+        // 충분한 대기 시간 (렌더링 완료 보장)
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        await this.convertLayoutToImage();
     }
     
     /**
