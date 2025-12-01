@@ -6107,26 +6107,28 @@ export class MainController {
             const maxWidth = 800; // 스마트폰 최적화를 위한 최대 너비
             const targetScale = rect.width > maxWidth ? maxWidth / rect.width : 1;
             
+            // 전체 영역을 캡처하기 위해 스크롤 위치 저장 및 리셋
+            const originalScrollX = window.scrollX;
+            const originalScrollY = window.scrollY;
+            window.scrollTo(0, 0);
+            
             // html2canvas로 이미지 변환 (전체 캡처, 스마트폰 최적화)
             const canvas = await html2canvas(classroomLayout, {
                 backgroundColor: '#ffffff',
-                scale: targetScale * 2, // 스마트폰에 맞게 축소하되 선명도 유지 (2배 스케일)
+                scale: 1, // 기본 스케일
                 logging: false,
                 useCORS: true,
                 allowTaint: false,
                 scrollX: 0,
-                scrollY: 0,
-                width: rect.width,
-                height: rect.height,
-                windowWidth: window.innerWidth,
-                windowHeight: window.innerHeight,
-                x: 0,
-                y: 0
+                scrollY: 0
             });
+            
+            // 스크롤 위치 복원
+            window.scrollTo(originalScrollX, originalScrollY);
             
             // 캔버스 크기를 스마트폰에 맞게 조정
             let finalCanvas = canvas;
-            if (rect.width > maxWidth) {
+            if (canvas.width > maxWidth) {
                 const newWidth = maxWidth;
                 const newHeight = (canvas.height * maxWidth) / canvas.width;
                 const resizedCanvas = document.createElement('canvas');
@@ -6694,12 +6696,11 @@ export class MainController {
             });
             
             currentShareUrl = this.generateShareUrl(seatsAreaHtml, currentGridTemplateColumns, dateString, expiresIn > 0 ? expiresIn : undefined, password || undefined);
-            textarea.value = currentShareUrl;
             
             // QR 코드 재생성
             await this.generateQRCode(currentShareUrl, qrCodeContainer);
             
-            this.outputModule.showSuccess('링크가 재생성되었습니다.');
+            this.outputModule.showSuccess('QR 코드가 재생성되었습니다.');
         };
 
         optionsSection.appendChild(expiresGroup);
@@ -6714,41 +6715,20 @@ export class MainController {
         // QR 코드 생성
         await this.generateQRCode(currentShareUrl, qrCodeContainer);
 
-        // 공유 URL 텍스트 영역
+        // QR 코드 사용 안내
         const instruction = document.createElement('div');
         instruction.innerHTML = `
-            <p style="margin-bottom: 15px; color: #666; font-size: 0.9em;">
-                <strong>사용 방법:</strong><br>
-                1. 아래 공유 주소를 복사하세요<br>
-                2. 이메일, 메신저, 문서 등에 붙여넣기하세요<br>
-                3. QR 코드를 스캔하여 빠르게 공유할 수 있습니다
+            <p style="margin-bottom: 15px; color: #666; font-size: 0.9em; text-align: center;">
+                <strong>QR 코드를 스캔하여 자리 배치도를 확인하세요</strong>
             </p>
-        `;
-
-        const textarea = document.createElement('textarea');
-        textarea.value = currentShareUrl;
-        textarea.id = 'share-url-textarea';
-        textarea.readOnly = true;
-        textarea.style.cssText = `
-            width: 100%;
-            height: 100px;
-            font-family: monospace;
-            font-size: 13px;
-            border: 2px solid #007bff;
-            border-radius: 8px;
-            padding: 12px;
-            resize: none;
-            background: #f8f9fa;
-            word-break: break-all;
-            box-sizing: border-box;
         `;
 
         const buttonContainer = document.createElement('div');
         buttonContainer.style.cssText = `
-            margin-top: 15px;
+            margin-top: 20px;
             display: flex;
             gap: 10px;
-            justify-content: flex-end;
+            justify-content: center;
         `;
 
         // 모달 닫기 함수
@@ -6770,22 +6750,12 @@ export class MainController {
             }
         };
 
-        const copyButton = document.createElement('button');
-        copyButton.textContent = '📋 주소 복사';
-        copyButton.className = 'primary-btn';
-        copyButton.onclick = async () => {
-            const success = await this.copyToClipboard(currentShareUrl);
-            if (success) {
-                const originalText = copyButton.textContent;
-                copyButton.textContent = '✅ 복사됨!';
-                copyButton.style.background = '#28a745';
-                this.setTimeoutSafe(() => {
-                    copyButton.textContent = originalText;
-                    copyButton.style.background = '';
-                }, 2000);
-            } else {
-                this.outputModule.showError('클립보드를 복사할 수 없습니다. 브라우저 설정을 확인해주세요.');
-            }
+        // QR 인쇄 버튼
+        const printQRButton = document.createElement('button');
+        printQRButton.textContent = '🖨️ QR 인쇄';
+        printQRButton.className = 'primary-btn';
+        printQRButton.onclick = () => {
+            this.printQRCode(currentShareUrl, qrCodeContainer);
         };
 
         const closeButton = document.createElement('button');
@@ -6793,14 +6763,13 @@ export class MainController {
         closeButton.className = 'secondary-btn';
         closeButton.onclick = closeModal;
 
-        buttonContainer.appendChild(copyButton);
+        buttonContainer.appendChild(printQRButton);
         buttonContainer.appendChild(closeButton);
 
         modalContent.appendChild(title);
         modalContent.appendChild(optionsSection);
         modalContent.appendChild(qrCodeContainer);
         modalContent.appendChild(instruction);
-        modalContent.appendChild(textarea);
         modalContent.appendChild(buttonContainer);
         modal.appendChild(modalContent);
         document.body.appendChild(modal);
@@ -6813,12 +6782,102 @@ export class MainController {
                 closeModal();
             }
         };
+    }
 
-        // 텍스트 영역에 포커스하고 전체 선택
-        this.setTimeoutSafe(() => {
-            textarea.focus();
-            textarea.select();
-        }, 100);
+    /**
+     * QR 코드 인쇄
+     */
+    private printQRCode(url: string, qrContainer: HTMLElement): void {
+        try {
+            // QR 코드 이미지 찾기
+            const qrCanvas = qrContainer.querySelector('canvas') as HTMLCanvasElement;
+            if (!qrCanvas) {
+                this.outputModule.showError('QR 코드를 찾을 수 없습니다.');
+                return;
+            }
+
+            // 인쇄용 HTML 생성
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) {
+                this.outputModule.showError('팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해주세요.');
+                return;
+            }
+
+            const qrImageData = qrCanvas.toDataURL('image/png');
+            
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html lang="ko">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>QR 코드 인쇄</title>
+                    <style>
+                        body {
+                            margin: 0;
+                            padding: 20px;
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            justify-content: center;
+                            min-height: 100vh;
+                            font-family: 'Malgun Gothic', sans-serif;
+                        }
+                        .qr-title {
+                            font-size: 24px;
+                            font-weight: bold;
+                            margin-bottom: 20px;
+                            text-align: center;
+                        }
+                        .qr-image {
+                            max-width: 100%;
+                            height: auto;
+                            border: 2px solid #333;
+                            padding: 10px;
+                            background: white;
+                        }
+                        .qr-instruction {
+                            margin-top: 20px;
+                            font-size: 14px;
+                            color: #666;
+                            text-align: center;
+                        }
+                        @media print {
+                            body {
+                                padding: 0;
+                            }
+                            .qr-title {
+                                font-size: 20px;
+                                margin-bottom: 10px;
+                            }
+                            .qr-image {
+                                border: 1px solid #333;
+                                padding: 5px;
+                            }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="qr-title">자리 배치도 QR 코드</div>
+                    <img src="${qrImageData}" alt="QR Code" class="qr-image" />
+                    <div class="qr-instruction">QR 코드를 스캔하여 자리 배치도를 확인하세요</div>
+                </body>
+                </html>
+            `);
+            
+            printWindow.document.close();
+            
+            // 인쇄 창이 로드된 후 인쇄 대화상자 열기
+            printWindow.onload = () => {
+                setTimeout(() => {
+                    printWindow.print();
+                }, 250);
+            };
+            
+        } catch (error) {
+            logger.error('QR 코드 인쇄 실패:', error);
+            this.outputModule.showError('QR 코드 인쇄 중 오류가 발생했습니다.');
+        }
     }
 
     /**
