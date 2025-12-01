@@ -6063,35 +6063,67 @@ export class MainController {
             this.setupViewerModeUI();
             
             // 잠시 대기 (UI 숨김 적용 대기)
-            await new Promise(resolve => setTimeout(resolve, 100));
+            await new Promise(resolve => setTimeout(resolve, 300));
             
-            const seatsArea = document.getElementById('seats-area');
-            if (!seatsArea) {
-                throw new Error('좌석 영역을 찾을 수 없습니다.');
+            // classroom-layout 전체를 캡처 (칠판, 교탁, 좌석 모두 포함)
+            const classroomLayout = document.getElementById('classroom-layout');
+            if (!classroomLayout) {
+                throw new Error('교실 레이아웃을 찾을 수 없습니다.');
             }
             
-            // html2canvas로 이미지 변환
-            const canvas = await html2canvas(seatsArea, {
-                backgroundColor: '#ffffff',
-                scale: 2, // 고해상도
+            // 전체 영역의 크기 계산
+            const rect = classroomLayout.getBoundingClientRect();
+            const scrollWidth = classroomLayout.scrollWidth;
+            const scrollHeight = classroomLayout.scrollHeight;
+            
+            // html2canvas로 이미지 변환 (전체 영역 캡처)
+            const canvas = await html2canvas(classroomLayout, {
+                backgroundColor: '#f8f9fa',
+                scale: 1.5, // 적절한 해상도 (스마트폰 최적화)
                 logging: false,
                 useCORS: true,
-                allowTaint: false
+                allowTaint: false,
+                width: scrollWidth,
+                height: scrollHeight,
+                windowWidth: scrollWidth,
+                windowHeight: scrollHeight,
+                scrollX: 0,
+                scrollY: 0
             });
             
+            // 스마트폰에 맞게 이미지 크기 조정 (최대 너비 800px)
+            const maxWidth = 800;
+            let finalWidth = canvas.width;
+            let finalHeight = canvas.height;
+            
+            if (finalWidth > maxWidth) {
+                const ratio = maxWidth / finalWidth;
+                finalWidth = maxWidth;
+                finalHeight = Math.round(finalHeight * ratio);
+            }
+            
+            // 리사이즈된 캔버스 생성
+            const resizedCanvas = document.createElement('canvas');
+            resizedCanvas.width = finalWidth;
+            resizedCanvas.height = finalHeight;
+            const ctx = resizedCanvas.getContext('2d');
+            if (ctx) {
+                ctx.drawImage(canvas, 0, 0, finalWidth, finalHeight);
+            }
+            
             // 이미지 데이터 URL 생성
-            const imageDataUrl = canvas.toDataURL('image/png', 1.0);
+            const imageDataUrl = resizedCanvas.toDataURL('image/png', 0.9);
             
             // 모든 UI 숨기고 이미지만 표시
             document.body.innerHTML = '';
-            document.body.style.cssText = 'margin: 0; padding: 20px; background: #f5f5f5; display: flex; justify-content: center; align-items: center; min-height: 100vh;';
+            document.body.style.cssText = 'margin: 0; padding: 10px; background: #f5f5f5; display: flex; justify-content: center; align-items: center; min-height: 100vh;';
             
             const imageContainer = document.createElement('div');
-            imageContainer.style.cssText = 'text-align: center; max-width: 100%;';
+            imageContainer.style.cssText = 'text-align: center; max-width: 100%; width: 100%;';
             
             const img = document.createElement('img');
             img.src = imageDataUrl;
-            img.style.cssText = 'max-width: 100%; height: auto; border: 2px solid #ddd; border-radius: 8px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); background: white;';
+            img.style.cssText = 'max-width: 100%; height: auto; border: 2px solid #ddd; border-radius: 8px; box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); background: white; display: block; margin: 0 auto;';
             img.alt = '자리 배치도';
             
             imageContainer.appendChild(img);
@@ -6404,7 +6436,7 @@ export class MainController {
             }
         });
 
-        // 공유 데이터 생성 (최적화된 형식 - 날짜 제거하여 URL 단축)
+        // 공유 데이터 생성 (최적화된 형식 - 더 짧게 압축)
         // 학생 데이터를 배열로 압축: [이름, 성별] 형식
         const compressedStudents = studentData.map(s => [s.name, s.gender]);
         
@@ -6433,7 +6465,7 @@ export class MainController {
             shareData.p = Math.abs(hash).toString(36); // password hash (36진수로 변환하여 단축)
         }
 
-        // JSON 문자열 생성
+        // JSON 문자열 생성 및 압축 (공백 제거)
         const jsonString = JSON.stringify(shareData);
         
         // Base64 URL-safe 인코딩 (+, /, = 문자를 URL-safe 문자로 변환)
@@ -6484,18 +6516,64 @@ export class MainController {
 
         const title = document.createElement('h3');
         title.textContent = '📤 자리 배치도 공유';
-        title.style.cssText = 'margin-top: 0; margin-bottom: 20px; color: #333; font-size: 1.5em;';
+        title.style.cssText = 'margin-top: 0; margin-bottom: 15px; color: #333; font-size: 1.3em; text-align: center;';
 
-        // 옵션 설정 섹션
+        // QR 코드 컨테이너 (먼저 표시)
+        const qrCodeContainer = document.createElement('div');
+        qrCodeContainer.id = 'share-qrcode-container';
+        qrCodeContainer.style.cssText = 'text-align: center; margin: 20px 0;';
+        
+        // QR 코드 생성
+        await this.generateQRCode(shareUrl, qrCodeContainer);
+
+        // 공유 URL 표시 (간단한 형태)
+        const urlContainer = document.createElement('div');
+        urlContainer.style.cssText = 'margin: 15px 0; padding: 12px; background: #f8f9fa; border-radius: 8px; border: 1px solid #ddd;';
+        
+        const urlLabel = document.createElement('div');
+        urlLabel.textContent = '공유 주소:';
+        urlLabel.style.cssText = 'font-size: 0.85em; color: #666; margin-bottom: 8px; font-weight: bold;';
+        
+        const urlText = document.createElement('div');
+        urlText.textContent = shareUrl;
+        urlText.style.cssText = `
+            font-family: monospace;
+            font-size: 11px;
+            color: #333;
+            word-break: break-all;
+            line-height: 1.4;
+            padding: 8px;
+            background: white;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        `;
+        
+        urlContainer.appendChild(urlLabel);
+        urlContainer.appendChild(urlText);
+
+        // 옵션 설정 섹션 (접을 수 있게)
+        const optionsToggle = document.createElement('button');
+        optionsToggle.textContent = '⚙️ 고급 옵션';
+        optionsToggle.className = 'secondary-btn';
+        optionsToggle.style.cssText = 'width: 100%; margin: 10px 0; font-size: 0.9em;';
+        
         const optionsSection = document.createElement('div');
-        optionsSection.style.cssText = 'margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;';
+        optionsSection.id = 'share-options-section';
+        optionsSection.style.cssText = 'margin: 10px 0; padding: 15px; background: #f8f9fa; border-radius: 8px; display: none;';
+
+        let isOptionsVisible = false;
+        optionsToggle.onclick = () => {
+            isOptionsVisible = !isOptionsVisible;
+            optionsSection.style.display = isOptionsVisible ? 'block' : 'none';
+            optionsToggle.textContent = isOptionsVisible ? '⚙️ 고급 옵션 숨기기' : '⚙️ 고급 옵션';
+        };
 
         // 만료 시간 설정
         const expiresGroup = document.createElement('div');
         expiresGroup.style.cssText = 'margin-bottom: 15px;';
         const expiresLabel = document.createElement('label');
-        expiresLabel.innerHTML = '<strong>⏰ 만료 시간 설정 (선택사항):</strong>';
-        expiresLabel.style.cssText = 'display: block; margin-bottom: 5px; color: #555;';
+        expiresLabel.innerHTML = '<strong>⏰ 만료 시간:</strong>';
+        expiresLabel.style.cssText = 'display: block; margin-bottom: 5px; color: #555; font-size: 0.9em;';
         const expiresSelect = document.createElement('select');
         expiresSelect.id = 'share-expires-select';
         expiresSelect.style.cssText = 'width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;';
@@ -6517,12 +6595,12 @@ export class MainController {
         const passwordGroup = document.createElement('div');
         passwordGroup.style.cssText = 'margin-bottom: 15px;';
         const passwordLabel = document.createElement('label');
-        passwordLabel.innerHTML = '<strong>🔒 비밀번호 보호 (선택사항):</strong>';
-        passwordLabel.style.cssText = 'display: block; margin-bottom: 5px; color: #555;';
+        passwordLabel.innerHTML = '<strong>🔒 비밀번호:</strong>';
+        passwordLabel.style.cssText = 'display: block; margin-bottom: 5px; color: #555; font-size: 0.9em;';
         const passwordInput = document.createElement('input');
         passwordInput.type = 'password';
         passwordInput.id = 'share-password-input';
-        passwordInput.placeholder = '비밀번호를 입력하세요 (4자 이상)';
+        passwordInput.placeholder = '비밀번호 (4자 이상)';
         passwordInput.style.cssText = 'width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;';
         if (options?.password) {
             passwordInput.value = options.password;
@@ -6560,7 +6638,7 @@ export class MainController {
             });
             
             currentShareUrl = this.generateShareUrl(seatsAreaHtml, currentGridTemplateColumns, dateString, expiresIn > 0 ? expiresIn : undefined, password || undefined);
-            textarea.value = currentShareUrl;
+            urlText.textContent = currentShareUrl;
             
             // QR 코드 재생성
             await this.generateQRCode(currentShareUrl, qrCodeContainer);
@@ -6571,43 +6649,6 @@ export class MainController {
         optionsSection.appendChild(expiresGroup);
         optionsSection.appendChild(passwordGroup);
         optionsSection.appendChild(regenerateButton);
-
-        // QR 코드 컨테이너
-        const qrCodeContainer = document.createElement('div');
-        qrCodeContainer.id = 'share-qrcode-container';
-        qrCodeContainer.style.cssText = 'text-align: center; margin: 20px 0;';
-        
-        // QR 코드 생성
-        await this.generateQRCode(currentShareUrl, qrCodeContainer);
-
-        // 공유 URL 텍스트 영역
-        const instruction = document.createElement('div');
-        instruction.innerHTML = `
-            <p style="margin-bottom: 15px; color: #666; font-size: 0.9em;">
-                <strong>사용 방법:</strong><br>
-                1. 아래 공유 주소를 복사하세요<br>
-                2. 이메일, 메신저, 문서 등에 붙여넣기하세요<br>
-                3. QR 코드를 스캔하여 빠르게 공유할 수 있습니다
-            </p>
-        `;
-
-        const textarea = document.createElement('textarea');
-        textarea.value = currentShareUrl;
-        textarea.id = 'share-url-textarea';
-        textarea.readOnly = true;
-        textarea.style.cssText = `
-            width: 100%;
-            height: 100px;
-            font-family: monospace;
-            font-size: 13px;
-            border: 2px solid #007bff;
-            border-radius: 8px;
-            padding: 12px;
-            resize: none;
-            background: #f8f9fa;
-            word-break: break-all;
-            box-sizing: border-box;
-        `;
 
         const buttonContainer = document.createElement('div');
         buttonContainer.style.cssText = `
@@ -6639,6 +6680,7 @@ export class MainController {
         const copyButton = document.createElement('button');
         copyButton.textContent = '📋 주소 복사';
         copyButton.className = 'primary-btn';
+        copyButton.style.cssText = 'width: 100%; margin-top: 10px;';
         copyButton.onclick = async () => {
             const success = await this.copyToClipboard(currentShareUrl);
             if (success) {
@@ -6655,19 +6697,18 @@ export class MainController {
         };
 
         const closeButton = document.createElement('button');
-        closeButton.textContent = '❌ 닫기';
+        closeButton.textContent = '닫기';
         closeButton.className = 'secondary-btn';
+        closeButton.style.cssText = 'width: 100%; margin-top: 10px;';
         closeButton.onclick = closeModal;
 
-        buttonContainer.appendChild(copyButton);
-        buttonContainer.appendChild(closeButton);
-
         modalContent.appendChild(title);
-        modalContent.appendChild(optionsSection);
         modalContent.appendChild(qrCodeContainer);
-        modalContent.appendChild(instruction);
-        modalContent.appendChild(textarea);
-        modalContent.appendChild(buttonContainer);
+        modalContent.appendChild(urlContainer);
+        modalContent.appendChild(copyButton);
+        modalContent.appendChild(optionsToggle);
+        modalContent.appendChild(optionsSection);
+        modalContent.appendChild(closeButton);
         modal.appendChild(modalContent);
         document.body.appendChild(modal);
 
@@ -6680,11 +6721,6 @@ export class MainController {
             }
         };
 
-        // 텍스트 영역에 포커스하고 전체 선택
-        this.setTimeoutSafe(() => {
-            textarea.focus();
-            textarea.select();
-        }, 100);
     }
 
     /**
@@ -6696,8 +6732,8 @@ export class MainController {
             
             const canvas = document.createElement('canvas');
             await QRCode.toCanvas(canvas, url, {
-                width: 200,
-                margin: 2,
+                width: 180,
+                margin: 1,
                 color: {
                     dark: '#000000',
                     light: '#FFFFFF'
@@ -6705,10 +6741,10 @@ export class MainController {
             });
             
             container.appendChild(canvas);
-            canvas.style.cssText = 'border: 2px solid #ddd; border-radius: 8px; padding: 10px; background: white;';
+            canvas.style.cssText = 'border: 1px solid #ddd; border-radius: 8px; padding: 8px; background: white; display: block; margin: 0 auto;';
         } catch (error) {
             logger.error('QR 코드 생성 실패:', error);
-            container.innerHTML = '<p style="color: #dc3545;">QR 코드 생성에 실패했습니다.</p>';
+            container.innerHTML = '<p style="color: #dc3545; font-size: 0.9em;">QR 코드 생성에 실패했습니다.</p>';
         }
     }
 
