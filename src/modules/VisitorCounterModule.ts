@@ -64,6 +64,27 @@ export class VisitorCounterModule {
   }
 
   /**
+   * Firebase 초기화 대기
+   */
+  private async waitForFirebase(maxRetries: number = 10, delay: number = 500): Promise<boolean> {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        const firebaseService = this.deps.firebaseStorageManager.getFirebaseService();
+        const firestore = firebaseService?.getFirestore();
+        if (firestore) {
+          logger.info('Firebase 초기화 확인 완료');
+          return true;
+        }
+      } catch (error) {
+        logger.warn(`Firebase 초기화 대기 중... (${i + 1}/${maxRetries})`);
+      }
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+    logger.warn('Firebase 초기화 대기 시간 초과');
+    return false;
+  }
+
+  /**
    * 방문자 수 업데이트
    */
   public async updateVisitorCount(): Promise<void> {
@@ -73,6 +94,16 @@ export class VisitorCounterModule {
       if (!this.visitorNumberElement) {
         logger.warn('visitor-number 요소를 찾을 수 없습니다. 재시도 중...');
         setTimeout(() => this.updateVisitorCount(), 100);
+        return;
+      }
+
+      // Firebase 초기화 대기
+      const firebaseReady = await this.waitForFirebase();
+      if (!firebaseReady) {
+        logger.warn('Firebase가 초기화되지 않아 방문자 수를 가져올 수 없습니다.');
+        if (this.visitorNumberElement) {
+          this.visitorNumberElement.textContent = '?';
+        }
         return;
       }
 

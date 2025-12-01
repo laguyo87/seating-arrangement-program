@@ -751,6 +751,13 @@ export class FirebaseStorageManager {
       return null;
     }
   }
+
+  /**
+   * FirebaseService 인스턴스 가져오기 (외부 접근용)
+   */
+  public getFirebaseService(): FirebaseService {
+    return this.firebaseService;
+  }
 }
 
 
