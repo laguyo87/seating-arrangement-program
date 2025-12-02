@@ -5319,7 +5319,34 @@ export class MainController {
             if (existingHistory.length > 50) {
                 existingHistory.splice(50);
             }
-            this.storageManager.safeSetItem(historyKey, JSON.stringify(existingHistory));
+            
+            // 저장 실행
+            const saved = this.storageManager.safeSetItem(historyKey, JSON.stringify(existingHistory));
+            if (!saved) {
+                logger.error('이력 저장 실패:', { historyKey, historyLength: existingHistory.length });
+                this.outputModule.showError('이력 저장에 실패했습니다. 브라우저 저장소를 확인해주세요.');
+                return;
+            }
+            
+            // 저장 확인: 저장 직후 읽어서 검증
+            const verifyHistory = this.getSeatHistory(currentClassId);
+            if (verifyHistory.length === 0 || verifyHistory[0].id !== historyItem.id) {
+                logger.error('이력 저장 검증 실패:', { 
+                    saved: saved, 
+                    verifyLength: verifyHistory.length,
+                    expectedId: historyItem.id,
+                    actualId: verifyHistory[0]?.id 
+                });
+                this.outputModule.showError('이력 저장 후 검증에 실패했습니다. 다시 시도해주세요.');
+                return;
+            }
+            
+            logger.info('✅ 이력 저장 성공:', { 
+                historyKey, 
+                historyLength: verifyHistory.length,
+                historyId: historyItem.id,
+                date: historyItem.date 
+            });
 
             // 드롭다운 메뉴 업데이트
             this.updateHistoryDropdown();
