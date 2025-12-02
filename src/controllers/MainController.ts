@@ -4265,7 +4265,7 @@ export class MainController {
     }
 
     /**
-     * 교탁과 칠판 그리기
+     * 칠판 그리기
      */
     private drawTeacherDeskAndBoard(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement): void {
         const width = canvas.width;
@@ -4286,27 +4286,6 @@ export class MainController {
         ctx.font = 'bold 18px sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText('칠판', width * 0.5, boardY + 40);
-        
-        // 교탁 그리기
-        const deskY = boardY + boardHeight + 15;
-        const deskWidth = 80;
-        const deskHeight = 20;
-        ctx.fillStyle = '#95a5a6';
-        ctx.fillRect((width - deskWidth) / 2, deskY, deskWidth, deskHeight);
-        
-        // 교탁 테두리
-        ctx.strokeStyle = '#7f8c8d';
-        ctx.lineWidth = 2;
-        ctx.strokeRect((width - deskWidth) / 2, deskY, deskWidth, deskHeight);
-        
-        // 교탁 다리
-        const legWidth = 5;
-        const legHeight = 30;
-        ctx.fillStyle = '#7f8c8d';
-        // 왼쪽 다리
-        ctx.fillRect((width - deskWidth) / 2 + 10, deskY + deskHeight, legWidth, legHeight);
-        // 오른쪽 다리
-        ctx.fillRect((width - deskWidth) / 2 + deskWidth - 10 - legWidth, deskY + deskHeight, legWidth, legHeight);
     }
 
 
@@ -6913,7 +6892,6 @@ export class MainController {
             // 모든 자식 요소의 실제 크기를 계산하여 전체 영역 파악
             const seatsArea = document.getElementById('seats-area');
             const blackboardArea = document.getElementById('blackboard-area');
-            const teacherDeskArea = document.getElementById('teacher-desk-area');
             
             // 좌석 영역의 실제 크기 계산 (모든 좌석 카드 포함)
             let seatsAreaHeight = 0;
@@ -6952,14 +6930,13 @@ export class MainController {
                 );
             }
             
-            // 칠판과 교탁 영역 고려 (절대 위치이므로 포함)
+            // 칠판 영역 고려 (절대 위치이므로 포함)
             const blackboardHeight = blackboardArea ? (blackboardArea.getBoundingClientRect().height || 40) : 40;
-            const teacherDeskHeight = teacherDeskArea ? (teacherDeskArea.getBoundingClientRect().height || 40) : 40;
             
-            // 전체 높이 계산: 상단 패딩(20px) + 칠판(20px top + 높이) + 교탁(84px top + 높이) + 좌석 영역(margin-top 140px + 실제 높이) + 하단 패딩(20px)
-            // 좌석 영역은 margin-top 140px부터 시작하므로, 전체 높이는 140 + seatsAreaHeight
+            // 전체 높이 계산: 상단 패딩(20px) + 칠판(20px top + 높이) + 좌석 영역(margin-top 80px + 실제 높이) + 하단 패딩(20px)
+            // 좌석 영역은 margin-top 80px부터 시작하므로, 전체 높이는 80 + seatsAreaHeight
             const calculatedHeight = 20 + // 상단 패딩
-                Math.max(20 + blackboardHeight, 84 + teacherDeskHeight) + // 칠판/교탁 영역
+                (20 + blackboardHeight) + // 칠판 영역
                 seatsAreaHeight + // 좌석 영역 높이
                 20; // 하단 패딩
             
@@ -6967,7 +6944,7 @@ export class MainController {
                 calculatedHeight,
                 classroomLayout.scrollHeight,
                 classroomLayout.offsetHeight,
-                140 + seatsAreaHeight, // 좌석 영역 시작 위치 + 높이
+                80 + seatsAreaHeight, // 좌석 영역 시작 위치 + 높이
                 rect.height
             );
             

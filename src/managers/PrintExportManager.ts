@@ -120,24 +120,6 @@ export class PrintExportManager {
                             font-size: 12px;
                             margin-bottom: 10px;
                         }
-                        .teacher-desk-area {
-                            position: relative;
-                            top: 0;
-                            left: 50%;
-                            transform: translateX(-50%);
-                            width: 80px;
-                            height: 25px;
-                            background: #95a5a6;
-                            border: 1px solid #7f8c8d;
-                            border-radius: 3px;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                            color: white;
-                            font-weight: bold;
-                            font-size: 10px;
-                            margin-bottom: 20px;
-                        }
                         .seats-area {
                             display: grid;
                             gap: 5px 20px !important;
@@ -315,7 +297,6 @@ export class PrintExportManager {
                     
                     <div class="classroom-layout">
                         <div class="blackboard-area">📝 칠판</div>
-                        <div class="teacher-desk-area">🖥️ 교탁</div>
                         <div class="seats-area">
                             ${seatsAreaHtml}
                         </div>
@@ -440,27 +421,6 @@ export class PrintExportManager {
                             margin-bottom: 10px;
                         }
                         .blackboard-area span {
-                            transform: rotate(180deg);
-                        }
-                        .teacher-desk-area {
-                            position: relative;
-                            top: 0;
-                            left: 50%;
-                            transform: translateX(-50%);
-                            width: 80px;
-                            height: 25px;
-                            background: #95a5a6;
-                            border: 1px solid #7f8c8d;
-                            border-radius: 3px;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                            color: white;
-                            font-weight: bold;
-                            font-size: 10px;
-                            margin-bottom: 20px;
-                        }
-                        .teacher-desk-area span {
                             transform: rotate(180deg);
                         }
                         .seats-area {
@@ -588,7 +548,6 @@ export class PrintExportManager {
                                 font-size: 10px;
                                 margin-bottom: 5px;
                             }
-                            .teacher-desk-area {
                                 width: 60px;
                                 height: 20px;
                                 font-size: 8px;
@@ -647,7 +606,6 @@ export class PrintExportManager {
                         </div>
                         <div class="classroom-layout">
                             <div class="blackboard-area"><span>📝 칠판</span></div>
-                            <div class="teacher-desk-area"><span>🖥️ 교탁</span></div>
                             <div class="seats-area">
                                 ${seatsAreaHtml}
                             </div>
@@ -780,23 +738,6 @@ export class PrintExportManager {
                             font-size: 18px;
                             margin-bottom: 20px;
                         }
-                        .teacher-desk-area {
-                            position: relative;
-                            top: 0;
-                            left: 50%;
-                            transform: translateX(-50%);
-                            width: 120px;
-                            height: 40px;
-                            background: #95a5a6;
-                            border: 2px solid #7f8c8d;
-                            border-radius: 5px;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                            color: white;
-                            font-weight: bold;
-                            margin-bottom: 40px;
-                        }
                         .seats-area {
                             display: grid;
                             gap: 10px 40px !important;
@@ -851,7 +792,6 @@ export class PrintExportManager {
                     
                     <div class="classroom-layout">
                         <div class="blackboard-area">📝 칠판</div>
-                        <div class="teacher-desk-area">🖥️ 교탁</div>
                         <div class="seats-area">
                             ${seatsAreaHtml}
                         </div>
