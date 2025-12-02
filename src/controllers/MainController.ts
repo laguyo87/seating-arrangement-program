@@ -5379,7 +5379,52 @@ export class MainController {
                 });
             }
 
-            this.outputModule.showSuccess(`자리가 확정되었습니다! 날짜: ${dateString}`);
+            // 이쁘고 가독성 있는 메시지 생성 (HTML 형식)
+            const successMessage = `✅ 확정된 자리 이력에 기록하였습니다.<br><br>💾 <strong>'저장하기'</strong>를 클릭하면 최종 저장됩니다.<br><br>📅 날짜: <strong>${dateString}</strong>`;
+            
+            // OutputModule의 showSuccess는 innerHTML을 사용하므로 HTML 지원
+            // 하지만 기본적으로 textContent를 사용하므로, 직접 메시지 요소를 생성
+            const container = (this.outputModule as any).container;
+            if (container) {
+                // 기존 메시지 제거
+                const existingMessage = container.querySelector('.output-message');
+                if (existingMessage) {
+                    existingMessage.remove();
+                }
+                
+                // 새 메시지 생성
+                const messageElement = document.createElement('div');
+                messageElement.className = 'output-message success';
+                messageElement.innerHTML = successMessage;
+                messageElement.style.cssText = `
+                    padding: 18px;
+                    margin: 20px 0;
+                    border-radius: 8px;
+                    font-weight: 500;
+                    background: #d4edda;
+                    color: #155724;
+                    border: 1px solid #c3e6cb;
+                    line-height: 1.8;
+                    font-size: 1.05em;
+                    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+                `;
+                messageElement.setAttribute('role', 'status');
+                messageElement.setAttribute('aria-live', 'polite');
+                messageElement.setAttribute('aria-atomic', 'true');
+                messageElement.setAttribute('aria-label', '확정된 자리 이력에 기록되었습니다');
+                
+                container.appendChild(messageElement);
+                
+                // 7초 후 자동 제거 (메시지가 길어서 조금 더 길게)
+                setTimeout(() => {
+                    if (messageElement.parentNode) {
+                        messageElement.remove();
+                    }
+                }, 7000);
+            } else {
+                // 폴백: 기본 showSuccess 사용
+                this.outputModule.showSuccess(`✅ 확정된 자리 이력에 기록하였습니다. 💾 '저장하기'를 클릭하면 최종 저장됩니다. 📅 날짜: ${dateString}`);
+            }
         } catch (error) {
             logger.error('자리 확정 중 오류:', error);
             this.outputModule.showError('자리 확정 중 오류가 발생했습니다.');
