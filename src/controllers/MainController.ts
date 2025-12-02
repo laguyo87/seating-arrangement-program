@@ -381,8 +381,15 @@ export class MainController {
                 if (checkedLayoutType.value === 'single-uniform') {
                     this.toggleCustomMode1(true);
                     this.updatePartitionLimitForSingleUniform();
+                    // '이전 짝 금지' 비활성화
+                    this.toggleAvoidPrevPartnerOption(false);
                 } else if (checkedLayoutType.value === 'pair-uniform') {
                     this.updatePartitionLimitForPair();
+                    // '이전 짝 금지' 활성화
+                    this.toggleAvoidPrevPartnerOption(true);
+                } else if (checkedLayoutType.value === 'group') {
+                    // '이전 짝 금지' 비활성화
+                    this.toggleAvoidPrevPartnerOption(false);
                 }
             }
             
@@ -627,8 +634,14 @@ export class MainController {
                 if (layoutType === 'pair-uniform') {
                     this.togglePairSubmenu(true);
                     this.updatePartitionLimitForPair();
+                    // '이전 짝 금지' 체크박스 활성화
+                    this.toggleAvoidPrevPartnerOption(true);
                 } else {
                     this.togglePairSubmenu(false);
+                    // '1명씩 한 줄로 배치' 또는 '모둠 배치' 선택 시 '이전 짝 금지' 비활성화
+                    if (layoutType === 'single-uniform' || layoutType === 'group') {
+                        this.toggleAvoidPrevPartnerOption(false);
+                    }
                 }
                 
                 // '모둠 배치' 선택 시 서브 메뉴 표시 및 분단 개수 제한
@@ -4364,6 +4377,27 @@ export class MainController {
     /**
      * 모둠 배치 서브 메뉴 토글
      */
+    /**
+     * '이전 짝 금지' 체크박스 활성화/비활성화
+     */
+    private toggleAvoidPrevPartnerOption(enable: boolean): void {
+        const avoidPrevPartner = document.getElementById('avoid-prev-partner') as HTMLInputElement;
+        if (avoidPrevPartner) {
+            if (enable) {
+                // 활성화
+                avoidPrevPartner.disabled = false;
+                avoidPrevPartner.style.opacity = '1';
+                avoidPrevPartner.style.cursor = '';
+            } else {
+                // 비활성화 및 체크 해제
+                avoidPrevPartner.disabled = true;
+                avoidPrevPartner.checked = false;
+                avoidPrevPartner.style.opacity = '0.5';
+                avoidPrevPartner.style.cursor = 'not-allowed';
+            }
+        }
+    }
+
     private toggleGroupSubmenu(show: boolean): void {
         const groupSubmenu = document.getElementById('group-submenu');
         if (!groupSubmenu) return;
@@ -5633,61 +5667,65 @@ export class MainController {
                 });
             }
 
-            // 이전 짝꿍 정보 추출 (짝꿍 배치인 경우)
+            // 이전 짝꿍 정보 추출 (이력의 layoutType이 'pair-uniform'인 경우만)
             if (avoidPrevPartner && isPairLayout) {
-                // pairInfo가 있으면 사용 (더 정확함)
-                if (historyItem.pairInfo && historyItem.pairInfo.length > 0) {
-                    historyItem.pairInfo.forEach(pair => {
-                        if (pair.student1 && pair.student2) {
-                            if (!lastPartnerByStudent[pair.student1]) {
-                                lastPartnerByStudent[pair.student1] = pair.student2;
-                            }
-                            if (!lastPartnerByStudent[pair.student2]) {
-                                lastPartnerByStudent[pair.student2] = pair.student1;
-                            }
-                        }
-                    });
-                } else {
-                    // pairInfo가 없으면 좌석 번호 기반으로 추론 (하위 호환성)
-                    const seatGroups: {[seatId: number]: Array<{studentName: string, seatId: number}>} = {};
-                    
-                    layout.forEach(item => {
-                        if (item.studentName) {
-                            if (!seatGroups[item.seatId]) {
-                                seatGroups[item.seatId] = [];
-                            }
-                            seatGroups[item.seatId].push(item);
-                        }
-                    });
-
-                    // 같은 좌석에 2명이 앉은 경우 (짝꿍 배치)
-                    Object.values(seatGroups).forEach(group => {
-                        if (group.length === 2) {
-                            const [student1, student2] = group;
-                            if (student1.studentName && student2.studentName) {
-                                if (!lastPartnerByStudent[student1.studentName]) {
-                                    lastPartnerByStudent[student1.studentName] = student2.studentName;
+                // 이력의 layoutType이 'pair-uniform'인 경우만 짝꿍 정보 추출
+                const historyLayoutType = historyItem.layoutType;
+                if (historyLayoutType === 'pair-uniform') {
+                    // pairInfo가 있으면 사용 (더 정확함)
+                    if (historyItem.pairInfo && historyItem.pairInfo.length > 0) {
+                        historyItem.pairInfo.forEach(pair => {
+                            if (pair.student1 && pair.student2) {
+                                if (!lastPartnerByStudent[pair.student1]) {
+                                    lastPartnerByStudent[pair.student1] = pair.student2;
                                 }
-                                if (!lastPartnerByStudent[student2.studentName]) {
-                                    lastPartnerByStudent[student2.studentName] = student1.studentName;
+                                if (!lastPartnerByStudent[pair.student2]) {
+                                    lastPartnerByStudent[pair.student2] = pair.student1;
                                 }
                             }
-                        }
-                    });
-
-                    // 인접한 좌석 번호를 가진 학생들도 짝꿍으로 간주 (같은 행에 있는 경우)
-                    const sortedLayout = [...layout].sort((a, b) => a.seatId - b.seatId);
-                    for (let i = 0; i < sortedLayout.length - 1; i++) {
-                        const current = sortedLayout[i];
-                        const next = sortedLayout[i + 1];
+                        });
+                    } else {
+                        // pairInfo가 없으면 좌석 번호 기반으로 추론 (하위 호환성)
+                        const seatGroups: {[seatId: number]: Array<{studentName: string, seatId: number}>} = {};
                         
-                        // 인접한 좌석이고 (차이가 1 또는 2), 같은 행에 있을 가능성이 높은 경우
-                        if (current.studentName && next.studentName && 
-                            (next.seatId - current.seatId <= 2)) {
-                            // 이미 다른 짝꿍이 없으면 인접 학생을 짝꿍으로 기록
-                            if (!lastPartnerByStudent[current.studentName] && !lastPartnerByStudent[next.studentName]) {
-                                lastPartnerByStudent[current.studentName] = next.studentName;
-                                lastPartnerByStudent[next.studentName] = current.studentName;
+                        layout.forEach(item => {
+                            if (item.studentName) {
+                                if (!seatGroups[item.seatId]) {
+                                    seatGroups[item.seatId] = [];
+                                }
+                                seatGroups[item.seatId].push(item);
+                            }
+                        });
+
+                        // 같은 좌석에 2명이 앉은 경우 (짝꿍 배치)
+                        Object.values(seatGroups).forEach(group => {
+                            if (group.length === 2) {
+                                const [student1, student2] = group;
+                                if (student1.studentName && student2.studentName) {
+                                    if (!lastPartnerByStudent[student1.studentName]) {
+                                        lastPartnerByStudent[student1.studentName] = student2.studentName;
+                                    }
+                                    if (!lastPartnerByStudent[student2.studentName]) {
+                                        lastPartnerByStudent[student2.studentName] = student1.studentName;
+                                    }
+                                }
+                            }
+                        });
+
+                        // 인접한 좌석 번호를 가진 학생들도 짝꿍으로 간주 (같은 행에 있는 경우)
+                        const sortedLayout = [...layout].sort((a, b) => a.seatId - b.seatId);
+                        for (let i = 0; i < sortedLayout.length - 1; i++) {
+                            const current = sortedLayout[i];
+                            const next = sortedLayout[i + 1];
+                            
+                            // 인접한 좌석이고 (차이가 1 또는 2), 같은 행에 있을 가능성이 높은 경우
+                            if (current.studentName && next.studentName && 
+                                (next.seatId - current.seatId <= 2)) {
+                                // 이미 다른 짝꿍이 없으면 인접 학생을 짝꿍으로 기록
+                                if (!lastPartnerByStudent[current.studentName] && !lastPartnerByStudent[next.studentName]) {
+                                    lastPartnerByStudent[current.studentName] = next.studentName;
+                                    lastPartnerByStudent[next.studentName] = current.studentName;
+                                }
                             }
                         }
                     }
