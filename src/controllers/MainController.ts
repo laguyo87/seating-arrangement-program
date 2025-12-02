@@ -5724,6 +5724,9 @@ export class MainController {
                 arrangeBtn.title = '확정된 자리 이력은 수정할 수 없습니다.';
             }
             
+            // 사이드바 옵션들 비활성화
+            this.disableSidebarOptions();
+            
             // 읽기 전용 모드 표시 배지 추가
             const readOnlyBadge = document.createElement('div');
             readOnlyBadge.id = 'read-only-badge';
@@ -5771,6 +5774,246 @@ export class MainController {
     }
 
     /**
+     * 사이드바 옵션들 비활성화 (읽기 전용 모드)
+     */
+    private disableSidebarOptions(): void {
+        // 옵션1: 좌석 배치 형태
+        const layoutTypeInputs = document.querySelectorAll('input[name="layout-type"]') as NodeListOf<HTMLInputElement>;
+        layoutTypeInputs.forEach(input => {
+            input.disabled = true;
+            input.style.opacity = '0.5';
+            input.style.cursor = 'not-allowed';
+        });
+        
+        // 서브 옵션들
+        const singleModeInputs = document.querySelectorAll('input[name="single-mode"]') as NodeListOf<HTMLInputElement>;
+        singleModeInputs.forEach(input => {
+            input.disabled = true;
+            input.style.opacity = '0.5';
+            input.style.cursor = 'not-allowed';
+        });
+        
+        const pairModeInputs = document.querySelectorAll('input[name="pair-mode"]') as NodeListOf<HTMLInputElement>;
+        pairModeInputs.forEach(input => {
+            input.disabled = true;
+            input.style.opacity = '0.5';
+            input.style.cursor = 'not-allowed';
+        });
+        
+        const groupSizeInputs = document.querySelectorAll('input[name="group-size"]') as NodeListOf<HTMLInputElement>;
+        groupSizeInputs.forEach(input => {
+            input.disabled = true;
+            input.style.opacity = '0.5';
+            input.style.cursor = 'not-allowed';
+        });
+        
+        const reverseGenderOrder = document.getElementById('reverse-gender-order') as HTMLInputElement;
+        if (reverseGenderOrder) {
+            reverseGenderOrder.disabled = true;
+            reverseGenderOrder.style.opacity = '0.5';
+            reverseGenderOrder.style.cursor = 'not-allowed';
+        }
+        
+        const groupGenderMix = document.getElementById('group-gender-mix') as HTMLInputElement;
+        if (groupGenderMix) {
+            groupGenderMix.disabled = true;
+            groupGenderMix.style.opacity = '0.5';
+            groupGenderMix.style.cursor = 'not-allowed';
+        }
+        
+        const genderPairing = document.getElementById('gender-pairing') as HTMLInputElement;
+        if (genderPairing) {
+            genderPairing.disabled = true;
+            genderPairing.style.opacity = '0.5';
+            genderPairing.style.cursor = 'not-allowed';
+        }
+        
+        // 옵션2: 학생 자리 수
+        const maleStudents = document.getElementById('male-students') as HTMLInputElement;
+        if (maleStudents) {
+            maleStudents.disabled = true;
+            maleStudents.style.opacity = '0.5';
+            maleStudents.style.cursor = 'not-allowed';
+        }
+        
+        const femaleStudents = document.getElementById('female-students') as HTMLInputElement;
+        if (femaleStudents) {
+            femaleStudents.disabled = true;
+            femaleStudents.style.opacity = '0.5';
+            femaleStudents.style.cursor = 'not-allowed';
+        }
+        
+        // 옵션3: 분단 개수
+        const numberOfPartitions = document.getElementById('number-of-partitions') as HTMLInputElement;
+        if (numberOfPartitions) {
+            numberOfPartitions.disabled = true;
+            numberOfPartitions.style.opacity = '0.5';
+            numberOfPartitions.style.cursor = 'not-allowed';
+        }
+        
+        // 옵션4: 맞춤 구성
+        const customModeInputs = document.querySelectorAll('input[name="custom-mode-2"]') as NodeListOf<HTMLInputElement>;
+        customModeInputs.forEach(input => {
+            input.disabled = true;
+            input.style.opacity = '0.5';
+            input.style.cursor = 'not-allowed';
+        });
+        
+        // 학생 이름 입력하기 버튼
+        const createStudentTable = document.getElementById('create-student-table') as HTMLButtonElement;
+        if (createStudentTable) {
+            createStudentTable.disabled = true;
+            createStudentTable.style.opacity = '0.5';
+            createStudentTable.style.cursor = 'not-allowed';
+            createStudentTable.title = '확정된 자리 이력은 수정할 수 없습니다.';
+        }
+        
+        // 옵션 설정 기억하기 버튼
+        const saveOptions = document.getElementById('save-options') as HTMLButtonElement;
+        if (saveOptions) {
+            saveOptions.disabled = true;
+            saveOptions.style.opacity = '0.5';
+            saveOptions.style.cursor = 'not-allowed';
+        }
+        
+        // 초기화 버튼 (읽기 전용 모드에서는 비활성화하지 않음 - 사용자가 초기화할 수 있도록)
+        
+        // 자리 배치하기 섹션의 체크박스들 (출력 영역)
+        const avoidPrevSeat = document.getElementById('avoid-prev-seat') as HTMLInputElement;
+        if (avoidPrevSeat) {
+            avoidPrevSeat.disabled = true;
+            avoidPrevSeat.style.opacity = '0.5';
+            avoidPrevSeat.style.cursor = 'not-allowed';
+        }
+        
+        const avoidPrevPartner = document.getElementById('avoid-prev-partner') as HTMLInputElement;
+        if (avoidPrevPartner) {
+            avoidPrevPartner.disabled = true;
+            avoidPrevPartner.style.opacity = '0.5';
+            avoidPrevPartner.style.cursor = 'not-allowed';
+        }
+    }
+
+    /**
+     * 사이드바 옵션들 활성화 (읽기 전용 모드 해제)
+     */
+    private enableSidebarOptions(): void {
+        // 옵션1: 좌석 배치 형태
+        const layoutTypeInputs = document.querySelectorAll('input[name="layout-type"]') as NodeListOf<HTMLInputElement>;
+        layoutTypeInputs.forEach(input => {
+            input.disabled = false;
+            input.style.opacity = '1';
+            input.style.cursor = '';
+        });
+        
+        // 서브 옵션들
+        const singleModeInputs = document.querySelectorAll('input[name="single-mode"]') as NodeListOf<HTMLInputElement>;
+        singleModeInputs.forEach(input => {
+            input.disabled = false;
+            input.style.opacity = '1';
+            input.style.cursor = '';
+        });
+        
+        const pairModeInputs = document.querySelectorAll('input[name="pair-mode"]') as NodeListOf<HTMLInputElement>;
+        pairModeInputs.forEach(input => {
+            input.disabled = false;
+            input.style.opacity = '1';
+            input.style.cursor = '';
+        });
+        
+        const groupSizeInputs = document.querySelectorAll('input[name="group-size"]') as NodeListOf<HTMLInputElement>;
+        groupSizeInputs.forEach(input => {
+            input.disabled = false;
+            input.style.opacity = '1';
+            input.style.cursor = '';
+        });
+        
+        const reverseGenderOrder = document.getElementById('reverse-gender-order') as HTMLInputElement;
+        if (reverseGenderOrder) {
+            reverseGenderOrder.disabled = false;
+            reverseGenderOrder.style.opacity = '1';
+            reverseGenderOrder.style.cursor = '';
+        }
+        
+        const groupGenderMix = document.getElementById('group-gender-mix') as HTMLInputElement;
+        if (groupGenderMix) {
+            groupGenderMix.disabled = false;
+            groupGenderMix.style.opacity = '1';
+            groupGenderMix.style.cursor = '';
+        }
+        
+        const genderPairing = document.getElementById('gender-pairing') as HTMLInputElement;
+        if (genderPairing) {
+            genderPairing.disabled = false;
+            genderPairing.style.opacity = '1';
+            genderPairing.style.cursor = '';
+        }
+        
+        // 옵션2: 학생 자리 수
+        const maleStudents = document.getElementById('male-students') as HTMLInputElement;
+        if (maleStudents) {
+            maleStudents.disabled = false;
+            maleStudents.style.opacity = '1';
+            maleStudents.style.cursor = '';
+        }
+        
+        const femaleStudents = document.getElementById('female-students') as HTMLInputElement;
+        if (femaleStudents) {
+            femaleStudents.disabled = false;
+            femaleStudents.style.opacity = '1';
+            femaleStudents.style.cursor = '';
+        }
+        
+        // 옵션3: 분단 개수
+        const numberOfPartitions = document.getElementById('number-of-partitions') as HTMLInputElement;
+        if (numberOfPartitions) {
+            numberOfPartitions.disabled = false;
+            numberOfPartitions.style.opacity = '1';
+            numberOfPartitions.style.cursor = '';
+        }
+        
+        // 옵션4: 맞춤 구성
+        const customModeInputs = document.querySelectorAll('input[name="custom-mode-2"]') as NodeListOf<HTMLInputElement>;
+        customModeInputs.forEach(input => {
+            input.disabled = false;
+            input.style.opacity = '1';
+            input.style.cursor = '';
+        });
+        
+        // 학생 이름 입력하기 버튼
+        const createStudentTable = document.getElementById('create-student-table') as HTMLButtonElement;
+        if (createStudentTable) {
+            createStudentTable.disabled = false;
+            createStudentTable.style.opacity = '1';
+            createStudentTable.style.cursor = 'pointer';
+            createStudentTable.title = '';
+        }
+        
+        // 옵션 설정 기억하기 버튼
+        const saveOptions = document.getElementById('save-options') as HTMLButtonElement;
+        if (saveOptions) {
+            saveOptions.disabled = false;
+            saveOptions.style.opacity = '1';
+            saveOptions.style.cursor = 'pointer';
+        }
+        
+        // 자리 배치하기 섹션의 체크박스들 (출력 영역)
+        const avoidPrevSeat = document.getElementById('avoid-prev-seat') as HTMLInputElement;
+        if (avoidPrevSeat) {
+            avoidPrevSeat.disabled = false;
+            avoidPrevSeat.style.opacity = '1';
+            avoidPrevSeat.style.cursor = '';
+        }
+        
+        const avoidPrevPartner = document.getElementById('avoid-prev-partner') as HTMLInputElement;
+        if (avoidPrevPartner) {
+            avoidPrevPartner.disabled = false;
+            avoidPrevPartner.style.opacity = '1';
+            avoidPrevPartner.style.cursor = '';
+        }
+    }
+
+    /**
      * 읽기 전용 모드 해제
      */
     private disableReadOnlyMode(): void {
@@ -5798,6 +6041,9 @@ export class MainController {
             arrangeBtn.style.cursor = 'pointer';
             arrangeBtn.title = '';
         }
+        
+        // 사이드바 옵션들 활성화
+        this.enableSidebarOptions();
         
         // 읽기 전용 모드 표시 배지 제거
         const readOnlyBadge = document.getElementById('read-only-badge');
