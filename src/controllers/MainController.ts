@@ -5393,6 +5393,9 @@ export class MainController {
             // 드롭다운 메뉴 업데이트
             this.updateHistoryDropdown();
 
+            // '저장하기' 버튼 하이라이트 (자리 확정했지만 아직 저장하지 않음을 표시)
+            this.highlightSaveButton();
+
             // 반이 선택된 경우 Firebase에 자리 배치도 저장
             if (this.classManager && this.classManager.getCurrentClassId()) {
                 // 현재 seats와 students를 화면 데이터로 업데이트한 후 저장
@@ -5839,7 +5842,7 @@ export class MainController {
                 // 옵션 변경 이벤트 발생 (UI 업데이트를 위해)
                 await new Promise<void>(resolve => setTimeout(resolve, 100));
             }
-            
+
             // 모든 카드 초기화
             let allCards = Array.from(seatsArea.querySelectorAll('.student-seat-card')) as HTMLElement[];
             
@@ -6515,13 +6518,13 @@ export class MainController {
                         };
                     } else {
                         // 이전 형식: [이름, 성별]
-                        const name = String(student[0] || '').trim();
-                        const gender = (student[1] === 'F' ? 'F' : 'M') as 'M' | 'F';
-                        return {
-                            id: index + 1,
-                            name: name || `학생${index + 1}`,
-                            gender: gender
-                        };
+                    const name = String(student[0] || '').trim();
+                    const gender = (student[1] === 'F' ? 'F' : 'M') as 'M' | 'F';
+                    return {
+                        id: index + 1,
+                        name: name || `학생${index + 1}`,
+                        gender: gender
+                    };
                     }
                 } else {
                     // 객체 형식: {name: string, gender: 'M' | 'F'}
@@ -6623,31 +6626,31 @@ export class MainController {
         const seatsArea = document.getElementById('seats-area');
         if (!seatsArea) return;
         
-        const cards = seatsArea.querySelectorAll('.student-seat-card');
-        let cardIndex = 0;
-        
-        this.students.forEach((student) => {
-            if (cardIndex < cards.length) {
-                const card = cards[cardIndex] as HTMLElement;
-                const nameDiv = card.querySelector('.student-name') as HTMLElement;
-                if (nameDiv) {
-                    nameDiv.textContent = student.name;
-                    // 성별 클래스 설정
-                    card.classList.remove('gender-m', 'gender-f');
-                    card.classList.add(`gender-${student.gender.toLowerCase()}`);
-                }
-                cardIndex++;
-            }
-        });
-        
-        // 빈 좌석 초기화
-        for (let i = cardIndex; i < cards.length; i++) {
-            const card = cards[i] as HTMLElement;
-            const nameDiv = card.querySelector('.student-name') as HTMLElement;
-            if (nameDiv) {
-                nameDiv.textContent = '';
-            }
-        }
+                    const cards = seatsArea.querySelectorAll('.student-seat-card');
+                    let cardIndex = 0;
+                    
+                    this.students.forEach((student) => {
+                        if (cardIndex < cards.length) {
+                            const card = cards[cardIndex] as HTMLElement;
+                            const nameDiv = card.querySelector('.student-name') as HTMLElement;
+                            if (nameDiv) {
+                                nameDiv.textContent = student.name;
+                                // 성별 클래스 설정
+                                card.classList.remove('gender-m', 'gender-f');
+                                card.classList.add(`gender-${student.gender.toLowerCase()}`);
+                            }
+                            cardIndex++;
+                        }
+                    });
+                    
+                    // 빈 좌석 초기화
+                    for (let i = cardIndex; i < cards.length; i++) {
+                        const card = cards[i] as HTMLElement;
+                        const nameDiv = card.querySelector('.student-name') as HTMLElement;
+                        if (nameDiv) {
+                            nameDiv.textContent = '';
+                        }
+                    }
     }
     
     /**
@@ -7234,13 +7237,13 @@ export class MainController {
                         };
                     } else {
                         // 이전 형식: [이름, 성별]
-                        const name = String(student[0] || '').trim();
-                        const gender = (student[1] === 'F' ? 'F' : 'M') as 'M' | 'F';
-                        return {
-                            id: index + 1,
-                            name: name || `학생${index + 1}`,
-                            gender: gender
-                        };
+                    const name = String(student[0] || '').trim();
+                    const gender = (student[1] === 'F' ? 'F' : 'M') as 'M' | 'F';
+                    return {
+                        id: index + 1,
+                        name: name || `학생${index + 1}`,
+                        gender: gender
+                    };
                     }
                 } else {
                     // 객체 형식: {name: string, gender: 'M' | 'F'}
@@ -8542,8 +8545,55 @@ export class MainController {
     private handleSaveClassLayout(): void {
         // 비동기 처리
         this.classManager.saveCurrentLayout().then((saved) => {
+            // 저장 성공 시 하이라이트 제거
+            if (saved) {
+                this.removeSaveButtonHighlight();
+            }
             // 저장 성공 메시지는 ClassManager에서 표시됨
         });
+    }
+    
+    /**
+     * '저장하기' 버튼 하이라이트 (자리 확정했지만 아직 저장하지 않음을 표시)
+     */
+    private highlightSaveButton(): void {
+        const saveBtn = document.getElementById('save-layout-btn') as HTMLButtonElement;
+        if (saveBtn) {
+            // 테두리 하이라이트 스타일 추가
+            saveBtn.style.border = '3px solid #ff9800';
+            saveBtn.style.boxShadow = '0 0 10px rgba(255, 152, 0, 0.5)';
+            saveBtn.style.animation = 'pulse 2s infinite';
+            
+            // CSS 애니메이션 추가 (없는 경우)
+            if (!document.getElementById('save-button-pulse-animation')) {
+                const style = document.createElement('style');
+                style.id = 'save-button-pulse-animation';
+                style.textContent = `
+                    @keyframes pulse {
+                        0%, 100% {
+                            box-shadow: 0 0 10px rgba(255, 152, 0, 0.5);
+                        }
+                        50% {
+                            box-shadow: 0 0 20px rgba(255, 152, 0, 0.8);
+                        }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+        }
+    }
+    
+    /**
+     * '저장하기' 버튼 하이라이트 제거
+     */
+    private removeSaveButtonHighlight(): void {
+        const saveBtn = document.getElementById('save-layout-btn') as HTMLButtonElement;
+        if (saveBtn) {
+            // 하이라이트 스타일 제거
+            saveBtn.style.border = '';
+            saveBtn.style.boxShadow = '';
+            saveBtn.style.animation = '';
+        }
     }
 
     /**
