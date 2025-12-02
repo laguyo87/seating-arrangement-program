@@ -5826,19 +5826,26 @@ export class MainController {
             
             // 저장된 배치 형태 정보 복원 (이력에서 불러온 배치 형태로 복원)
             if (historyItem.layoutType) {
-                // layout-type 라디오 버튼 설정
+                logger.info('배치 형태 복원 시작:', {
+                    layoutType: historyItem.layoutType,
+                    singleMode: historyItem.singleMode,
+                    pairMode: historyItem.pairMode,
+                    partitionCount: historyItem.partitionCount
+                });
+                
+                // 먼저 모든 라디오 버튼의 체크 해제
+                document.querySelectorAll('input[name="layout-type"]').forEach((input: Element) => {
+                    (input as HTMLInputElement).checked = false;
+                });
+                
+                // layout-type 라디오 버튼 설정 (이벤트 발생 없이)
                 const layoutTypeRadio = document.querySelector(`input[name="layout-type"][value="${historyItem.layoutType}"]`) as HTMLInputElement;
                 if (layoutTypeRadio) {
                     layoutTypeRadio.checked = true;
-                    layoutTypeRadio.dispatchEvent(new Event('change', { bubbles: true }));
                 }
                 
                 // layout-type에 따른 서브 옵션 설정
-                if (historyItem.layoutType === 'single-uniform' && historyItem.singleMode) {
-                    const singleModeRadio = document.querySelector(`input[name="single-mode"][value="${historyItem.singleMode}"]`) as HTMLInputElement;
-                    if (singleModeRadio) {
-                        singleModeRadio.checked = true;
-                    }
+                if (historyItem.layoutType === 'single-uniform') {
                     // single-submenu 표시
                     const singleSubmenu = document.getElementById('single-submenu');
                     if (singleSubmenu) {
@@ -5848,11 +5855,18 @@ export class MainController {
                     if (pairSubmenu) {
                         pairSubmenu.style.display = 'none';
                     }
-                } else if (historyItem.layoutType === 'pair-uniform' && historyItem.pairMode) {
-                    const pairModeRadio = document.querySelector(`input[name="pair-mode"][value="${historyItem.pairMode}"]`) as HTMLInputElement;
-                    if (pairModeRadio) {
-                        pairModeRadio.checked = true;
+                    
+                    // single-mode 설정
+                    if (historyItem.singleMode) {
+                        document.querySelectorAll('input[name="single-mode"]').forEach((input: Element) => {
+                            (input as HTMLInputElement).checked = false;
+                        });
+                        const singleModeRadio = document.querySelector(`input[name="single-mode"][value="${historyItem.singleMode}"]`) as HTMLInputElement;
+                        if (singleModeRadio) {
+                            singleModeRadio.checked = true;
+                        }
                     }
+                } else if (historyItem.layoutType === 'pair-uniform') {
                     // pair-submenu 표시
                     const pairSubmenu = document.getElementById('pair-submenu');
                     if (pairSubmenu) {
@@ -5862,10 +5876,27 @@ export class MainController {
                     if (singleSubmenu) {
                         singleSubmenu.style.display = 'none';
                     }
-                } else if (historyItem.layoutType === 'group' && historyItem.groupSize) {
-                    const groupSizeRadio = document.querySelector(`input[name="group-size"][value="${historyItem.groupSize}"]`) as HTMLInputElement;
-                    if (groupSizeRadio) {
-                        groupSizeRadio.checked = true;
+                    
+                    // pair-mode 설정
+                    if (historyItem.pairMode) {
+                        document.querySelectorAll('input[name="pair-mode"]').forEach((input: Element) => {
+                            (input as HTMLInputElement).checked = false;
+                        });
+                        const pairModeRadio = document.querySelector(`input[name="pair-mode"][value="${historyItem.pairMode}"]`) as HTMLInputElement;
+                        if (pairModeRadio) {
+                            pairModeRadio.checked = true;
+                        }
+                    }
+                } else if (historyItem.layoutType === 'group') {
+                    // group-size 설정
+                    if (historyItem.groupSize) {
+                        document.querySelectorAll('input[name="group-size"]').forEach((input: Element) => {
+                            (input as HTMLInputElement).checked = false;
+                        });
+                        const groupSizeRadio = document.querySelector(`input[name="group-size"][value="${historyItem.groupSize}"]`) as HTMLInputElement;
+                        if (groupSizeRadio) {
+                            groupSizeRadio.checked = true;
+                        }
                     }
                 }
                 
@@ -5877,8 +5908,15 @@ export class MainController {
                     }
                 }
                 
-                // 옵션 변경 이벤트 발생 (UI 업데이트를 위해)
-                await new Promise<void>(resolve => setTimeout(resolve, 100));
+                // 옵션 복원 완료 대기 (UI 업데이트를 위해)
+                await new Promise<void>(resolve => setTimeout(resolve, 200));
+                
+                // 복원된 옵션 확인
+                const restoredLayoutType = document.querySelector('input[name="layout-type"]:checked') as HTMLInputElement;
+                logger.info('배치 형태 복원 완료:', {
+                    expected: historyItem.layoutType,
+                    actual: restoredLayoutType?.value
+                });
             }
 
             // 모든 카드 초기화
