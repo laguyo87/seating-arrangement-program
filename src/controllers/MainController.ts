@@ -5715,7 +5715,7 @@ export class MainController {
     /**
      * 이력 항목 불러오기 (반별로 관리)
      */
-    private loadHistoryItem(historyId: string): void {
+    private async loadHistoryItem(historyId: string): Promise<void> {
         try {
             const currentClassId = this.classManager?.getCurrentClassId();
             if (!currentClassId) {
@@ -5744,35 +5744,68 @@ export class MainController {
                 return;
             }
 
+            // 이력에서 필요한 좌석 수 계산
+            const maxSeatId = Math.max(...historyItem.layout.map(item => item.seatId), 0);
+            const totalSeats = maxSeatId;
+            
+            // 학생 수 계산 (남학생 + 여학생)
+            const maleCount = historyItem.layout.filter(item => item.gender === 'M').length;
+            const femaleCount = historyItem.layout.filter(item => item.gender === 'F').length;
+            const totalStudents = maleCount + femaleCount;
+            
+            // 남학생/여학생 수 입력 필드 설정
+            const maleInput = document.getElementById('male-students') as HTMLInputElement;
+            const femaleInput = document.getElementById('female-students') as HTMLInputElement;
+            if (maleInput) maleInput.value = maleCount.toString();
+            if (femaleInput) femaleInput.value = femaleCount.toString();
+            
             // 모든 카드 초기화
             let allCards = Array.from(seatsArea.querySelectorAll('.student-seat-card')) as HTMLElement[];
             
-            // 좌석 카드가 없으면 미리보기 카드 생성
-            if (allCards.length === 0) {
-                // 이력에서 필요한 좌석 수 계산
-                const maxSeatId = Math.max(...historyItem.layout.map(item => item.seatId), 0);
-                const totalSeats = maxSeatId;
+            // 좌석 카드가 없거나 개수가 맞지 않으면 카드 생성
+            if (allCards.length === 0 || allCards.length < totalSeats) {
+                // 이력 데이터의 seatId에 맞춰 nextSeatId 설정
+                this.nextSeatId = maxSeatId + 1;
                 
-                // 학생 수 계산 (남학생 + 여학생)
-                const maleCount = historyItem.layout.filter(item => item.gender === 'M').length;
-                const femaleCount = historyItem.layout.filter(item => item.gender === 'F').length;
-                const totalStudents = maleCount + femaleCount;
+                // 미리보기 카드 생성 (renderExampleCards 호출)
+                this.renderExampleCards();
                 
-                // 기본값으로 미리보기 카드 생성
-                if (totalSeats > 0) {
-                    // 남학생/여학생 수 입력 필드 설정
-                    const maleInput = document.getElementById('male-students') as HTMLInputElement;
-                    const femaleInput = document.getElementById('female-students') as HTMLInputElement;
-                    if (maleInput) maleInput.value = maleCount.toString();
-                    if (femaleInput) femaleInput.value = femaleCount.toString();
-                    
-                    // 미리보기 카드 생성 (renderExampleCards 호출)
-                    this.renderExampleCards();
-                    
-                    // 카드 다시 가져오기
-                    allCards = Array.from(seatsArea.querySelectorAll('.student-seat-card')) as HTMLElement[];
-                }
+                // 카드가 완전히 렌더링될 때까지 대기
+                await new Promise<void>(resolve => setTimeout(resolve, 200));
+                
+                // 카드 다시 가져오기
+                allCards = Array.from(seatsArea.querySelectorAll('.student-seat-card')) as HTMLElement[];
             }
+            
+            // 이력 데이터의 seatId에 맞춰 카드의 data-seat-id 재설정
+            // 이력 데이터를 seatId 순으로 정렬
+            const sortedLayout = [...historyItem.layout].sort((a, b) => a.seatId - b.seatId);
+            
+            // 카드가 충분하지 않으면 추가 생성
+            while (allCards.length < totalSeats) {
+                // 빈 학생 데이터로 카드 생성
+                const emptyStudent: Student = {
+                    id: allCards.length + 1,
+                    name: '',
+                    gender: 'M'
+                };
+                const newCard = this.createStudentCard(emptyStudent, allCards.length);
+                seatsArea.appendChild(newCard);
+                allCards.push(newCard);
+            }
+            
+            // 이력 데이터의 seatId에 맞춰 각 카드의 data-seat-id 설정
+            sortedLayout.forEach(({ seatId }, index) => {
+                if (index < allCards.length) {
+                    const card = allCards[index];
+                    card.setAttribute('data-seat-id', seatId.toString());
+                    // 좌석 번호 레이블도 업데이트
+                    const seatNumberDiv = card.querySelector('.seat-number-label') as HTMLElement;
+                    if (seatNumberDiv) {
+                        seatNumberDiv.textContent = `#${seatId}`;
+                    }
+                }
+            });
             
             // 모든 카드 초기화
             allCards.forEach(card => {
@@ -5784,12 +5817,15 @@ export class MainController {
 
             // 이력 데이터로 복원
             let restoredCount = 0;
-            historyItem.layout.forEach(({ seatId, studentName }) => {
+            historyItem.layout.forEach(({ seatId, studentName, gender }) => {
                 const card = seatsArea.querySelector(`[data-seat-id="${seatId}"]`) as HTMLElement;
                 if (card) {
                     const nameDiv = card.querySelector('.student-name') as HTMLElement;
                     if (nameDiv) {
                         nameDiv.textContent = studentName;
+                        // 성별 클래스 설정
+                        card.classList.remove('gender-m', 'gender-f');
+                        card.classList.add(`gender-${gender.toLowerCase()}`);
                         restoredCount++;
                     }
                 } else {
