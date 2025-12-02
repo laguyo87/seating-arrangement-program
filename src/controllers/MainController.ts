@@ -8597,22 +8597,26 @@ export class MainController {
     private highlightSaveButton(): void {
         const saveBtn = document.getElementById('save-layout-btn') as HTMLButtonElement;
         if (saveBtn) {
-            // 테두리 하이라이트 스타일 추가
-            saveBtn.style.border = '3px solid #ff9800';
-            saveBtn.style.boxShadow = '0 0 10px rgba(255, 152, 0, 0.5)';
-            saveBtn.style.animation = 'pulse 2s infinite';
+            // 노란색 테두리 하이라이트 스타일 추가
+            saveBtn.style.border = '3px solid #ffeb3b';
+            saveBtn.style.boxShadow = '0 0 15px rgba(255, 235, 59, 0.8)';
+            saveBtn.style.animation = 'saveButtonBlink 1s infinite';
             
-            // CSS 애니메이션 추가 (없는 경우)
-            if (!document.getElementById('save-button-pulse-animation')) {
+            // CSS 깜박이는 애니메이션 추가 (없는 경우)
+            if (!document.getElementById('save-button-blink-animation')) {
                 const style = document.createElement('style');
-                style.id = 'save-button-pulse-animation';
+                style.id = 'save-button-blink-animation';
                 style.textContent = `
-                    @keyframes pulse {
+                    @keyframes saveButtonBlink {
                         0%, 100% {
-                            box-shadow: 0 0 10px rgba(255, 152, 0, 0.5);
+                            border-color: #ffeb3b;
+                            box-shadow: 0 0 15px rgba(255, 235, 59, 0.8);
+                            opacity: 1;
                         }
                         50% {
-                            box-shadow: 0 0 20px rgba(255, 152, 0, 0.8);
+                            border-color: #ffc107;
+                            box-shadow: 0 0 25px rgba(255, 193, 7, 1);
+                            opacity: 0.7;
                         }
                     }
                 `;
