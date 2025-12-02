@@ -8598,7 +8598,7 @@ export class MainController {
         const saveBtn = document.getElementById('save-layout-btn') as HTMLButtonElement;
         if (saveBtn) {
             // 노란색 테두리 하이라이트 스타일 추가
-            saveBtn.style.border = '3px solid #ffeb3b';
+            saveBtn.style.border = '2px solid #ffeb3b';
             saveBtn.style.boxShadow = '0 0 15px rgba(255, 235, 59, 0.8)';
             saveBtn.style.animation = 'saveButtonBlink 1s infinite';
             
