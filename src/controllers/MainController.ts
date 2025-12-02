@@ -5326,15 +5326,17 @@ export class MainController {
                 historyItem.pairInfo = pairInfo;
             }
 
-            // 현재 선택된 반 ID 가져오기
+            // 현재 선택된 반 ID 가져오기 (반별로 따로 저장하기 위해 필수)
             const currentClassId = this.classManager?.getCurrentClassId();
             if (!currentClassId) {
                 this.outputModule.showWarning('반이 선택되지 않아 이력이 저장되지 않습니다. 먼저 반을 선택하세요.');
+                logger.warn('자리 확정 실패: 반이 선택되지 않음');
                 return;
             }
             
-            // 반별 이력 키: seatHistory_${classId}
+            // 반별 이력 키: seatHistory_${classId} (각 반마다 독립적으로 저장)
             const historyKey = `seatHistory_${currentClassId}`;
+            logger.info(`반별 이력 저장 시작: 반ID=${currentClassId}, 키=${historyKey}`);
             const existingHistory = this.getSeatHistory(currentClassId);
             existingHistory.unshift(historyItem); // 최신 항목을 맨 앞에 추가
             // 최대 50개까지만 저장
@@ -5583,8 +5585,12 @@ export class MainController {
             return { lastSeatByStudent, lastPartnerByStudent };
         }
 
-        // 확정된 자리 이력 가져오기
-        const history = this.getSeatHistory();
+        // 확정된 자리 이력 가져오기 (현재 선택된 반의 이력)
+        const currentClassId = this.classManager?.getCurrentClassId();
+        if (!currentClassId) {
+            return { lastSeatByStudent, lastPartnerByStudent };
+        }
+        const history = this.getSeatHistory(currentClassId);
         if (history.length === 0) {
             return { lastSeatByStudent, lastPartnerByStudent };
         }
