@@ -442,6 +442,9 @@ export class MainController {
      */
     private resetApp(): void {
         try {
+            // 읽기 전용 모드 해제
+            this.disableReadOnlyMode();
+            
             // 로컬 스토리지 정리 (앱 관련 데이터만)
             try {
                 localStorage.removeItem('layoutResult');
@@ -483,6 +486,12 @@ export class MainController {
             if (outputSection) {
                 const tables = outputSection.querySelectorAll('table');
                 tables.forEach(t => t.remove());
+            }
+
+            // card-layout-container 숨김 (초기화면으로 복귀)
+            const cardContainer = document.getElementById('card-layout-container');
+            if (cardContainer) {
+                cardContainer.style.display = 'none';
             }
 
             // 액션 버튼 숨김
