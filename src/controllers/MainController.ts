@@ -70,6 +70,12 @@ interface SeatHistoryItem {
     layout: Array<{seatId: number, studentName: string, gender: 'M' | 'F'}>;
     pairInfo?: Array<{student1: string, student2: string}>;
     timestamp: number;
+    // 배치 형태 정보 (복원을 위해 필요)
+    layoutType?: string; // 'single-uniform' | 'pair-uniform' | 'group' | 'custom'
+    singleMode?: string; // 'basic-row' | 'gender-row' | 'gender-symmetric-row'
+    pairMode?: string; // 'gender-pair' | 'same-gender-pair'
+    partitionCount?: number; // 분단 수
+    groupSize?: string; // 'group-3' | 'group-4' | 'group-5' | 'group-6'
 }
 
 /**
@@ -5248,9 +5254,21 @@ export class MainController {
             const currentLayout: Array<{seatId: number, studentName: string, gender: 'M' | 'F'}> = [];
             const pairInfo: Array<{student1: string, student2: string}> = []; // 짝꿍 정보
             
-            // 현재 배치 유형 확인
+            // 현재 배치 유형 확인 및 배치 형태 정보 수집
             const layoutTypeInput = document.querySelector('input[name="layout-type"]:checked') as HTMLInputElement;
-            const isPairLayout = layoutTypeInput && layoutTypeInput.value === 'pair-uniform';
+            const layoutType = layoutTypeInput?.value || 'single-uniform';
+            const isPairLayout = layoutType === 'pair-uniform';
+            
+            // 배치 형태 정보 수집 (복원을 위해 필요)
+            const singleModeInput = document.querySelector('input[name="single-mode"]:checked') as HTMLInputElement;
+            const pairModeInput = document.querySelector('input[name="pair-mode"]:checked') as HTMLInputElement;
+            const groupSizeInput = document.querySelector('input[name="group-size"]:checked') as HTMLInputElement;
+            const partitionInput = document.getElementById('number-of-partitions') as HTMLInputElement;
+            
+            const singleMode = singleModeInput?.value || 'basic-row';
+            const pairMode = pairModeInput?.value || 'gender-pair';
+            const groupSize = groupSizeInput?.value || '';
+            const partitionCount = partitionInput ? parseInt(partitionInput.value || '1', 10) : 1;
             
             const allCards = Array.from(seatsArea.querySelectorAll('.student-seat-card')) as HTMLElement[];
             
@@ -5308,17 +5326,17 @@ export class MainController {
 
             // 이력 데이터 생성
             const historyId = `history_${Date.now()}`;
-            const historyItem: {
-                id: string,
-                date: string,
-                layout: Array<{seatId: number, studentName: string, gender: 'M' | 'F'}>,
-                pairInfo?: Array<{student1: string, student2: string}>,
-                timestamp: number
-            } = {
+            const historyItem: SeatHistoryItem = {
                 id: historyId,
                 date: dateString,
                 layout: currentLayout,
-                timestamp: now.getTime()
+                timestamp: now.getTime(),
+                // 배치 형태 정보 저장 (복원을 위해 필요)
+                layoutType: layoutType,
+                singleMode: layoutType === 'single-uniform' ? singleMode : undefined,
+                pairMode: layoutType === 'pair-uniform' ? pairMode : undefined,
+                partitionCount: partitionCount,
+                groupSize: layoutType === 'group' ? groupSize : undefined
             };
             
             // 짝꿍 정보가 있으면 추가
@@ -5765,6 +5783,63 @@ export class MainController {
             if (maleInput) maleInput.value = maleCount.toString();
             if (femaleInput) femaleInput.value = femaleCount.toString();
             
+            // 저장된 배치 형태 정보 복원 (이력에서 불러온 배치 형태로 복원)
+            if (historyItem.layoutType) {
+                // layout-type 라디오 버튼 설정
+                const layoutTypeRadio = document.querySelector(`input[name="layout-type"][value="${historyItem.layoutType}"]`) as HTMLInputElement;
+                if (layoutTypeRadio) {
+                    layoutTypeRadio.checked = true;
+                    layoutTypeRadio.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                
+                // layout-type에 따른 서브 옵션 설정
+                if (historyItem.layoutType === 'single-uniform' && historyItem.singleMode) {
+                    const singleModeRadio = document.querySelector(`input[name="single-mode"][value="${historyItem.singleMode}"]`) as HTMLInputElement;
+                    if (singleModeRadio) {
+                        singleModeRadio.checked = true;
+                    }
+                    // single-submenu 표시
+                    const singleSubmenu = document.getElementById('single-submenu');
+                    if (singleSubmenu) {
+                        singleSubmenu.style.display = 'block';
+                    }
+                    const pairSubmenu = document.getElementById('pair-submenu');
+                    if (pairSubmenu) {
+                        pairSubmenu.style.display = 'none';
+                    }
+                } else if (historyItem.layoutType === 'pair-uniform' && historyItem.pairMode) {
+                    const pairModeRadio = document.querySelector(`input[name="pair-mode"][value="${historyItem.pairMode}"]`) as HTMLInputElement;
+                    if (pairModeRadio) {
+                        pairModeRadio.checked = true;
+                    }
+                    // pair-submenu 표시
+                    const pairSubmenu = document.getElementById('pair-submenu');
+                    if (pairSubmenu) {
+                        pairSubmenu.style.display = 'block';
+                    }
+                    const singleSubmenu = document.getElementById('single-submenu');
+                    if (singleSubmenu) {
+                        singleSubmenu.style.display = 'none';
+                    }
+                } else if (historyItem.layoutType === 'group' && historyItem.groupSize) {
+                    const groupSizeRadio = document.querySelector(`input[name="group-size"][value="${historyItem.groupSize}"]`) as HTMLInputElement;
+                    if (groupSizeRadio) {
+                        groupSizeRadio.checked = true;
+                    }
+                }
+                
+                // 분단 수 설정
+                if (historyItem.partitionCount !== undefined) {
+                    const partitionInput = document.getElementById('number-of-partitions') as HTMLInputElement;
+                    if (partitionInput) {
+                        partitionInput.value = historyItem.partitionCount.toString();
+                    }
+                }
+                
+                // 옵션 변경 이벤트 발생 (UI 업데이트를 위해)
+                await new Promise<void>(resolve => setTimeout(resolve, 100));
+            }
+            
             // 모든 카드 초기화
             let allCards = Array.from(seatsArea.querySelectorAll('.student-seat-card')) as HTMLElement[];
             
@@ -5773,7 +5848,7 @@ export class MainController {
                 // 이력 데이터의 seatId에 맞춰 nextSeatId 설정
                 this.nextSeatId = maxSeatId + 1;
                 
-                // 미리보기 카드 생성 (renderExampleCards 호출)
+                // 미리보기 카드 생성 (renderExampleCards 호출 - 복원된 배치 형태로 렌더링됨)
                 this.renderExampleCards();
                 
                 // 카드가 완전히 렌더링될 때까지 대기

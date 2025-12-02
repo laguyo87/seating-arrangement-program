@@ -18,6 +18,12 @@ export interface SeatHistoryItem {
     layout: Array<{seatId: number, studentName: string, gender: 'M' | 'F'}>;
     pairInfo?: Array<{student1: string, student2: string}>;
     timestamp: number;
+    // 배치 형태 정보 (복원을 위해 필요)
+    layoutType?: string; // 'single-uniform' | 'pair-uniform' | 'group' | 'custom'
+    singleMode?: string; // 'basic-row' | 'gender-row' | 'gender-symmetric-row'
+    pairMode?: string; // 'gender-pair' | 'same-gender-pair'
+    partitionCount?: number; // 분단 수
+    groupSize?: string; // 'group-3' | 'group-4' | 'group-5' | 'group-6'
 }
 
 /**
