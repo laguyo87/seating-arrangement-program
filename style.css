@@ -2149,8 +2149,38 @@ button:disabled {
         box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3) !important;
     }
     
-    /* 드롭 타겟 하이라이트 */
-    .student-seat-card.drop-target {
+/* 읽기 전용 좌석 카드 스타일 */
+.student-seat-card.read-only-seat {
+    cursor: default !important;
+    opacity: 0.8 !important;
+    pointer-events: auto;
+    position: relative;
+}
+
+.student-seat-card.read-only-seat::after {
+    content: '🔒';
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    font-size: 0.8em;
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* 읽기 전용 배지 애니메이션 */
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* 드롭 타겟 하이라이트 */
+.student-seat-card.drop-target {
         outline: 3px dashed #667eea !important;
         outline-offset: 2px !important;
         background-color: rgba(102, 126, 234, 0.1) !important;

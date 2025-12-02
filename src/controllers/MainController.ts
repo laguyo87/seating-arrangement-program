@@ -140,6 +140,7 @@ export class MainController {
     private isSyncing: boolean = false; // 동기화 중 플래그 (무한 루프 방지)
     private layoutHistory: HistoryItem[] = []; // 통합 히스토리 (모든 액션 추적)
     private historyIndex: number = -1; // 현재 히스토리 인덱스
+    private isReadOnlyMode: boolean = false; // 읽기 전용 모드 (이력에서 불러온 경우)
     
     // 메모리 누수 방지를 위한 추적 변수
     private eventListeners: Array<{element: EventTarget, event: string, handler: EventListener | ((e: Event) => void)}> = [];
@@ -1950,6 +1951,12 @@ export class MainController {
             const e = ev as DragEvent;
             const target = (e.target as HTMLElement)?.closest('.student-seat-card') as HTMLElement | null;
             if (!target) return;
+            
+            // 읽기 전용 모드에서는 드래그 불가
+            if (this.isReadOnlyMode) {
+                e.preventDefault();
+                return;
+            }
             
             // 자리 배치가 완료되었는지 확인 (액션 버튼이 표시되어 있으면 배치 완료 상태)
             const actionButtons = document.getElementById('layout-action-buttons');
@@ -4607,6 +4614,9 @@ export class MainController {
      * 좌석 배치하기 처리
      */
     private handleArrangeSeats(): void {
+            // 읽기 전용 모드 해제
+            this.disableReadOnlyMode();
+            
             // 테이블에서 학생 데이터 가져오기
             const studentData = this.inputModule.getStudentData();
             
@@ -5141,6 +5151,9 @@ export class MainController {
             } else {
                 this.outputModule.showSuccess('좌석 배치가 완료되었습니다!');
             }
+            
+            // 읽기 전용 모드 해제 (새로운 배치 생성 시)
+            this.disableReadOnlyMode();
             
             // 자리 배치도 액션 버튼들 표시
             const actionButtons = document.getElementById('layout-action-buttons');
@@ -5691,6 +5704,53 @@ export class MainController {
                 }
             });
 
+            // 읽기 전용 모드 활성화
+            this.isReadOnlyMode = true;
+            
+            // 모든 좌석 카드의 드래그 비활성화
+            allCards.forEach(card => {
+                card.setAttribute('draggable', 'false');
+                card.style.cursor = 'default';
+                card.style.opacity = '0.8';
+                card.classList.add('read-only-seat');
+            });
+            
+            // "자리 배치하기" 버튼 비활성화
+            const arrangeBtn = document.getElementById('arrange-seats');
+            if (arrangeBtn) {
+                (arrangeBtn as HTMLButtonElement).disabled = true;
+                arrangeBtn.style.opacity = '0.5';
+                arrangeBtn.style.cursor = 'not-allowed';
+                arrangeBtn.title = '확정된 자리 이력은 수정할 수 없습니다.';
+            }
+            
+            // 읽기 전용 모드 표시 배지 추가
+            const readOnlyBadge = document.createElement('div');
+            readOnlyBadge.id = 'read-only-badge';
+            readOnlyBadge.textContent = '📋 읽기 전용 (확정된 자리 이력)';
+            readOnlyBadge.style.cssText = `
+                position: fixed;
+                top: 80px;
+                right: 20px;
+                background: #ff9800;
+                color: white;
+                padding: 10px 20px;
+                border-radius: 8px;
+                font-size: 0.9em;
+                font-weight: bold;
+                z-index: 1000;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+                animation: slideIn 0.3s ease;
+            `;
+            
+            // 기존 배지 제거
+            const existingBadge = document.getElementById('read-only-badge');
+            if (existingBadge) {
+                existingBadge.remove();
+            }
+            
+            document.body.appendChild(readOnlyBadge);
+
             // 드롭다운 닫기
             const dropdown = document.getElementById('history-dropdown-content');
             if (dropdown) {
@@ -5703,10 +5763,46 @@ export class MainController {
                 actionButtons.style.display = 'block';
             }
 
-            this.outputModule.showSuccess(`${historyItem.date}의 자리 배치를 불러왔습니다.`);
+            this.outputModule.showSuccess(`${historyItem.date}의 자리 배치를 불러왔습니다. (읽기 전용)`);
         } catch (error) {
             logger.error('이력 불러오기 중 오류:', error);
             this.outputModule.showError('이력을 불러오는 중 오류가 발생했습니다.');
+        }
+    }
+
+    /**
+     * 읽기 전용 모드 해제
+     */
+    private disableReadOnlyMode(): void {
+        if (!this.isReadOnlyMode) return;
+        
+        this.isReadOnlyMode = false;
+        
+        // 모든 좌석 카드의 드래그 활성화
+        const seatsArea = document.getElementById('seats-area');
+        if (seatsArea) {
+            const allCards = Array.from(seatsArea.querySelectorAll('.student-seat-card')) as HTMLElement[];
+            allCards.forEach(card => {
+                card.setAttribute('draggable', 'true');
+                card.style.cursor = 'grab';
+                card.style.opacity = '1';
+                card.classList.remove('read-only-seat');
+            });
+        }
+        
+        // "자리 배치하기" 버튼 활성화
+        const arrangeBtn = document.getElementById('arrange-seats');
+        if (arrangeBtn) {
+            (arrangeBtn as HTMLButtonElement).disabled = false;
+            arrangeBtn.style.opacity = '1';
+            arrangeBtn.style.cursor = 'pointer';
+            arrangeBtn.title = '';
+        }
+        
+        // 읽기 전용 모드 표시 배지 제거
+        const readOnlyBadge = document.getElementById('read-only-badge');
+        if (readOnlyBadge) {
+            readOnlyBadge.remove();
         }
     }
 
