@@ -5722,6 +5722,12 @@ export class MainController {
                 return;
             }
 
+            // card-layout-container가 숨겨져 있으면 표시
+            const cardContainer = document.getElementById('card-layout-container');
+            if (cardContainer) {
+                cardContainer.style.display = 'block';
+            }
+
             // 좌석 배치 복원
             const seatsArea = document.getElementById('seats-area');
             if (!seatsArea) {
@@ -5730,7 +5736,36 @@ export class MainController {
             }
 
             // 모든 카드 초기화
-            const allCards = Array.from(seatsArea.querySelectorAll('.student-seat-card')) as HTMLElement[];
+            let allCards = Array.from(seatsArea.querySelectorAll('.student-seat-card')) as HTMLElement[];
+            
+            // 좌석 카드가 없으면 미리보기 카드 생성
+            if (allCards.length === 0) {
+                // 이력에서 필요한 좌석 수 계산
+                const maxSeatId = Math.max(...historyItem.layout.map(item => item.seatId), 0);
+                const totalSeats = maxSeatId;
+                
+                // 학생 수 계산 (남학생 + 여학생)
+                const maleCount = historyItem.layout.filter(item => item.gender === 'M').length;
+                const femaleCount = historyItem.layout.filter(item => item.gender === 'F').length;
+                const totalStudents = maleCount + femaleCount;
+                
+                // 기본값으로 미리보기 카드 생성
+                if (totalSeats > 0) {
+                    // 남학생/여학생 수 입력 필드 설정
+                    const maleInput = document.getElementById('male-students') as HTMLInputElement;
+                    const femaleInput = document.getElementById('female-students') as HTMLInputElement;
+                    if (maleInput) maleInput.value = maleCount.toString();
+                    if (femaleInput) femaleInput.value = femaleCount.toString();
+                    
+                    // 미리보기 카드 생성 (renderExampleCards 호출)
+                    this.renderExampleCards();
+                    
+                    // 카드 다시 가져오기
+                    allCards = Array.from(seatsArea.querySelectorAll('.student-seat-card')) as HTMLElement[];
+                }
+            }
+            
+            // 모든 카드 초기화
             allCards.forEach(card => {
                 const nameDiv = card.querySelector('.student-name') as HTMLElement;
                 if (nameDiv) {
@@ -5739,15 +5774,27 @@ export class MainController {
             });
 
             // 이력 데이터로 복원
+            let restoredCount = 0;
             historyItem.layout.forEach(({ seatId, studentName }) => {
                 const card = seatsArea.querySelector(`[data-seat-id="${seatId}"]`) as HTMLElement;
                 if (card) {
                     const nameDiv = card.querySelector('.student-name') as HTMLElement;
                     if (nameDiv) {
                         nameDiv.textContent = studentName;
+                        restoredCount++;
                     }
+                } else {
+                    logger.warn(`좌석 카드를 찾을 수 없습니다: seatId=${seatId}, studentName=${studentName}`);
                 }
             });
+            
+            if (restoredCount === 0) {
+                logger.error('이력 복원 실패: 복원된 좌석이 없습니다.');
+                this.outputModule.showError('이력 복원에 실패했습니다. 좌석 카드를 찾을 수 없습니다.');
+                return;
+            }
+            
+            logger.info(`이력 복원 완료: ${restoredCount}개 좌석 복원됨`);
 
             // 읽기 전용 모드 활성화
             this.isReadOnlyMode = true;
