@@ -5614,8 +5614,31 @@ export class MainController {
                 } catch {}
                 return [];
             }
+            
+            // 반 ID로 필터링 (classId가 저장된 경우 검증)
+            const filteredHistory = history.filter(item => {
+                // classId가 없으면 포함 (이전 버전 호환성)
+                if (!item.classId) {
+                    return true;
+                }
+                // classId가 있으면 현재 반 ID와 일치하는 것만 포함
+                return item.classId === targetClassId;
+            });
+            
+            // 필터링된 결과가 원본과 다르면 저장 (데이터 정리)
+            if (filteredHistory.length !== history.length) {
+                logger.warn('잘못된 반 ID를 가진 이력 항목 제거:', {
+                    targetClassId,
+                    originalCount: history.length,
+                    filteredCount: filteredHistory.length
+                });
+                // 정리된 이력 다시 저장
+                const cleanedHistoryKey = `seatHistory_${targetClassId}`;
+                this.storageManager.safeSetItem(cleanedHistoryKey, JSON.stringify(filteredHistory));
+            }
+            
             // 최신 항목이 앞에 오도록 timestamp 기준 내림차순 정렬
-            return history.sort((a, b) => {
+            return filteredHistory.sort((a, b) => {
                 return (b.timestamp || 0) - (a.timestamp || 0);
             });
         } catch {
@@ -8643,15 +8666,48 @@ export class MainController {
         this.disableReadOnlyMode();
 
         // 먼저 확정된 자리 이력의 최신 항목을 불러오기 시도
+        // 명시적으로 반 ID를 전달하여 해당 반의 이력만 가져오기
         const history = this.getSeatHistory(classId);
+        
+        // 디버깅: 반 ID와 이력 개수 로그
+        logger.info('반 선택 시 이력 확인:', {
+            classId,
+            historyCount: history.length,
+            historyItems: history.map(item => ({
+                id: item.id,
+                date: item.date,
+                layoutType: item.layoutType,
+                singleMode: item.singleMode,
+                pairMode: item.pairMode,
+                classId: item.classId
+            }))
+        });
+        
         if (history.length > 0) {
             // 최신 확정된 자리 배치도 불러오기 (읽기 전용)
             const latestHistoryItem = history[0]; // 이미 timestamp 기준 내림차순 정렬됨
+            
+            // 추가 검증: 이력 항목의 classId가 현재 반 ID와 일치하는지 확인
+            if (latestHistoryItem.classId && latestHistoryItem.classId !== classId) {
+                logger.error('이력 항목의 반 ID가 일치하지 않음:', {
+                    expectedClassId: classId,
+                    actualClassId: latestHistoryItem.classId,
+                    historyId: latestHistoryItem.id
+                });
+                // 잘못된 이력이면 저장된 자리 배치도 불러오기
+                this.fallbackToSavedLayout(classId);
+                return;
+            }
+            
             logger.info('반 선택 시 최신 확정된 자리 배치도 불러오기:', {
                 classId,
                 historyId: latestHistoryItem.id,
-                date: latestHistoryItem.date
+                date: latestHistoryItem.date,
+                layoutType: latestHistoryItem.layoutType,
+                singleMode: latestHistoryItem.singleMode,
+                pairMode: latestHistoryItem.pairMode
             });
+            
             this.loadHistoryItem(latestHistoryItem.id).catch((error) => {
                 logger.error('확정된 자리 배치도 불러오기 실패:', error);
                 // 실패 시 저장된 자리 배치도 불러오기 시도
