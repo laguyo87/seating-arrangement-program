@@ -8627,6 +8627,8 @@ export class MainController {
             this.updateClassSelect();
             // 반이 선택되지 않았으므로 이력 드롭다운 업데이트 (빈 상태로)
             this.updateHistoryDropdown();
+            // 읽기 전용 모드 해제
+            this.disableReadOnlyMode();
             return;
         }
 
@@ -8637,11 +8639,43 @@ export class MainController {
         // 반이 변경되었으므로 해당 반의 이력 드롭다운 업데이트
         this.updateHistoryDropdown();
 
-        // 저장된 자리 배치도 불러오기 (비동기)
+        // 읽기 전용 모드 해제 (새 반 선택 시)
+        this.disableReadOnlyMode();
+
+        // 먼저 확정된 자리 이력의 최신 항목을 불러오기 시도
+        const history = this.getSeatHistory(classId);
+        if (history.length > 0) {
+            // 최신 확정된 자리 배치도 불러오기 (읽기 전용)
+            const latestHistoryItem = history[0]; // 이미 timestamp 기준 내림차순 정렬됨
+            logger.info('반 선택 시 최신 확정된 자리 배치도 불러오기:', {
+                classId,
+                historyId: latestHistoryItem.id,
+                date: latestHistoryItem.date
+            });
+            this.loadHistoryItem(latestHistoryItem.id).catch((error) => {
+                logger.error('확정된 자리 배치도 불러오기 실패:', error);
+                // 실패 시 저장된 자리 배치도 불러오기 시도
+                this.fallbackToSavedLayout(classId);
+            });
+        } else {
+            // 확정된 자리 이력이 없으면 저장된 자리 배치도 불러오기
+            this.fallbackToSavedLayout(classId);
+        }
+    }
+
+    /**
+     * 저장된 자리 배치도 불러오기 (확정된 이력이 없을 때 사용)
+     */
+    private fallbackToSavedLayout(classId: string): void {
         this.classManager.loadLayout(classId).then((loaded) => {
             if (!loaded) {
-                // 저장된 배치도가 없으면 현재 배치도 유지
+                // 저장된 배치도도 없으면 빈 화면만 표시
                 this.outputModule.showInfo('저장된 자리 배치도가 없습니다. 새로 배치를 생성해주세요.');
+                // 좌석 영역 초기화
+                const seatsArea = document.getElementById('seats-area');
+                if (seatsArea) {
+                    seatsArea.innerHTML = '';
+                }
             }
         });
     }
