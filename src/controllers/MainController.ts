@@ -76,6 +76,7 @@ interface SeatHistoryItem {
     pairMode?: string; // 'gender-pair' | 'same-gender-pair'
     partitionCount?: number; // 분단 수
     groupSize?: string; // 'group-3' | 'group-4' | 'group-5' | 'group-6'
+    classId?: string; // 반 ID (검증을 위해 저장)
 }
 
 /**
@@ -5351,7 +5352,9 @@ export class MainController {
                 singleMode: layoutType === 'single-uniform' ? singleMode : undefined,
                 pairMode: layoutType === 'pair-uniform' ? pairMode : undefined,
                 partitionCount: partitionCount,
-                groupSize: layoutType === 'group' ? groupSize : undefined
+                groupSize: layoutType === 'group' ? groupSize : undefined,
+                // 반 ID 저장 (검증을 위해 필수)
+                classId: currentClassId
             };
             
             // 짝꿍 정보가 있으면 추가
@@ -5795,9 +5798,25 @@ export class MainController {
             }
             
             // 추가 검증: 이력 항목이 현재 반에 속하는지 확인
+            // classId가 저장되어 있으면 검증
+            if (historyItem.classId && historyItem.classId !== currentClassId) {
+                logger.error('이력 항목의 반 ID가 일치하지 않음:', {
+                    currentClassId,
+                    historyItemClassId: historyItem.classId,
+                    historyId,
+                    layoutType: historyItem.layoutType,
+                    date: historyItem.date
+                });
+                this.outputModule.showError(`이 이력은 '${historyItem.classId}'반의 이력입니다. 현재 선택된 반('${currentClassId}')과 일치하지 않습니다.`);
+                // 드롭다운을 다시 업데이트하여 현재 반의 이력만 표시
+                this.updateHistoryDropdown();
+                return;
+            }
+            
             logger.info('이력 항목 찾음:', {
                 currentClassId,
                 historyId,
+                historyItemClassId: historyItem.classId,
                 layoutType: historyItem.layoutType,
                 date: historyItem.date
             });

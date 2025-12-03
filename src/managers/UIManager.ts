@@ -24,6 +24,7 @@ export interface SeatHistoryItem {
     pairMode?: string; // 'gender-pair' | 'same-gender-pair'
     partitionCount?: number; // 분단 수
     groupSize?: string; // 'group-3' | 'group-4' | 'group-5' | 'group-6'
+    classId?: string; // 반 ID (검증을 위해 저장)
 }
 
 /**
