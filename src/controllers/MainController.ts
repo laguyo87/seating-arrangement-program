@@ -5333,6 +5333,14 @@ export class MainController {
                 return;
             }
 
+            // 현재 선택된 반 ID 가져오기 (반별로 따로 저장하기 위해 필수)
+            const currentClassId = this.classManager?.getCurrentClassId();
+            if (!currentClassId) {
+                this.outputModule.showWarning('반이 선택되지 않아 이력이 저장되지 않습니다. 먼저 반을 선택하세요.');
+                logger.warn('자리 확정 실패: 반이 선택되지 않음');
+                return;
+            }
+
             // 날짜 생성 (yy-mm-dd 형식)
             const now = new Date();
             const year = now.getFullYear().toString().slice(-2);
@@ -5360,14 +5368,6 @@ export class MainController {
             // 짝꿍 정보가 있으면 추가
             if (pairInfo.length > 0) {
                 historyItem.pairInfo = pairInfo;
-            }
-
-            // 현재 선택된 반 ID 가져오기 (반별로 따로 저장하기 위해 필수)
-            const currentClassId = this.classManager?.getCurrentClassId();
-            if (!currentClassId) {
-                this.outputModule.showWarning('반이 선택되지 않아 이력이 저장되지 않습니다. 먼저 반을 선택하세요.');
-                logger.warn('자리 확정 실패: 반이 선택되지 않음');
-                return;
             }
             
             // 반별 이력 키: seatHistory_${classId} (각 반마다 독립적으로 저장)
