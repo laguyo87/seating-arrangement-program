@@ -8665,6 +8665,9 @@ export class MainController {
         // 읽기 전용 모드 해제 (새 반 선택 시)
         this.disableReadOnlyMode();
 
+        // 현재 화면의 자리 배치도 지우기
+        this.clearCurrentLayout();
+
         // 먼저 확정된 자리 이력의 최신 항목을 불러오기 시도
         // 명시적으로 반 ID를 전달하여 해당 반의 이력만 가져오기
         const history = this.getSeatHistory(classId);
@@ -8694,8 +8697,13 @@ export class MainController {
                     actualClassId: latestHistoryItem.classId,
                     historyId: latestHistoryItem.id
                 });
-                // 잘못된 이력이면 저장된 자리 배치도 불러오기
-                this.fallbackToSavedLayout(classId);
+                // 잘못된 이력이면 저장된 자리 배치도 불러오기 시도
+                this.classManager.loadLayout(classId).then((loaded) => {
+                    if (!loaded) {
+                        // 저장된 배치도도 없으면 기본 1줄 배치 화면 표시
+                        this.showInitialLayout();
+                    }
+                });
                 return;
             }
             
@@ -8711,24 +8719,58 @@ export class MainController {
             this.loadHistoryItem(latestHistoryItem.id).catch((error) => {
                 logger.error('확정된 자리 배치도 불러오기 실패:', error);
                 // 실패 시 저장된 자리 배치도 불러오기 시도
-                this.fallbackToSavedLayout(classId);
+                this.classManager.loadLayout(classId).then((loaded) => {
+                    if (!loaded) {
+                        // 저장된 배치도도 없으면 기본 1줄 배치 화면 표시
+                        this.showInitialLayout();
+                    }
+                });
             });
         } else {
-            // 확정된 자리 이력이 없으면 저장된 자리 배치도 불러오기
-            this.fallbackToSavedLayout(classId);
+            // 확정된 자리 이력이 없으면 저장된 자리 배치도 불러오기 시도
+            this.classManager.loadLayout(classId).then((loaded) => {
+                if (!loaded) {
+                    // 저장된 배치도도 없으면 기본 1줄 배치 화면 표시
+                    this.showInitialLayout();
+                }
+            });
         }
     }
 
     /**
-     * 저장된 자리 배치도 불러오기 (확정된 이력이 없을 때 사용)
+     * 현재 화면의 자리 배치도 지우기
      */
-    private fallbackToSavedLayout(classId: string): void {
-        this.classManager.loadLayout(classId).then((loaded) => {
-            if (!loaded) {
-                // 저장된 배치도도 없으면 초기 화면의 자리 배치도 표시
-                this.showInitialLayout();
+    private clearCurrentLayout(): void {
+        try {
+            // 좌석 영역 초기화
+            const seatsArea = document.getElementById('seats-area');
+            if (seatsArea) {
+                seatsArea.innerHTML = '';
             }
-        });
+
+            // 내부 상태 초기화
+            this.students = [];
+            this.seats = [];
+            this.nextSeatId = 1;
+            this.fixedSeatIds.clear();
+
+            // 학생 테이블 제거 (존재한다면)
+            const outputSection = document.getElementById('output-section');
+            if (outputSection) {
+                const tables = outputSection.querySelectorAll('table');
+                tables.forEach(t => t.remove());
+            }
+
+            // 액션 버튼 숨김
+            const actionButtons = document.getElementById('layout-action-buttons');
+            if (actionButtons) {
+                actionButtons.style.display = 'none';
+            }
+
+            logger.info('현재 화면의 자리 배치도 지우기 완료');
+        } catch (error) {
+            logger.error('현재 화면 지우기 중 오류:', error);
+        }
     }
 
     /**
@@ -8736,6 +8778,9 @@ export class MainController {
      */
     private showInitialLayout(): void {
         try {
+            // 현재 화면이 이미 지워졌는지 확인 (반 선택 시 clearCurrentLayout 호출됨)
+            // 하지만 혹시 모를 경우를 대비해 다시 확인
+            
             // 기본 옵션 설정
             const maleInput = document.getElementById('male-students') as HTMLInputElement;
             const femaleInput = document.getElementById('female-students') as HTMLInputElement;
@@ -8769,7 +8814,8 @@ export class MainController {
                 pairSubmenu.style.display = 'none';
             }
 
-            // 좌석 영역 초기화
+            // 좌석 영역이 비어있는지 확인 (이미 clearCurrentLayout에서 지워졌을 수 있음)
+            // 하지만 확실하게 하기 위해 다시 확인
             const seatsArea = document.getElementById('seats-area');
             if (seatsArea) {
                 seatsArea.innerHTML = '';
