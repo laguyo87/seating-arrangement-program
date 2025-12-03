@@ -5380,12 +5380,25 @@ export class MainController {
                 existingHistory.splice(50);
             }
             
-            // 저장 실행
+            // 저장 실행 (localStorage)
             const saved = this.storageManager.safeSetItem(historyKey, JSON.stringify(existingHistory));
             if (!saved) {
                 logger.error('이력 저장 실패:', { historyKey, historyLength: existingHistory.length });
                 this.outputModule.showError('이력 저장에 실패했습니다. 브라우저 저장소를 확인해주세요.');
                 return;
+            }
+            
+            // Firebase에 이력 저장 (로그인된 경우)
+            if (this.firebaseStorageManager?.getIsAuthenticated()) {
+                this.firebaseStorageManager.saveSeatHistory(currentClassId, existingHistory).then((firebaseSaved) => {
+                    if (firebaseSaved) {
+                        logger.info('✅ Firebase에 확정된 자리 이력 저장 완료');
+                    } else {
+                        logger.warn('⚠️ Firebase에 확정된 자리 이력 저장 실패 (localStorage에는 저장됨)');
+                    }
+                }).catch((error) => {
+                    logger.error('❌ Firebase에 확정된 자리 이력 저장 실패:', error);
+                });
             }
             
             // 저장 확인: 저장 직후 읽어서 검증
@@ -8708,6 +8721,23 @@ export class MainController {
             // 저장 성공 시 하이라이트 제거
             if (saved) {
                 this.removeSaveButtonHighlight();
+                
+                // 확정된 자리 이력도 Firebase에 저장
+                const currentClassId = this.classManager?.getCurrentClassId();
+                if (currentClassId && this.firebaseStorageManager?.getIsAuthenticated()) {
+                    const history = this.getSeatHistory(currentClassId);
+                    if (history.length > 0) {
+                        this.firebaseStorageManager.saveSeatHistory(currentClassId, history).then((firebaseSaved) => {
+                            if (firebaseSaved) {
+                                logger.info('✅ 저장하기 클릭 시 Firebase에 확정된 자리 이력 저장 완료');
+                            } else {
+                                logger.warn('⚠️ 저장하기 클릭 시 Firebase에 확정된 자리 이력 저장 실패');
+                            }
+                        }).catch((error) => {
+                            logger.error('❌ 저장하기 클릭 시 Firebase에 확정된 자리 이력 저장 실패:', error);
+                        });
+                    }
+                }
             }
             // 저장 성공 메시지는 ClassManager에서 표시됨
         });

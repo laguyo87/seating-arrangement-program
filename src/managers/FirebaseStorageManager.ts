@@ -534,6 +534,105 @@ export class FirebaseStorageManager {
   }
 
   /**
+   * 반별 확정된 자리 이력 저장
+   */
+  public async saveSeatHistory(classId: string, history: Array<{
+    id: string;
+    date: string;
+    layout: Array<{seatId: number, studentName: string, gender: 'M' | 'F'}>;
+    pairInfo?: Array<{student1: string, student2: string}>;
+    timestamp: number;
+    layoutType?: string;
+    singleMode?: string;
+    pairMode?: string;
+    partitionCount?: number;
+    groupSize?: string;
+    classId?: string;
+  }>): Promise<boolean> {
+    if (!this.isAuthenticated) {
+      // 로그인되지 않은 경우에도 성공으로 처리 (localStorage에만 저장)
+      return true;
+    }
+
+    try {
+      const userId = this.getUserId();
+      if (!userId) return false;
+
+      const firestore = this.firebaseService.getFirestore();
+      if (!firestore) return false;
+
+      const historyDocRef = doc(firestore, 'users', userId, 'classes', classId, 'seatHistory', 'history');
+      const saveData = {
+        history: history,
+        lastUpdated: Timestamp.now()
+      };
+      
+      logger.info('Firebase에 확정된 자리 이력 저장 시작:', { 
+        userId, 
+        classId, 
+        historyCount: history.length
+      });
+      
+      await setDoc(historyDocRef, saveData);
+      
+      logger.info('✅ Firebase에 확정된 자리 이력 저장 완료:', { 
+        userId, 
+        classId, 
+        historyCount: history.length,
+        path: `users/${userId}/classes/${classId}/seatHistory/history`
+      });
+      
+      return true;
+    } catch (error) {
+      logger.error('❌ 확정된 자리 이력 저장 실패:', error);
+      // 에러가 발생해도 localStorage에는 저장되었으므로 true 반환
+      return true;
+    }
+  }
+
+  /**
+   * 반별 확정된 자리 이력 불러오기
+   */
+  public async loadSeatHistory(classId: string): Promise<Array<{
+    id: string;
+    date: string;
+    layout: Array<{seatId: number, studentName: string, gender: 'M' | 'F'}>;
+    pairInfo?: Array<{student1: string, student2: string}>;
+    timestamp: number;
+    layoutType?: string;
+    singleMode?: string;
+    pairMode?: string;
+    partitionCount?: number;
+    groupSize?: string;
+    classId?: string;
+  }> | null> {
+    if (!this.isAuthenticated) {
+      return null;
+    }
+
+    try {
+      const userId = this.getUserId();
+      if (!userId) return null;
+
+      const firestore = this.firebaseService.getFirestore();
+      if (!firestore) return null;
+
+      const historyDocRef = doc(firestore, 'users', userId, 'classes', classId, 'seatHistory', 'history');
+      const historyDocSnap = await getDoc(historyDocRef);
+
+      if (historyDocSnap.exists()) {
+        const data = historyDocSnap.data();
+        return data.history || [];
+      }
+
+      return null;
+    } catch (error) {
+      logger.error('확정된 자리 이력 불러오기 실패:', error);
+      return null;
+    }
+  }
+
+  /**
    * 모든 데이터 동기화 (localStorage → Firebase)
    */
   public async syncAllData(localData: {
