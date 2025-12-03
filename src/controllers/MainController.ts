@@ -5971,6 +5971,11 @@ export class MainController {
                     if (singleSubmenu) {
                         singleSubmenu.style.display = 'none';
                     }
+                    // group-submenu 숨김
+                    const groupSubmenu = document.getElementById('group-submenu');
+                    if (groupSubmenu) {
+                        groupSubmenu.style.display = 'none';
+                    }
                     
                     // pair-mode 설정
                     if (historyItem.pairMode) {
@@ -5980,9 +5985,27 @@ export class MainController {
                         const pairModeRadio = document.querySelector(`input[name="pair-mode"][value="${historyItem.pairMode}"]`) as HTMLInputElement;
                         if (pairModeRadio) {
                             pairModeRadio.checked = true;
+                        } else {
+                            logger.warn(`pair-mode 라디오 버튼을 찾을 수 없습니다: ${historyItem.pairMode}`);
                         }
+                    } else {
+                        logger.warn('historyItem에 pairMode가 없습니다.');
                     }
                 } else if (historyItem.layoutType === 'group') {
+                    // group-submenu 표시
+                    const groupSubmenu = document.getElementById('group-submenu');
+                    if (groupSubmenu) {
+                        groupSubmenu.style.display = 'block';
+                    }
+                    // single-submenu와 pair-submenu 숨김
+                    const singleSubmenu = document.getElementById('single-submenu');
+                    if (singleSubmenu) {
+                        singleSubmenu.style.display = 'none';
+                    }
+                    const pairSubmenu = document.getElementById('pair-submenu');
+                    if (pairSubmenu) {
+                        pairSubmenu.style.display = 'none';
+                    }
                     // group-size 설정
                     if (historyItem.groupSize) {
                         document.querySelectorAll('input[name="group-size"]').forEach((input: Element) => {
@@ -6004,14 +6027,50 @@ export class MainController {
                 }
                 
                 // 옵션 복원 완료 대기 (UI 업데이트를 위해)
-                await new Promise<void>(resolve => setTimeout(resolve, 200));
+                await new Promise<void>(resolve => setTimeout(resolve, 300));
                 
-                // 복원된 옵션 확인
+                // 복원된 옵션 확인 및 검증
                 const restoredLayoutType = document.querySelector('input[name="layout-type"]:checked') as HTMLInputElement;
+                const actualLayoutType = restoredLayoutType?.value;
+                
+                // pair-uniform인 경우 pair-mode도 확인
+                let actualPairMode: string | null = null;
+                if (historyItem.layoutType === 'pair-uniform') {
+                    const restoredPairMode = document.querySelector('input[name="pair-mode"]:checked') as HTMLInputElement;
+                    actualPairMode = restoredPairMode?.value || null;
+                }
+                
                 logger.info('배치 형태 복원 완료:', {
-                    expected: historyItem.layoutType,
-                    actual: restoredLayoutType?.value
+                    expected: {
+                        layoutType: historyItem.layoutType,
+                        pairMode: historyItem.pairMode,
+                        singleMode: historyItem.singleMode,
+                        groupSize: historyItem.groupSize
+                    },
+                    actual: {
+                        layoutType: actualLayoutType,
+                        pairMode: actualPairMode,
+                        singleMode: document.querySelector('input[name="single-mode"]:checked')?.value || null,
+                        groupSize: document.querySelector('input[name="group-size"]:checked')?.value || null
+                    }
                 });
+                
+                // 옵션 복원 검증 실패 시 경고
+                if (actualLayoutType !== historyItem.layoutType) {
+                    logger.error('배치 형태 복원 실패:', {
+                        expected: historyItem.layoutType,
+                        actual: actualLayoutType
+                    });
+                    this.outputModule.showWarning(`배치 형태 복원에 실패했습니다. 예상: ${historyItem.layoutType}, 실제: ${actualLayoutType}`);
+                }
+                
+                if (historyItem.layoutType === 'pair-uniform' && actualPairMode !== historyItem.pairMode) {
+                    logger.error('pair-mode 복원 실패:', {
+                        expected: historyItem.pairMode,
+                        actual: actualPairMode
+                    });
+                    this.outputModule.showWarning(`짝꿍 모드 복원에 실패했습니다. 예상: ${historyItem.pairMode}, 실제: ${actualPairMode}`);
+                }
             }
 
             // 모든 카드 초기화
@@ -6019,6 +6078,39 @@ export class MainController {
             
             // 좌석 카드가 없거나 개수가 맞지 않으면 카드 생성
             if (allCards.length === 0 || allCards.length < totalSeats) {
+                // 옵션이 제대로 복원되었는지 다시 한 번 확인
+                const verifyLayoutType = document.querySelector('input[name="layout-type"]:checked') as HTMLInputElement;
+                const verifyLayoutTypeValue = verifyLayoutType?.value;
+                
+                if (verifyLayoutTypeValue !== historyItem.layoutType) {
+                    logger.error('옵션 복원 검증 실패 - renderExampleCards 호출 전:', {
+                        expected: historyItem.layoutType,
+                        actual: verifyLayoutTypeValue
+                    });
+                    // 강제로 옵션 재설정
+                    document.querySelectorAll('input[name="layout-type"]').forEach((input: Element) => {
+                        (input as HTMLInputElement).checked = false;
+                    });
+                    const layoutTypeRadio = document.querySelector(`input[name="layout-type"][value="${historyItem.layoutType}"]`) as HTMLInputElement;
+                    if (layoutTypeRadio) {
+                        layoutTypeRadio.checked = true;
+                    }
+                    
+                    // pair-uniform인 경우 pair-mode도 재설정
+                    if (historyItem.layoutType === 'pair-uniform' && historyItem.pairMode) {
+                        document.querySelectorAll('input[name="pair-mode"]').forEach((input: Element) => {
+                            (input as HTMLInputElement).checked = false;
+                        });
+                        const pairModeRadio = document.querySelector(`input[name="pair-mode"][value="${historyItem.pairMode}"]`) as HTMLInputElement;
+                        if (pairModeRadio) {
+                            pairModeRadio.checked = true;
+                        }
+                    }
+                    
+                    // 재설정 후 대기
+                    await new Promise<void>(resolve => setTimeout(resolve, 200));
+                }
+                
                 // 미리보기 카드 생성 (renderExampleCards 호출 - 복원된 배치 형태로 렌더링됨)
                 // renderExampleCards는 nextSeatId를 1로 초기화하므로, 호출 후에 seatId를 재설정해야 함
                 this.renderExampleCards();
