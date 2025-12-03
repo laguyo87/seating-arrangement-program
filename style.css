@@ -2170,7 +2170,7 @@ button:disabled {
 /* 읽기 전용 배지 애니메이션 */
 @keyframes slideIn {
     from {
-        transform: translateX(100%);
+        transform: translateX(-100%);
         opacity: 0;
     }
     to {

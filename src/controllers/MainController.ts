@@ -6410,26 +6410,22 @@ export class MainController {
             readOnlyBadge.id = 'read-only-badge';
             readOnlyBadge.textContent = '📋 읽기 전용 (확정된 자리 이력)';
             
-            // 버튼들의 위치를 확인하여 배지를 적절한 위치에 배치
-            const actionButtons = document.getElementById('layout-action-buttons');
-            let badgeTop = 80;
-            let badgeRight = 20;
+            // 자리 배치도 화면의 왼쪽 상단 모서리에 배치
+            const classroomLayout = document.getElementById('classroom-layout');
+            let badgeTop = 20;
+            let badgeLeft = 20;
             
-            if (actionButtons && actionButtons.offsetParent !== null) {
-                // 버튼들이 표시되어 있으면 그 아래에 배치
-                const rect = actionButtons.getBoundingClientRect();
-                badgeTop = rect.bottom + 10;
-                // 오른쪽 정렬을 위해 버튼 영역의 오른쪽 끝에 맞춤
-                badgeRight = window.innerWidth - rect.right;
-            } else {
-                // 버튼들이 표시되지 않으면 상단에 배치
-                badgeTop = 20;
+            if (classroomLayout) {
+                const rect = classroomLayout.getBoundingClientRect();
+                // 자리 배치도 영역의 왼쪽 상단 모서리에 배치
+                badgeTop = rect.top + 10; // 상단에서 10px 아래
+                badgeLeft = rect.left + 10; // 왼쪽에서 10px 오른쪽
             }
             
             readOnlyBadge.style.cssText = `
                 position: fixed;
                 top: ${badgeTop}px;
-                right: ${badgeRight}px;
+                left: ${badgeLeft}px;
                 background: #ff9800;
                 color: white;
                 padding: 10px 20px;
