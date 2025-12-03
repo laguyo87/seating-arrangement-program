@@ -72,12 +72,26 @@ console.warn = function(...args: any[]) {
 // 전역 에러 핸들러
 window.addEventListener('error', (event) => {
     // 브라우저 확장 프로그램 에러는 무시
-    if (event.filename && (event.filename.includes('content.js') || event.filename.includes('extension'))) {
+    if (event.filename && (
+        event.filename.includes('content.js') || 
+        event.filename.includes('content_script.js') ||
+        event.filename.includes('extension') ||
+        event.filename.includes('chrome-extension://') ||
+        event.filename.includes('moz-extension://')
+    )) {
+        return;
+    }
+    
+    // 에러 메시지에서도 확장 프로그램 관련 에러 필터링
+    const errorMessage = event.message || event.error?.message || '';
+    if (errorMessage.includes('content_script') || 
+        errorMessage.includes('shouldOfferCompletionListForField') ||
+        errorMessage.includes('elementWasFocused') ||
+        errorMessage.includes('processInputEvent')) {
         return;
     }
     
     // Firebase 인증 관련 Cross-Origin-Opener-Policy 경고는 무시 (기능에 영향 없음)
-    const errorMessage = event.message || event.error?.message || '';
     if (errorMessage.includes('Cross-Origin-Opener-Policy') || errorMessage.includes('window.close')) {
         return;
     }
@@ -88,7 +102,13 @@ window.addEventListener('error', (event) => {
 window.addEventListener('unhandledrejection', (event) => {
     // 메시지 포트 관련 에러는 브라우저 확장 프로그램에서 발생하는 것으로 무시
     const errorMessage = event.reason?.message || event.reason?.toString() || '';
-    if (errorMessage.includes('message port') || errorMessage.includes('chrome-extension')) {
+    if (errorMessage.includes('message port') || 
+        errorMessage.includes('chrome-extension') ||
+        errorMessage.includes('content_script') ||
+        errorMessage.includes('shouldOfferCompletionListForField') ||
+        errorMessage.includes('elementWasFocused') ||
+        errorMessage.includes('processInputEvent') ||
+        errorMessage.includes('Cannot read properties of undefined (reading \'control\')')) {
         event.preventDefault(); // 기본 에러 처리 방지
         return;
     }
