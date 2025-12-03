@@ -5427,7 +5427,7 @@ export class MainController {
             }
 
             // 이쁘고 가독성 있는 메시지 생성 (HTML 형식)
-            const successMessage = `✅ 확정된 자리 이력에 기록하였습니다.<br><br>💾 <strong>'저장하기'</strong>를 클릭하면 최종 저장됩니다.<br><br>📅 날짜: <strong>${dateString}</strong>`;
+            const successMessage = `✅ <strong>자리가 확정되었습니다.</strong><br><br>📋 확정된 자리 이력에 기록하였습니다.<br><br>💾 <strong>'저장하기'</strong>를 클릭하면 최종 저장됩니다.<br><br>📅 날짜: <strong>${dateString}</strong>`;
             
             // OutputModule의 showSuccess는 innerHTML을 사용하므로 HTML 지원
             // 하지만 기본적으로 textContent를 사용하므로, 직접 메시지 요소를 생성
@@ -5458,7 +5458,7 @@ export class MainController {
                 messageElement.setAttribute('role', 'status');
                 messageElement.setAttribute('aria-live', 'polite');
                 messageElement.setAttribute('aria-atomic', 'true');
-                messageElement.setAttribute('aria-label', '확정된 자리 이력에 기록되었습니다');
+                messageElement.setAttribute('aria-label', '자리가 확정되었습니다. 확정된 자리 이력에 기록되었습니다');
                 
                 container.appendChild(messageElement);
                 
@@ -5470,7 +5470,7 @@ export class MainController {
                 }, 7000);
             } else {
                 // 폴백: 기본 showSuccess 사용
-                this.outputModule.showSuccess(`✅ 확정된 자리 이력에 기록하였습니다. 💾 '저장하기'를 클릭하면 최종 저장됩니다. 📅 날짜: ${dateString}`);
+                this.outputModule.showSuccess(`✅ 자리가 확정되었습니다. 📋 확정된 자리 이력에 기록하였습니다. 💾 '저장하기'를 클릭하면 최종 저장됩니다. 📅 날짜: ${dateString}`);
             }
         } catch (error) {
             logger.error('자리 확정 중 오류:', error);
