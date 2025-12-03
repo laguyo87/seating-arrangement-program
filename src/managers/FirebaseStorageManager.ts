@@ -561,9 +561,44 @@ export class FirebaseStorageManager {
       const firestore = this.firebaseService.getFirestore();
       if (!firestore) return false;
 
+      // Firebase는 undefined 값을 허용하지 않으므로 undefined 필드 제거
+      const cleanedHistory = history.map(item => {
+        const cleaned: any = {
+          id: item.id,
+          date: item.date,
+          layout: item.layout,
+          timestamp: item.timestamp
+        };
+        
+        // undefined가 아닌 필드만 추가
+        if (item.pairInfo !== undefined) {
+          cleaned.pairInfo = item.pairInfo;
+        }
+        if (item.layoutType !== undefined) {
+          cleaned.layoutType = item.layoutType;
+        }
+        if (item.singleMode !== undefined) {
+          cleaned.singleMode = item.singleMode;
+        }
+        if (item.pairMode !== undefined) {
+          cleaned.pairMode = item.pairMode;
+        }
+        if (item.partitionCount !== undefined) {
+          cleaned.partitionCount = item.partitionCount;
+        }
+        if (item.groupSize !== undefined) {
+          cleaned.groupSize = item.groupSize;
+        }
+        if (item.classId !== undefined) {
+          cleaned.classId = item.classId;
+        }
+        
+        return cleaned;
+      });
+
       const historyDocRef = doc(firestore, 'users', userId, 'classes', classId, 'seatHistory', 'history');
       const saveData = {
-        history: history,
+        history: cleanedHistory,
         lastUpdated: Timestamp.now()
       };
       
