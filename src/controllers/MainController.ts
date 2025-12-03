@@ -5930,14 +5930,12 @@ export class MainController {
             
             // 좌석 카드가 없거나 개수가 맞지 않으면 카드 생성
             if (allCards.length === 0 || allCards.length < totalSeats) {
-                // 이력 데이터의 seatId에 맞춰 nextSeatId 설정
-                this.nextSeatId = maxSeatId + 1;
-                
                 // 미리보기 카드 생성 (renderExampleCards 호출 - 복원된 배치 형태로 렌더링됨)
+                // renderExampleCards는 nextSeatId를 1로 초기화하므로, 호출 후에 seatId를 재설정해야 함
                 this.renderExampleCards();
                 
                 // 카드가 완전히 렌더링될 때까지 대기
-                await new Promise<void>(resolve => setTimeout(resolve, 200));
+                await new Promise<void>(resolve => setTimeout(resolve, 300));
                 
                 // 카드 다시 가져오기
                 allCards = Array.from(seatsArea.querySelectorAll('.student-seat-card')) as HTMLElement[];
@@ -5961,17 +5959,37 @@ export class MainController {
             }
             
             // 이력 데이터의 seatId에 맞춰 각 카드의 data-seat-id 설정
-            sortedLayout.forEach(({ seatId }, index) => {
-                if (index < allCards.length) {
-                    const card = allCards[index];
+            // 중요: 카드 순서와 seatId 순서가 다를 수 있으므로, 각 seatId에 해당하는 카드를 찾아서 설정
+            sortedLayout.forEach(({ seatId }) => {
+                // 먼저 이미 올바른 seatId를 가진 카드가 있는지 확인
+                let card = allCards.find(c => c.getAttribute('data-seat-id') === seatId.toString());
+                
+                // 없으면 순서대로 할당 (아직 seatId가 설정되지 않은 카드 찾기)
+                if (!card) {
+                    // seatId가 1부터 시작하는 카드 찾기 (renderExampleCards가 1부터 생성)
+                    const cardIndex = seatId - 1;
+                    if (cardIndex >= 0 && cardIndex < allCards.length) {
+                        card = allCards[cardIndex];
+                    } else {
+                        // 범위를 벗어나면 빈 카드 찾기
+                        card = allCards.find(c => !c.getAttribute('data-seat-id') || c.getAttribute('data-seat-id') === '0');
+                    }
+                }
+                
+                if (card) {
                     card.setAttribute('data-seat-id', seatId.toString());
                     // 좌석 번호 레이블도 업데이트
                     const seatNumberDiv = card.querySelector('.seat-number-label') as HTMLElement;
                     if (seatNumberDiv) {
                         seatNumberDiv.textContent = `#${seatId}`;
                     }
+                } else {
+                    logger.warn(`좌석 카드를 찾을 수 없습니다: seatId=${seatId}`);
                 }
             });
+            
+            // nextSeatId 업데이트 (다음 카드 생성을 위해)
+            this.nextSeatId = maxSeatId + 1;
             
             // 모든 카드 초기화
             allCards.forEach(card => {
@@ -5982,7 +6000,12 @@ export class MainController {
             });
 
             // 이력 데이터로 복원
+            // 먼저 모든 카드를 다시 가져와서 최신 상태 확인
+            allCards = Array.from(seatsArea.querySelectorAll('.student-seat-card')) as HTMLElement[];
+            
             let restoredCount = 0;
+            const missingSeats: Array<{seatId: number, studentName: string}> = [];
+            
             historyItem.layout.forEach(({ seatId, studentName, gender }) => {
                 const card = seatsArea.querySelector(`[data-seat-id="${seatId}"]`) as HTMLElement;
                 if (card) {
@@ -5993,19 +6016,57 @@ export class MainController {
                         card.classList.remove('gender-m', 'gender-f');
                         card.classList.add(`gender-${gender.toLowerCase()}`);
                         restoredCount++;
+                    } else {
+                        logger.warn(`학생 이름 요소를 찾을 수 없습니다: seatId=${seatId}`);
+                        missingSeats.push({ seatId, studentName });
                     }
                 } else {
                     logger.warn(`좌석 카드를 찾을 수 없습니다: seatId=${seatId}, studentName=${studentName}`);
+                    missingSeats.push({ seatId, studentName });
                 }
             });
             
+            // 누락된 좌석이 있으면 추가 시도
+            if (missingSeats.length > 0) {
+                logger.warn(`누락된 좌석 ${missingSeats.length}개 발견, 추가 시도 중...`);
+                missingSeats.forEach(({ seatId, studentName }) => {
+                    // 빈 카드 찾기 또는 새로 생성
+                    let emptyCard = allCards.find(c => {
+                        const nameDiv = c.querySelector('.student-name') as HTMLElement;
+                        return nameDiv && !nameDiv.textContent?.trim();
+                    });
+                    
+                    if (emptyCard) {
+                        emptyCard.setAttribute('data-seat-id', seatId.toString());
+                        const seatNumberDiv = emptyCard.querySelector('.seat-number-label') as HTMLElement;
+                        if (seatNumberDiv) {
+                            seatNumberDiv.textContent = `#${seatId}`;
+                        }
+                        const nameDiv = emptyCard.querySelector('.student-name') as HTMLElement;
+                        if (nameDiv) {
+                            nameDiv.textContent = studentName;
+                            restoredCount++;
+                        }
+                    }
+                });
+            }
+            
             if (restoredCount === 0) {
-                logger.error('이력 복원 실패: 복원된 좌석이 없습니다.');
+                logger.error('이력 복원 실패: 복원된 좌석이 없습니다.', {
+                    totalCards: allCards.length,
+                    totalSeats: totalSeats,
+                    historyLayoutCount: historyItem.layout.length,
+                    cardSeatIds: allCards.map(c => c.getAttribute('data-seat-id'))
+                });
                 this.outputModule.showError('이력 복원에 실패했습니다. 좌석 카드를 찾을 수 없습니다.');
                 return;
             }
             
-            logger.info(`이력 복원 완료: ${restoredCount}개 좌석 복원됨`);
+            logger.info(`이력 복원 완료: ${restoredCount}/${historyItem.layout.length}개 좌석 복원됨`, {
+                totalCards: allCards.length,
+                totalSeats: totalSeats,
+                historyLayoutCount: historyItem.layout.length
+            });
 
             // 읽기 전용 모드 활성화
             this.isReadOnlyMode = true;
