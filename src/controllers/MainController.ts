@@ -6452,7 +6452,8 @@ export class MainController {
                 dropdown.style.display = 'none';
             }
 
-            // 자리 배치도 액션 버튼들 표시 (actionButtons는 이미 위에서 선언됨)
+            // 자리 배치도 액션 버튼들 표시
+            const actionButtons = document.getElementById('layout-action-buttons');
             if (actionButtons) {
                 actionButtons.style.display = 'block';
             }
