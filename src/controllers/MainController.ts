@@ -6409,10 +6409,27 @@ export class MainController {
             const readOnlyBadge = document.createElement('div');
             readOnlyBadge.id = 'read-only-badge';
             readOnlyBadge.textContent = '📋 읽기 전용 (확정된 자리 이력)';
+            
+            // 버튼들의 위치를 확인하여 배지를 적절한 위치에 배치
+            const actionButtons = document.getElementById('layout-action-buttons');
+            let badgeTop = 80;
+            let badgeRight = 20;
+            
+            if (actionButtons && actionButtons.offsetParent !== null) {
+                // 버튼들이 표시되어 있으면 그 아래에 배치
+                const rect = actionButtons.getBoundingClientRect();
+                badgeTop = rect.bottom + 10;
+                // 오른쪽 정렬을 위해 버튼 영역의 오른쪽 끝에 맞춤
+                badgeRight = window.innerWidth - rect.right;
+            } else {
+                // 버튼들이 표시되지 않으면 상단에 배치
+                badgeTop = 20;
+            }
+            
             readOnlyBadge.style.cssText = `
                 position: fixed;
-                top: 80px;
-                right: 20px;
+                top: ${badgeTop}px;
+                right: ${badgeRight}px;
                 background: #ff9800;
                 color: white;
                 padding: 10px 20px;
@@ -6422,6 +6439,7 @@ export class MainController {
                 z-index: 1000;
                 box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
                 animation: slideIn 0.3s ease;
+                max-width: 300px;
             `;
             
             // 기존 배지 제거
@@ -6438,8 +6456,7 @@ export class MainController {
                 dropdown.style.display = 'none';
             }
 
-            // 자리 배치도 액션 버튼들 표시
-            const actionButtons = document.getElementById('layout-action-buttons');
+            // 자리 배치도 액션 버튼들 표시 (actionButtons는 이미 위에서 선언됨)
             if (actionButtons) {
                 actionButtons.style.display = 'block';
             }
