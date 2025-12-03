@@ -63,7 +63,6 @@
                     </select>
                     <button id="add-class-btn" class="icon-btn" title="새 반 추가" aria-label="새 반 추가">➕</button>
                     <button id="delete-class-btn" class="icon-btn" title="선택한 반 삭제" aria-label="선택한 반 삭제" style="display: none;">🗑️</button>
-                    <button id="save-layout-btn" class="icon-btn" title="현재 반의 자리 배치도 저장" aria-label="현재 반의 자리 배치도 저장" style="display: none;">💾</button>
                 </div>
                 <button id="firebase-login-btn" class="login-btn" title="로그인 (클라우드 동기화)" aria-label="로그인">🔐 로그인</button>
                 <span id="firebase-status" class="firebase-status" style="display: none;" aria-live="polite"></span>
@@ -427,7 +426,6 @@
                 console.log('1. 반을 선택하세요');
                 console.log('2. 자리 배치하기 버튼을 클릭하세요');
                 console.log('3. ✅ 자리 확정하기 버튼을 클릭하세요');
-                console.log('   (또는 💾 저장하기 버튼 클릭)');
                 console.log('4. 콘솔에서 "✅ Firebase에" 로그를 확인하세요');
                 console.log('\n🌐 Firebase Console에서 확인:');
                 console.log(`https://console.firebase.google.com/project/seating-arrangement-back-7ffa1/firestore/data/~2Fusers~2F${currentUser.uid}`);

@@ -1010,7 +1010,7 @@ export class MainController {
                 this.handleRedoLayout();
             }
             
-            // 저장하기 버튼 클릭
+            // 저장하기 버튼 클릭 (제거됨 - 자리 확정하기에서 통합)
             if (target.id === 'save-layout') {
                 this.handleSaveLayout();
             }
@@ -1030,10 +1030,7 @@ export class MainController {
                 this.handleDeleteClass();
             }
             
-            // 자리 배치도 저장 버튼 클릭
-            if (target.id === 'save-layout-btn') {
-                this.handleSaveClassLayout();
-            }
+            // 자리 배치도 저장 버튼 클릭 (제거됨 - 자리 확정하기에서 통합)
             
             // 사이드바 토글 버튼 클릭
             if (target.id === 'sidebar-toggle-btn' || target.closest('#sidebar-toggle-btn')) {
@@ -5454,26 +5451,40 @@ export class MainController {
             // 드롭다운 메뉴 업데이트
             this.updateHistoryDropdown();
 
-            // '저장하기' 버튼 하이라이트 (자리 확정했지만 아직 저장하지 않음을 표시)
-            this.highlightSaveButton();
-
-            // 반이 선택된 경우 Firebase에 자리 배치도 저장
+            // 반이 선택된 경우 Firebase에 자리 배치도 저장 (자리 확정과 동시에 저장)
             if (this.classManager && this.classManager.getCurrentClassId()) {
                 // 현재 seats와 students를 화면 데이터로 업데이트한 후 저장
                 this.updateSeatsAndStudentsFromLayout(currentLayout);
                 this.classManager.saveCurrentLayout().then((saved) => {
                     if (saved) {
-                        logger.info('✅ 자리 확정 시 Firebase에 자동 저장 완료');
+                        logger.info('✅ 자리 확정 및 저장 완료');
+                        
+                        // 확정된 자리 이력도 Firebase에 저장
+                        const currentClassId = this.classManager?.getCurrentClassId();
+                        if (currentClassId && this.firebaseStorageManager?.getIsAuthenticated()) {
+                            const history = this.getSeatHistory(currentClassId);
+                            if (history.length > 0) {
+                                this.firebaseStorageManager.saveSeatHistory(currentClassId, history).then((firebaseSaved) => {
+                                    if (firebaseSaved) {
+                                        logger.info('✅ Firebase에 확정된 자리 이력 저장 완료');
+                                    } else {
+                                        logger.warn('⚠️ Firebase에 확정된 자리 이력 저장 실패');
+                                    }
+                                }).catch((error) => {
+                                    logger.error('❌ Firebase에 확정된 자리 이력 저장 실패:', error);
+                                });
+                            }
+                        }
                     } else {
-                        logger.warn('⚠️ 자리 확정 시 Firebase 저장 실패');
+                        logger.warn('⚠️ 자리 확정 시 저장 실패');
                     }
                 }).catch((error) => {
-                    logger.error('❌ 자리 확정 시 Firebase 저장 실패:', error);
+                    logger.error('❌ 자리 확정 시 저장 실패:', error);
                 });
             }
 
             // 이쁘고 가독성 있는 메시지 생성 (HTML 형식)
-            const successMessage = `✅ <strong>자리가 확정되었습니다.</strong><br><br>📋 확정된 자리 이력에 기록하였습니다.<br><br>💾 <strong>'저장하기'</strong>를 클릭하면 최종 저장됩니다.<br><br>📅 날짜: <strong>${dateString}</strong>`;
+            const successMessage = `✅ <strong>자리가 확정되었습니다.</strong><br><br>📋 확정된 자리 이력에 기록하였습니다.<br><br>💾 <strong>저장도 완료되었습니다.</strong><br><br>📅 날짜: <strong>${dateString}</strong>`;
             
             // OutputModule의 showSuccess는 innerHTML을 사용하므로 HTML 지원
             // 하지만 기본적으로 textContent를 사용하므로, 직접 메시지 요소를 생성
@@ -5516,7 +5527,7 @@ export class MainController {
                 }, 7000);
             } else {
                 // 폴백: 기본 showSuccess 사용
-                this.outputModule.showSuccess(`✅ 자리가 확정되었습니다. 📋 확정된 자리 이력에 기록하였습니다. 💾 '저장하기'를 클릭하면 최종 저장됩니다. 📅 날짜: ${dateString}`);
+                this.outputModule.showSuccess(`✅ 자리가 확정되었습니다. 📋 확정된 자리 이력에 기록하였습니다. 💾 저장도 완료되었습니다. 📅 날짜: ${dateString}`);
             }
         } catch (error) {
             logger.error('자리 확정 중 오류:', error);
@@ -8350,7 +8361,7 @@ export class MainController {
 
                 <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">7️⃣ 확정된 자리 이력 (반별 관리)</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
-                    <li><strong>✅ 자리 확정하기</strong>: 자리 배치가 완료된 후 "✅ 자리 확정하기" 버튼을 클릭하면 현재 배치가 해당 반의 이력에 저장됩니다</li>
+                    <li><strong>✅ 자리 확정하기</strong>: 자리 배치가 완료된 후 "✅ 자리 확정하기" 버튼을 클릭하면 현재 배치가 해당 반의 이력에 저장되고 자동으로 저장됩니다</li>
                     <li><strong>⚠️ 중요</strong>: "자리 확정하기" 버튼을 클릭하지 않으면 이력에 기록되지 않습니다</li>
                     <li><strong>📋 확정된 자리 이력</strong>: 상단 바의 "📋 확정된 자리 이력" 드롭다운에서 현재 선택된 반의 저장된 배치를 확인할 수 있습니다</li>
                     <li><strong>반별 이력 관리</strong>: 각 반의 확정된 자리 이력은 독립적으로 관리됩니다. 반을 변경하면 해당 반의 이력이 자동으로 표시됩니다</li>
@@ -9155,81 +9166,84 @@ export class MainController {
 
     /**
      * 현재 반의 자리 배치도 저장 처리
+     * @deprecated '저장하기' 버튼이 제거되어 자리 확정하기에서 통합되었습니다. 더 이상 사용되지 않습니다.
      */
-    private handleSaveClassLayout(): void {
-        // 비동기 처리
-        this.classManager.saveCurrentLayout().then((saved) => {
-            // 저장 성공 시 하이라이트 제거
-            if (saved) {
-                this.removeSaveButtonHighlight();
-                
-                // 확정된 자리 이력도 Firebase에 저장
-                const currentClassId = this.classManager?.getCurrentClassId();
-                if (currentClassId && this.firebaseStorageManager?.getIsAuthenticated()) {
-                    const history = this.getSeatHistory(currentClassId);
-                    if (history.length > 0) {
-                        this.firebaseStorageManager.saveSeatHistory(currentClassId, history).then((firebaseSaved) => {
-                            if (firebaseSaved) {
-                                logger.info('✅ 저장하기 클릭 시 Firebase에 확정된 자리 이력 저장 완료');
-                            } else {
-                                logger.warn('⚠️ 저장하기 클릭 시 Firebase에 확정된 자리 이력 저장 실패');
-                            }
-                        }).catch((error) => {
-                            logger.error('❌ 저장하기 클릭 시 Firebase에 확정된 자리 이력 저장 실패:', error);
-                        });
-                    }
-                }
-            }
-            // 저장 성공 메시지는 ClassManager에서 표시됨
-        });
-    }
+    // private handleSaveClassLayout(): void {
+    //     // 비동기 처리
+    //     this.classManager.saveCurrentLayout().then((saved) => {
+    //         // 저장 성공 시 하이라이트 제거
+    //         if (saved) {
+    //             this.removeSaveButtonHighlight();
+    //             
+    //             // 확정된 자리 이력도 Firebase에 저장
+    //             const currentClassId = this.classManager?.getCurrentClassId();
+    //             if (currentClassId && this.firebaseStorageManager?.getIsAuthenticated()) {
+    //                 const history = this.getSeatHistory(currentClassId);
+    //                 if (history.length > 0) {
+    //                     this.firebaseStorageManager.saveSeatHistory(currentClassId, history).then((firebaseSaved) => {
+    //                         if (firebaseSaved) {
+    //                             logger.info('✅ 저장하기 클릭 시 Firebase에 확정된 자리 이력 저장 완료');
+    //                         } else {
+    //                             logger.warn('⚠️ 저장하기 클릭 시 Firebase에 확정된 자리 이력 저장 실패');
+    //                         }
+    //                     }).catch((error) => {
+    //                         logger.error('❌ 저장하기 클릭 시 Firebase에 확정된 자리 이력 저장 실패:', error);
+    //                     });
+    //                 }
+    //             }
+    //         }
+    //         // 저장 성공 메시지는 ClassManager에서 표시됨
+    //     });
+    // }
     
     /**
      * '저장하기' 버튼 하이라이트 (자리 확정했지만 아직 저장하지 않음을 표시)
+     * @deprecated '저장하기' 버튼이 제거되어 더 이상 사용되지 않습니다.
      */
-    private highlightSaveButton(): void {
-        const saveBtn = document.getElementById('save-layout-btn') as HTMLButtonElement;
-        if (saveBtn) {
-            // 노란색 테두리 하이라이트 스타일 추가
-            saveBtn.style.border = '2px solid #ffeb3b';
-            saveBtn.style.boxShadow = '0 0 15px rgba(255, 235, 59, 0.8)';
-            saveBtn.style.animation = 'saveButtonBlink 1s infinite';
-            
-            // CSS 깜박이는 애니메이션 추가 (없는 경우)
-            if (!document.getElementById('save-button-blink-animation')) {
-                const style = document.createElement('style');
-                style.id = 'save-button-blink-animation';
-                style.textContent = `
-                    @keyframes saveButtonBlink {
-                        0%, 100% {
-                            border-color: #ffeb3b;
-                            box-shadow: 0 0 15px rgba(255, 235, 59, 0.8);
-                            opacity: 1;
-                        }
-                        50% {
-                            border-color: #ffc107;
-                            box-shadow: 0 0 25px rgba(255, 193, 7, 1);
-                            opacity: 0.7;
-                        }
-                    }
-                `;
-                document.head.appendChild(style);
-            }
-        }
-    }
+    // private highlightSaveButton(): void {
+    //     const saveBtn = document.getElementById('save-layout-btn') as HTMLButtonElement;
+    //     if (saveBtn) {
+    //         // 노란색 테두리 하이라이트 스타일 추가
+    //         saveBtn.style.border = '2px solid #ffeb3b';
+    //         saveBtn.style.boxShadow = '0 0 15px rgba(255, 235, 59, 0.8)';
+    //         saveBtn.style.animation = 'saveButtonBlink 1s infinite';
+    //         
+    //         // CSS 깜박이는 애니메이션 추가 (없는 경우)
+    //         if (!document.getElementById('save-button-blink-animation')) {
+    //             const style = document.createElement('style');
+    //             style.id = 'save-button-blink-animation';
+    //             style.textContent = `
+    //                 @keyframes saveButtonBlink {
+    //                     0%, 100% {
+    //                         border-color: #ffeb3b;
+    //                         box-shadow: 0 0 15px rgba(255, 235, 59, 0.8);
+    //                         opacity: 1;
+    //                     }
+    //                     50% {
+    //                         border-color: #ffc107;
+    //                         box-shadow: 0 0 25px rgba(255, 193, 7, 1);
+    //                         opacity: 0.7;
+    //                     }
+    //                 }
+    //             `;
+    //             document.head.appendChild(style);
+    //         }
+    //     }
+    // }
     
     /**
      * '저장하기' 버튼 하이라이트 제거
+     * @deprecated '저장하기' 버튼이 제거되어 더 이상 사용되지 않습니다.
      */
-    private removeSaveButtonHighlight(): void {
-        const saveBtn = document.getElementById('save-layout-btn') as HTMLButtonElement;
-        if (saveBtn) {
-            // 하이라이트 스타일 제거
-            saveBtn.style.border = '';
-            saveBtn.style.boxShadow = '';
-            saveBtn.style.animation = '';
-        }
-    }
+    // private removeSaveButtonHighlight(): void {
+    //     const saveBtn = document.getElementById('save-layout-btn') as HTMLButtonElement;
+    //     if (saveBtn) {
+    //         // 하이라이트 스타일 제거
+    //         saveBtn.style.border = '';
+    //         saveBtn.style.boxShadow = '';
+    //         saveBtn.style.animation = '';
+    //     }
+    // }
 
     /**
      * Firebase 로그인 처리 (로그인 페이지 표시)
