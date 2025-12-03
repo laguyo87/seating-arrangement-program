@@ -674,7 +674,13 @@ export class MainController {
         // 1명씩 한 줄로 배치 모드 라디오 버튼 변경 이벤트
         const singleModeInputs = document.querySelectorAll('input[name="single-mode"]');
         singleModeInputs.forEach(input => {
-            this.addEventListenerSafe(input, 'change', () => {
+            this.addEventListenerSafe(input, 'change', (e) => {
+                // 읽기 전용 모드에서는 옵션 변경 이벤트 무시
+                if (this.isReadOnlyMode) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    return;
+                }
                 // 배치 형태 변경 시 미리보기 업데이트
                 this.updatePreviewForGenderCounts();
             });
@@ -683,7 +689,13 @@ export class MainController {
         // '남녀 순서 바꾸기' 체크박스 이벤트 리스너
         const reverseGenderOrderCheckbox = document.getElementById('reverse-gender-order');
         if (reverseGenderOrderCheckbox) {
-            this.addEventListenerSafe(reverseGenderOrderCheckbox, 'change', () => {
+            this.addEventListenerSafe(reverseGenderOrderCheckbox, 'change', (e) => {
+                // 읽기 전용 모드에서는 옵션 변경 이벤트 무시
+                if (this.isReadOnlyMode) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    return;
+                }
                 // 체크박스 변경 시 미리보기 업데이트
                 this.updatePreviewForGenderCounts();
             });
@@ -693,6 +705,12 @@ export class MainController {
         const groupSizeInputs = document.querySelectorAll('input[name="group-size"]');
         groupSizeInputs.forEach(input => {
             this.addEventListenerSafe(input, 'change', (e) => {
+                // 읽기 전용 모드에서는 옵션 변경 이벤트 무시
+                if (this.isReadOnlyMode) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    return;
+                }
                 const target = e.target as HTMLInputElement;
                 const groupSize = target.value;
                 
@@ -707,6 +725,12 @@ export class MainController {
         const pairModeInputs = document.querySelectorAll('input[name="pair-mode"]');
         pairModeInputs.forEach(input => {
             this.addEventListenerSafe(input, 'change', (e) => {
+                // 읽기 전용 모드에서는 옵션 변경 이벤트 무시
+                if (this.isReadOnlyMode) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    return;
+                }
                 // 짝꿍 모드 변경됨
                 // 분단 개수 제한 적용 (짝꿍 배치 선택 시)
                 const layoutTypeInput = document.querySelector('input[name="layout-type"]:checked') as HTMLInputElement;
@@ -843,7 +867,13 @@ export class MainController {
             // 남학생/여학생 수 입력 필드에 검증 이벤트 추가 (중복 제거 - 이미 위에서 처리됨)
             
             // 분단 수 변경 시 미리보기 업데이트
-            this.addEventListenerSafe(partitionInput, 'change', () => {
+            this.addEventListenerSafe(partitionInput, 'change', (e) => {
+                // 읽기 전용 모드에서는 옵션 변경 이벤트 무시
+                if (this.isReadOnlyMode) {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    return;
+                }
                 // 입력 검증
                 this.validateAndFixPartitionInput(partitionInput);
                 // 현재 학생 수 가져오기
@@ -5856,6 +5886,10 @@ export class MainController {
                 layoutType: historyItem.layoutType,
                 date: historyItem.date
             });
+
+            // 중요: 옵션 복원 전에 읽기 전용 모드 활성화
+            // 이렇게 하면 옵션 복원 중 이벤트 핸들러가 실행되어 옵션이 변경되는 것을 방지
+            this.isReadOnlyMode = true;
 
             // card-layout-container가 숨겨져 있으면 표시
             const cardContainer = document.getElementById('card-layout-container');
