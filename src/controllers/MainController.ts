@@ -9300,12 +9300,80 @@ export class MainController {
             statusSpan.style.display = 'inline-block';
             statusSpan.style.color = '#ffeb3b'; // 노란색
             statusSpan.style.fontWeight = '500';
+            
+            // 로그인 시 Firebase에서 데이터 동기화
+            this.syncDataFromFirebase();
         } else {
             loginBtn.textContent = '🔐 로그인';
             loginBtn.title = '로그인 (클라우드 동기화)';
             loginBtn.onclick = () => this.handleFirebaseLogin();
             statusSpan.textContent = '로그인 필요';
             statusSpan.style.display = 'none';
+        }
+    }
+
+    /**
+     * Firebase에서 데이터를 불러와서 localStorage에 동기화
+     */
+    private async syncDataFromFirebase(): Promise<void> {
+        if (!this.firebaseStorageManager.getIsAuthenticated()) {
+            return;
+        }
+
+        try {
+            logger.info('🔄 Firebase에서 데이터 동기화 시작...');
+            
+            // 1. 반 목록 동기화
+            const synced = await this.classManager.syncClassListFromFirebase();
+            if (synced) {
+                logger.info('✅ 반 목록 동기화 완료');
+                
+                // 반 목록 UI 업데이트
+                this.updateClassSelect();
+                
+                // 2. 각 반의 자리 배치도와 확정된 자리 이력 동기화
+                const classList = this.classManager.getClassList();
+                for (const classInfo of classList) {
+                    await this.syncClassDataFromFirebase(classInfo.id);
+                }
+                
+                logger.info('✅ Firebase 데이터 동기화 완료');
+                this.outputModule.showInfo('Firebase에서 데이터를 불러왔습니다.');
+            } else {
+                logger.info('⚠️ Firebase에 반 목록이 없거나 동기화 실패');
+            }
+        } catch (error) {
+            logger.error('❌ Firebase 데이터 동기화 실패:', error);
+            this.outputModule.showError('Firebase 데이터 동기화에 실패했습니다.');
+        }
+    }
+
+    /**
+     * 특정 반의 자리 배치도와 확정된 자리 이력을 Firebase에서 불러와서 localStorage에 저장
+     */
+    private async syncClassDataFromFirebase(classId: string): Promise<void> {
+        if (!this.firebaseStorageManager.getIsAuthenticated()) {
+            return;
+        }
+
+        try {
+            // 1. 자리 배치도 동기화
+            const layout = await this.firebaseStorageManager.loadClassLayout(classId);
+            if (layout) {
+                const storageKey = `classLayout_${classId}`;
+                this.storageManager.safeSetItem(storageKey, JSON.stringify(layout));
+                logger.info(`✅ 반 ${classId} 자리 배치도 동기화 완료`);
+            }
+
+            // 2. 확정된 자리 이력 동기화
+            const history = await this.firebaseStorageManager.loadSeatHistory(classId);
+            if (history && history.length > 0) {
+                const historyKey = `seatHistory_${classId}`;
+                this.storageManager.safeSetItem(historyKey, JSON.stringify(history));
+                logger.info(`✅ 반 ${classId} 확정된 자리 이력 ${history.length}개 동기화 완료`);
+            }
+        } catch (error) {
+            logger.error(`❌ 반 ${classId} 데이터 동기화 실패:`, error);
         }
     }
 }

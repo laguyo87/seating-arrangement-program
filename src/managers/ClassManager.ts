@@ -338,6 +338,37 @@ export class ClassManager {
         const classInfo = classList.find(c => c.id === classId);
         return classInfo ? classInfo.name : null;
     }
+
+    /**
+     * Firebase에서 반 목록을 불러와서 localStorage에 저장
+     */
+    public async syncClassListFromFirebase(): Promise<boolean> {
+        if (!this.deps.firebaseStorageManager?.getIsAuthenticated()) {
+            return false;
+        }
+
+        try {
+            const firebaseClassList = await this.deps.firebaseStorageManager.loadClassList();
+            
+            if (firebaseClassList && firebaseClassList.length > 0) {
+                // Firebase에서 불러온 반 목록을 localStorage에 저장
+                const localSuccess = this.deps.storageManager.safeSetItem(
+                    this.STORAGE_KEY_CLASSES,
+                    JSON.stringify(firebaseClassList)
+                );
+                
+                if (localSuccess) {
+                    logger.info(`Firebase에서 반 목록 ${firebaseClassList.length}개 동기화 완료`);
+                    return true;
+                }
+            }
+            
+            return false;
+        } catch (error) {
+            logger.error('Firebase에서 반 목록 동기화 실패:', error);
+            return false;
+        }
+    }
 }
 
 
