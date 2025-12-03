@@ -928,9 +928,11 @@ export class MainController {
             const dropdownContainer = document.getElementById('history-dropdown');
             
             if (target.id === 'history-dropdown-btn' || target.closest('#history-dropdown-btn')) {
-                // 드롭다운 버튼 클릭 시 토글
+                // 드롭다운 버튼 클릭 시 현재 반의 이력으로 업데이트 후 토글
+                this.updateHistoryDropdown();
                 if (dropdown) {
-                    dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+                    const isOpening = dropdown.style.display !== 'block';
+                    dropdown.style.display = isOpening ? 'block' : 'none';
                 }
             } else if (dropdown && dropdownContainer) {
                 // 드롭다운이 열려있고, 클릭된 요소가 드롭다운 내부가 아니면 닫기
@@ -5767,13 +5769,38 @@ export class MainController {
                 return;
             }
             
+            // 현재 반의 이력만 가져오기 (명시적으로 반 ID 전달)
             const history = this.getSeatHistory(currentClassId);
+            
+            // 디버깅: 현재 반 ID와 이력 개수 로그
+            logger.info('이력 불러오기 시도:', {
+                currentClassId,
+                historyId,
+                historyCount: history.length,
+                historyIds: history.map(item => item.id)
+            });
+            
             const historyItem = history.find(item => item.id === historyId);
 
             if (!historyItem) {
-                this.outputModule.showError('이력을 찾을 수 없습니다.');
+                logger.error('이력을 찾을 수 없음:', {
+                    currentClassId,
+                    historyId,
+                    availableIds: history.map(item => item.id)
+                });
+                this.outputModule.showError(`현재 선택된 반('${currentClassId}')의 이력을 찾을 수 없습니다. 반이 변경되었을 수 있습니다.`);
+                // 드롭다운을 다시 업데이트하여 현재 반의 이력만 표시
+                this.updateHistoryDropdown();
                 return;
             }
+            
+            // 추가 검증: 이력 항목이 현재 반에 속하는지 확인
+            logger.info('이력 항목 찾음:', {
+                currentClassId,
+                historyId,
+                layoutType: historyItem.layoutType,
+                date: historyItem.date
+            });
 
             // card-layout-container가 숨겨져 있으면 표시
             const cardContainer = document.getElementById('card-layout-container');
