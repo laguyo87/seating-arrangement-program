@@ -8669,15 +8669,72 @@ export class MainController {
     private fallbackToSavedLayout(classId: string): void {
         this.classManager.loadLayout(classId).then((loaded) => {
             if (!loaded) {
-                // 저장된 배치도도 없으면 빈 화면만 표시
-                this.outputModule.showInfo('저장된 자리 배치도가 없습니다. 새로 배치를 생성해주세요.');
-                // 좌석 영역 초기화
-                const seatsArea = document.getElementById('seats-area');
-                if (seatsArea) {
-                    seatsArea.innerHTML = '';
-                }
+                // 저장된 배치도도 없으면 초기 화면의 자리 배치도 표시
+                this.showInitialLayout();
             }
         });
+    }
+
+    /**
+     * 초기 화면의 자리 배치도 표시 (1명씩 한 줄로 배치 --> 기본 1줄 배치)
+     */
+    private showInitialLayout(): void {
+        try {
+            // 기본 옵션 설정
+            const maleInput = document.getElementById('male-students') as HTMLInputElement;
+            const femaleInput = document.getElementById('female-students') as HTMLInputElement;
+            const partitionInput = document.getElementById('number-of-partitions') as HTMLInputElement;
+            
+            // 기본값 설정 (초기값)
+            if (maleInput) maleInput.value = '12';
+            if (femaleInput) femaleInput.value = '12';
+            if (partitionInput) partitionInput.value = '5';
+
+            // layout-type: 1명씩 한 줄로 배치 (single-uniform)
+            const singleUniformRadio = document.querySelector('input[name="layout-type"][value="single-uniform"]') as HTMLInputElement;
+            if (singleUniformRadio) {
+                singleUniformRadio.checked = true;
+                // 이벤트 발생 없이 설정 (자동 배치 방지)
+            }
+
+            // single-mode: 기본 1줄 배치 (basic-row)
+            const basicRowRadio = document.querySelector('input[name="single-mode"][value="basic-row"]') as HTMLInputElement;
+            if (basicRowRadio) {
+                basicRowRadio.checked = true;
+            }
+
+            // 서브메뉴 표시 설정
+            const singleSubmenu = document.getElementById('single-submenu');
+            const pairSubmenu = document.getElementById('pair-submenu');
+            if (singleSubmenu) {
+                singleSubmenu.style.display = 'block';
+            }
+            if (pairSubmenu) {
+                pairSubmenu.style.display = 'none';
+            }
+
+            // 좌석 영역 초기화
+            const seatsArea = document.getElementById('seats-area');
+            if (seatsArea) {
+                seatsArea.innerHTML = '';
+            }
+
+            // card-layout-container 표시
+            const cardContainer = document.getElementById('card-layout-container');
+            if (cardContainer) {
+                cardContainer.style.display = 'block';
+            }
+
+            // 기본 카드 렌더링 (학생 수가 0이므로 빈 카드만 표시)
+            // 남학생 12명 + 여학생 12명 = 24명의 빈 카드 표시
+            this.nextSeatId = 1;
+            this.renderExampleCards();
+
+            logger.info('초기 화면의 자리 배치도 표시 완료');
+        } catch (error) {
+            logger.error('초기 화면 표시 중 오류:', error);
+            this.outputModule.showError('초기 화면 표시 중 오류가 발생했습니다.');
+        }
     }
 
     /**
