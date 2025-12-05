@@ -34,6 +34,15 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Update sitemap.xml lastmod date
+        run: |
+          # 현재 날짜를 YYYY-MM-DD 형식으로 가져오기
+          CURRENT_DATE=$(date +%Y-%m-%d)
+          # sitemap.xml의 lastmod 날짜를 현재 날짜로 업데이트
+          sed -i.bak "s|<lastmod>.*</lastmod>|<lastmod>${CURRENT_DATE}</lastmod>|" sitemap.xml
+          rm -f sitemap.xml.bak
+          echo "Updated sitemap.xml lastmod to: ${CURRENT_DATE}"
+
       - name: Copy static files to dist
         run: |
           cp browser-compatibility-check.js dist/ 2>/dev/null || true
