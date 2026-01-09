@@ -79,3 +79,10 @@ jobs:
         with:
           path: 'dist'
           # Vite 빌드 결과물(dist/)을 배포
+      
+      - name: Submit sitemap to Google Search Console
+        run: |
+          echo "🔔 Notifying Google Search Console about sitemap update..."
+          # Google에 sitemap 업데이트 알림 (ping)
+          curl -s "https://www.google.com/ping?sitemap=https://laguyo87.github.io/seating-arrangement-program/sitemap.xml" || echo "⚠️ Google ping failed (this is optional)"
+          echo "✅ Sitemap notification sent to Google"
