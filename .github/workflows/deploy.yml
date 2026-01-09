@@ -50,12 +50,14 @@ jobs:
           cp og-image.png dist/ 2>/dev/null || true
           cp robots.txt dist/ 2>/dev/null || true
           cp sitemap.xml dist/ 2>/dev/null || true
+          cp index.html dist/ 2>/dev/null || true
+          cp -r assets dist/ 2>/dev/null || true
       
-      - name: Add static script tags to dist/index.html
+      - name: Add static script tags to dist/app.html
         run: |
-          # dist/index.html에 browser-compatibility-check.js 스크립트 태그 추가
-          sed -i.bak 's|</body>|    <script type="module" src="browser-compatibility-check.js"></script>\n</body>|' dist/index.html
-          rm -f dist/index.html.bak
+          # dist/app.html에 browser-compatibility-check.js 스크립트 태그 추가
+          sed -i.bak 's|</body>|    <script type="module" src="browser-compatibility-check.js"></script>\n</body>|' dist/app.html
+          rm -f dist/app.html.bak
 
       - name: Setup Pages
         uses: actions/configure-pages@v4

@@ -22,7 +22,7 @@ export default defineConfig(({ command, mode }) => {
       outDir: 'dist',
       sourcemap: true,
       rollupOptions: {
-        input: './index.html'
+        input: './app.html'
       },
       // 의존성을 번들에 포함
       commonjsOptions: {

@@ -1,37 +1,46 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" data-theme="light">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="교실 자리 배치 프로그램 – 좌석 랜덤 배치, 고정 좌석, 인쇄/저장/공유 지원">
+    <meta name="description" content="교실 자리 배치 프로그램 – 좌석 랜덤 배치, 고정 좌석, 인쇄/저장/공유 지원. 무료 온라인 자리 배치 도구">
+    <meta name="keywords" content="자리 배치, 교실 자리 배치, 좌석 배치, 학급 관리, 선생님 도구, 교육 도구, 무료 자리 배치">
     <meta name="author" content="김신회 (laguyo87@gmail.com)">
     <meta name="theme-color" content="#667eea">
     <link rel="canonical" href="https://laguyo87.github.io/seating-arrangement-program/">
-    <!-- Open Graph / Twitter -->
+
+    <!-- Google Search Console Verification -->
+    <meta name="google-site-verification" content="xNE5LVH11OXsGxQ9RspfZlH-SF3M45DFMVU6_9oP174" />
+
+    <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
-    <meta property="og:title" content="교실 자리 배치 프로그램 online">
-    <meta property="og:description" content="좌석 랜덤 배치, 고정 좌석, 인쇄/저장/공유 지원">
+    <meta property="og:title" content="교실 자리 배치 프로그램 online - 무료 좌석 배치 도구">
+    <meta property="og:description" content="좌석 랜덤 배치, 고정 좌석, 인쇄/저장/공유 지원. 선생님을 위한 무료 온라인 자리 배치 프로그램">
     <meta property="og:url" content="https://laguyo87.github.io/seating-arrangement-program/">
     <meta property="og:image" content="https://laguyo87.github.io/seating-arrangement-program/og-image.png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
-    <meta property="og:image:type" content="image/png">
+    <meta property="og:locale" content="ko_KR">
+
+    <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="교실 자리 배치 프로그램 online">
     <meta name="twitter:description" content="좌석 랜덤 배치, 고정 좌석, 인쇄/저장/공유 지원">
     <meta name="twitter:image" content="https://laguyo87.github.io/seating-arrangement-program/og-image.png">
-    <meta name="google-site-verification" content="xNE5LVH11OXsGxQ9RspfZlH-SF3M45DFMVU6_9oP174" />
-    <title>교실 자리 배치 프로그램 online</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
-    <link rel="stylesheet" href="style.css">
-    
-    <!-- 구조화된 데이터 (Schema.org) -->
+
+    <title>교실 자리 배치 프로그램 online - 무료 좌석 배치 도구</title>
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪑</text></svg>">
+
+    <!-- Structured Data (Schema.org) -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "WebApplication",
       "name": "교실 자리 배치 프로그램",
-      "description": "좌석 랜덤 배치, 고정 좌석, 인쇄/저장/공유 지원",
+      "alternateName": "자리 배치 프로그램",
+      "description": "좌석 랜덤 배치, 고정 좌석, 인쇄/저장/공유를 지원하는 무료 온라인 교실 자리 배치 도구",
       "url": "https://laguyo87.github.io/seating-arrangement-program/",
       "applicationCategory": "EducationalApplication",
       "operatingSystem": "Web Browser",
@@ -46,394 +55,1115 @@
         "email": "laguyo87@gmail.com"
       },
       "inLanguage": "ko",
-      "isAccessibleForFree": true
+      "isAccessibleForFree": true,
+      "featureList": [
+        "랜덤 좌석 배치",
+        "고정 좌석 지정",
+        "드래그 앤 드롭",
+        "인쇄 기능",
+        "클라우드 저장",
+        "남녀 분리 배치"
+      ]
     }
     </script>
+
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root[data-theme="light"] {
+            --bg-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --bg-secondary: #ffffff;
+            --bg-tertiary: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            --text-primary: #333333;
+            --text-secondary: #666666;
+            --text-light: #999999;
+            --text-on-primary: #ffffff;
+            --card-bg: #ffffff;
+            --border-color: rgba(0, 0, 0, 0.1);
+            --shadow-color: rgba(0, 0, 0, 0.1);
+            --shadow-hover: rgba(0, 0, 0, 0.15);
+            --accent-color: #667eea;
+            --header-bg: rgba(255, 255, 255, 0.1);
+            --floating-shape: rgba(255, 255, 255, 0.1);
+        }
+
+        :root[data-theme="dark"] {
+            --bg-primary: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            --bg-secondary: #1a1a2e;
+            --bg-tertiary: linear-gradient(135deg, #16213e 0%, #0f3460 100%);
+            --text-primary: #e0e0e0;
+            --text-secondary: #b0b0b0;
+            --text-light: #808080;
+            --text-on-primary: #ffffff;
+            --card-bg: #2c2c3e;
+            --border-color: rgba(255, 255, 255, 0.1);
+            --shadow-color: rgba(0, 0, 0, 0.3);
+            --shadow-hover: rgba(0, 0, 0, 0.4);
+            --accent-color: #764ba2;
+            --header-bg: rgba(0, 0, 0, 0.3);
+            --floating-shape: rgba(255, 255, 255, 0.05);
+        }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            overflow-x: hidden;
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+
+        /* 배경 애니메이션 */
+        .background-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            z-index: -1;
+        }
+
+        .floating-shape {
+            position: absolute;
+            background: var(--floating-shape);
+            border-radius: 50%;
+            animation: float 20s infinite ease-in-out;
+        }
+
+        .shape-1 {
+            width: 300px;
+            height: 300px;
+            top: 10%;
+            left: 10%;
+            animation-delay: 0s;
+        }
+
+        .shape-2 {
+            width: 200px;
+            height: 200px;
+            top: 60%;
+            right: 10%;
+            animation-delay: 5s;
+        }
+
+        .shape-3 {
+            width: 150px;
+            height: 150px;
+            bottom: 20%;
+            left: 50%;
+            animation-delay: 10s;
+        }
+
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translate(0, 0) rotate(0deg);
+            }
+
+            33% {
+                transform: translate(30px, -30px) rotate(120deg);
+            }
+
+            66% {
+                transform: translate(-20px, 20px) rotate(240deg);
+            }
+        }
+
+        /* 헤더 */
+        .header {
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--header-bg);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--text-on-primary);
+            text-decoration: none;
+        }
+
+        .header-buttons {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .btn-header {
+            padding: 0.6rem 1.5rem;
+            border: 2px solid var(--text-on-primary);
+            background: transparent;
+            color: var(--text-on-primary);
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-header:hover {
+            background: var(--text-on-primary);
+            color: var(--accent-color);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px var(--shadow-color);
+        }
+
+        /* 다크 모드 토글 */
+        .dark-mode-toggle {
+            background: transparent;
+            border: 2px solid var(--text-on-primary);
+            color: var(--text-on-primary);
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .dark-mode-toggle:hover {
+            background: var(--text-on-primary);
+            transform: rotate(180deg) scale(1.1);
+        }
+
+        /* 히어로 섹션 */
+        .hero {
+            min-height: calc(100vh - 80px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 2rem;
+            position: relative;
+        }
+
+        .hero-content {
+            max-width: 800px;
+            animation: fadeInUp 1s ease-out;
+        }
+
+        .hero-emoji {
+            font-size: 5rem;
+            margin-bottom: 1rem;
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-20px);
+            }
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            color: var(--text-on-primary);
+            margin-bottom: 1rem;
+            font-weight: 800;
+            line-height: 1.2;
+        }
+
+        .hero-subtitle {
+            font-size: 1.3rem;
+            color: rgba(255, 255, 255, 0.9);
+            margin-bottom: 2rem;
+            line-height: 1.6;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn-primary {
+            padding: 1rem 2.5rem;
+            background: var(--card-bg);
+            color: var(--accent-color);
+            border: none;
+            border-radius: 30px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px var(--shadow-color);
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px var(--shadow-hover);
+        }
+
+        .btn-secondary {
+            padding: 1rem 2.5rem;
+            background: transparent;
+            color: var(--text-on-primary);
+            border: 2px solid var(--text-on-primary);
+            border-radius: 30px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-secondary:hover {
+            background: var(--text-on-primary);
+            color: var(--accent-color);
+            transform: translateY(-3px);
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 공통 섹션 스타일 */
+        .section {
+            padding: 5rem 2rem;
+        }
+
+        .section-white {
+            background: var(--bg-secondary);
+        }
+
+        .section-gradient {
+            background: var(--bg-tertiary);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .section-subtitle {
+            text-align: center;
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            margin-bottom: 3rem;
+        }
+
+        /* 스크린샷 섹션 */
+        .screenshots-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .screenshot-card {
+            background: var(--card-bg);
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px var(--shadow-color);
+            transition: all 0.3s ease;
+        }
+
+        .screenshot-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 50px var(--shadow-hover);
+        }
+
+        .screenshot-card img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .screenshot-caption {
+            padding: 1.5rem;
+            text-align: center;
+        }
+
+        .screenshot-caption h3 {
+            font-size: 1.3rem;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .screenshot-caption p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        /* 기능 섹션 */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .feature-card {
+            background: var(--card-bg);
+            padding: 2.5rem;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px var(--shadow-color);
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 50px var(--shadow-hover);
+            border: 2px solid #667eea;
+        }
+
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+
+        .feature-description {
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+
+
+        /* 후기 섹션 */
+        .testimonials-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .testimonial-card {
+            background: var(--card-bg);
+            padding: 2rem;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px var(--shadow-color);
+            position: relative;
+        }
+
+        .testimonial-quote {
+            font-size: 3rem;
+            color: #667eea;
+            opacity: 0.2;
+            position: absolute;
+            top: 1rem;
+            left: 1.5rem;
+        }
+
+        .testimonial-text {
+            font-size: 1.05rem;
+            line-height: 1.7;
+            color: var(--text-primary);
+            margin-bottom: 1.5rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .testimonial-author {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .testimonial-avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .testimonial-info h4 {
+            font-size: 1.1rem;
+            margin-bottom: 0.2rem;
+            color: var(--text-primary);
+        }
+
+        .testimonial-info p {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .testimonial-stars {
+            color: #ffc107;
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+        }
+
+        /* FAQ 섹션 */
+        .faq-container {
+            max-width: 800px;
+            margin: 3rem auto 0;
+        }
+
+        .faq-item {
+            background: var(--card-bg);
+            border-radius: 15px;
+            margin-bottom: 1.5rem;
+            overflow: hidden;
+            box-shadow: 0 5px 15px var(--shadow-color);
+            transition: all 0.3s ease;
+        }
+
+        .faq-item:hover {
+            box-shadow: 0 8px 25px var(--shadow-hover);
+        }
+
+        .faq-question {
+            padding: 1.5rem;
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+
+        .faq-question:hover {
+            color: #667eea;
+        }
+
+        .faq-icon {
+            font-size: 1.5rem;
+            transition: transform 0.3s ease;
+        }
+
+        .faq-item.active .faq-icon {
+            transform: rotate(180deg);
+        }
+
+        .faq-answer {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .faq-item.active .faq-answer {
+            max-height: 500px;
+        }
+
+        .faq-answer-content {
+            padding: 0 1.5rem 1.5rem;
+            color: var(--text-secondary);
+            line-height: 1.7;
+        }
+
+        /* 사용 방법 섹션 */
+        .steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .step-card {
+            background: var(--card-bg);
+            padding: 2rem;
+            border-radius: 20px;
+            text-align: center;
+            position: relative;
+            box-shadow: 0 5px 15px var(--shadow-color);
+        }
+
+        .step-number {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin: 0 auto 1.5rem;
+        }
+
+        .step-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+
+        .step-description {
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        /* CTA 섹션 */
+        .cta {
+            background: var(--bg-primary);
+            padding: 5rem 2rem;
+            text-align: center;
+            color: var(--text-on-primary);
+        }
+
+        .cta h2 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+        }
+
+        .cta p {
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+        }
+
+        /* 푸터 */
+        .footer {
+            background: #2c3e50;
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .footer p {
+            margin-bottom: 0.5rem;
+            opacity: 0.8;
+        }
+
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* 방문자 수 배지 */
+        .visitor-badge {
+            position: fixed;
+            bottom: 1rem;
+            right: 1rem;
+            background: var(--card-bg);
+            padding: 0.5rem 1rem;
+            border-radius: 50px;
+            box-shadow: 0 2px 8px var(--shadow-color);
+            font-weight: 400;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            opacity: 0.6;
+            z-index: 100;
+            transition: opacity 0.3s ease;
+        }
+
+        .visitor-badge:hover {
+            opacity: 1;
+        }
+
+        /* 반응형 */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+
+            .hero-subtitle {
+                font-size: 1.1rem;
+            }
+
+            .hero-emoji {
+                font-size: 3.5rem;
+            }
+
+            .section-title {
+                font-size: 2rem;
+            }
+
+            .features-grid,
+            .screenshots-grid,
+            .testimonials-grid,
+            .steps {
+                grid-template-columns: 1fr;
+            }
+
+            .visitor-badge {
+                bottom: 1rem;
+                right: 1rem;
+                padding: 0.8rem 1.2rem;
+                font-size: 0.9rem;
+            }
+
+            .header {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .hero-buttons {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .section {
+                padding: 3rem 1.5rem;
+            }
+        }
+    </style>
 </head>
+
 <body>
-    <!-- 상단 헤더 -->
-    <header class="top-header">
-        <div class="header-content">
-            <h1><span class="title-icon" aria-hidden="true">🪑</span>교실 자리 배치 프로그램 <small style="font-size: 0.6em;">online</small></h1>
-            <div class="header-info">
-                <div class="class-select-container" id="class-select-container">
-                    <label for="class-select" class="class-select-label" aria-label="반 선택">반 만들기:</label>
-                    <select id="class-select" class="class-select" aria-label="반 선택 메뉴">
-                        <option value="">반 선택</option>
-                    </select>
-                    <button id="add-class-btn" class="icon-btn" title="새 반 추가" aria-label="새 반 추가">➕</button>
-                    <button id="delete-class-btn" class="icon-btn" title="선택한 반 삭제" aria-label="선택한 반 삭제" style="display: none;">🗑️</button>
-                </div>
-                <button id="firebase-login-btn" class="login-btn" title="로그인 (클라우드 동기화)" aria-label="로그인">🔐 로그인</button>
-                <span id="firebase-status" class="firebase-status" style="display: none;" aria-live="polite"></span>
-                <button id="undo-layout" class="icon-btn" title="되돌리기 (Ctrl+Z / Cmd+Z)" aria-label="되돌리기 (Ctrl+Z 또는 Cmd+Z)">↶</button>
-                <button id="redo-layout" class="icon-btn" title="다시 실행하기 (Ctrl+Y / Cmd+Y)" aria-label="다시 실행하기 (Ctrl+Y 또는 Cmd+Y)">↷</button>
-                <div class="history-dropdown" id="history-dropdown">
-                    <button class="history-dropdown-btn" id="history-dropdown-btn" aria-label="확정된 자리 이력 보기" aria-expanded="false" aria-haspopup="true">📋 확정된 자리 이력</button>
-                    <div class="history-dropdown-content" id="history-dropdown-content" role="menu" aria-labelledby="history-dropdown-btn">
-                        <div class="history-empty" id="history-empty">확정된 자리 이력이 없습니다.</div>
-                    </div>
-                </div>
-                <button id="user-manual-btn" class="user-manual-btn" title="사용설명서" aria-label="사용설명서 열기">📖 사용설명서</button>
-                <p class="visitor-count" id="visitor-count" aria-live="polite">총 방문자 수: <span id="visitor-number">-</span></p>
-            </div>
+    <!-- 배경 애니메이션 -->
+    <div class="background-animation">
+        <div class="floating-shape shape-1"></div>
+        <div class="floating-shape shape-2"></div>
+        <div class="floating-shape shape-3"></div>
+    </div>
+
+    <!-- 헤더 -->
+    <header class="header">
+        <a href="index.html" class="logo">
+            <span>🪑</span>
+            <span>자리 배치 프로그램</span>
+        </a>
+        <div class="header-buttons">
+            <button class="dark-mode-toggle" id="darkModeToggle" title="다크 모드 전환">
+                <span id="themeIcon">🌙</span>
+            </button>
+            <a href="app.html" class="btn-header">프로그램 시작</a>
         </div>
     </header>
 
-    <!-- 메인 컨테이너 -->
-    <div class="main-container">
-        <!-- 사이드바 오버레이 (모바일용) -->
-        <div class="sidebar-overlay" id="sidebar-overlay" aria-hidden="true"></div>
-        <!-- 사이드바 토글 버튼 -->
-        <button id="sidebar-toggle-btn" class="sidebar-toggle-btn" title="사이드바 접기/펼치기" aria-label="사이드바 접기/펼치기" aria-expanded="true">
-            <span class="toggle-icon" aria-hidden="true">◀</span>
-        </button>
-        <!-- 좌측 사이드바 (설정) -->
-        <aside class="sidebar" id="sidebar">
-            <div class="sidebar-content">
-            <!-- 초기화 버튼 -->
-            <div class="form-group" style="margin-top: 0; margin-bottom: 16px;">
-                <button id="reset-app" class="secondary-btn" style="width: 100%;" aria-label="모든 설정 및 데이터 초기화">초기화(새 자리배치 시작)</button>
+    <!-- 히어로 섹션 -->
+    <section class="hero">
+        <div class="hero-content">
+            <div class="hero-emoji">🪑</div>
+            <h1>교실 자리 배치,<br>이제 클릭 한 번으로</h1>
+            <p class="hero-subtitle">
+                학생 정보를 입력하면 자동으로 최적의 자리 배치를 생성해드립니다.<br>
+                고정 좌석, 남녀 분리, 짝꿍 배치 등 다양한 옵션을 제공합니다.
+            </p>
+            <div class="hero-buttons">
+                <a href="app.html" class="btn-primary">🚀 지금 시작하기</a>
+                <a href="#features" class="btn-secondary">📖 기능 알아보기</a>
             </div>
-            
-            <!-- 옵션1: 좌석 배치 형태 -->
-            <section id="layout-section" class="step-section" aria-labelledby="layout-section-title">
-                <h2 id="layout-section-title">옵션1: 좌석 배치 형태</h2>
-                
-                <div class="form-group">
-                    <div class="radio-group">
-                        <label class="radio-option">
-                            <input type="radio" name="layout-type" value="single-uniform" data-seat-type="single" checked aria-label="1명씩 한 줄로 배치">
-                            <span>1명씩 한 줄로 배치</span>
-                        </label>
-                        
-                        <!-- 1명씩 한 줄로 배치 서브 옵션 (기본 표시) -->
-                        <div id="single-submenu" style="display: block; margin-left: 30px; margin-top: 2px; margin-bottom: 2px;">
-                            <label class="radio-option" style="border: none; padding: 2px 15px; margin: 0;">
-                                <input type="radio" name="single-mode" value="basic-row" checked aria-label="기본 1줄 배치">
-                                <span>기본 1줄 배치</span>
-                            </label>
-                            <label class="radio-option" style="border: none; padding: 2px 15px; margin: 0;">
-                                <input type="radio" name="single-mode" value="gender-row" aria-label="남녀 1줄 배치">
-                                <span>남녀 1줄 배치</span>
-                            </label>
-                            <label class="radio-option" style="border: none; padding: 2px 15px; margin: 0;">
-                                <input type="radio" name="single-mode" value="gender-symmetric-row" aria-label="남녀 대칭 1줄 배치">
-                                <span>남녀 대칭 1줄 배치</span>
-                            </label>
-                            <label style="display: flex; align-items: center; padding: 2px 15px; margin: 0; margin-left: 0px;">
-                                <input type="checkbox" id="reverse-gender-order" aria-label="남녀 순서 바꾸기" />
-                                <span style="margin-left: 8px;">남녀 순서 바꾸기</span>
-                            </label>
-                        </div>
-                        
-                        <label class="radio-option">
-                            <input type="radio" name="layout-type" value="pair-uniform" data-seat-type="pair" aria-label="2명씩 짝꿍 배치">
-                            <span>2명씩 짝꿍 배치</span>
-                        </label>
-                        
-                        <!-- 2명씩 짝꿍 배치 서브 옵션 (기본 숨김) -->
-                        <div id="pair-submenu" style="display: none; margin-left: 30px; margin-top: 5px; margin-bottom: 5px;">
-                            <label class="radio-option" style="border: none; padding: 1px 1px;">
-                                <input type="radio" name="pair-mode" value="gender-pair" checked aria-label="남녀 짝꿍 하기">
-                                <span>남녀 짝꿍 하기</span>
-                            </label>
-                            <label class="radio-option" style="border: none; padding: 1px 1px;">
-                                <input type="radio" name="pair-mode" value="same-gender-pair" aria-label="같은 성끼리 짝꿍하기">
-                                <span>같은 성끼리 짝꿍하기</span>
-                            </label>
-                        </div>
-                        
-                        <label class="radio-option">
-                            <input type="radio" name="layout-type" value="group" data-seat-type="single" id="radio-group" aria-label="모둠 배치">
-                            <span>모둠 배치</span>
-                        </label>
-                        
-                        <!-- 모둠 배치 서브 옵션 (기본 숨김) -->
-                        <div id="group-submenu" style="display: none; margin-left: 30px; margin-top: 0px; margin-bottom: 0px;">
-                            <label class="radio-option" style="border: none; padding: 2px 15px; line-height: 1.2;">
-                                <input type="radio" name="group-size" value="group-3" data-seat-type="single" aria-label="3명 모둠 배치">
-                                <span>3명 모둠 배치</span>
-                            </label>
-                            <label class="radio-option" style="border: none; padding: 2px 15px; line-height: 1.2;">
-                                <input type="radio" name="group-size" value="group-4" data-seat-type="single" aria-label="4명 모둠 배치">
-                                <span>4명 모둠 배치</span>
-                            </label>
-                            <label class="radio-option" style="border: none; padding: 2px 15px; line-height: 1.2;">
-                                <input type="radio" name="group-size" value="group-5" data-seat-type="single" aria-label="5명 모둠 배치">
-                                <span>5명 모둠 배치</span>
-                            </label>
-                            <label class="radio-option" style="border: none; padding: 2px 15px; line-height: 1.2;">
-                                <input type="radio" name="group-size" value="group-6" data-seat-type="single" aria-label="6명 모둠 배치">
-                                <span>6명 모둠 배치</span>
-                            </label>
-                        </div>
-                        
-                        <!-- 모둠 배치 남녀 섞기 옵션 (기본 숨김) -->
-                        <div id="group-gender-mix-option" style="display: none; margin-left: 30px; margin-top: 0px; margin-bottom: 0px;">
-                            <label style="display: flex; align-items: center; padding: 2px 15px; line-height: 1.2;">
-                                <input type="checkbox" id="group-gender-mix" aria-label="남녀 섞기" />
-                                <span style="margin-left: 8px;">남녀 섞기</span>
-                            </label>
-                        </div>
-                        
-                        <label class="radio-option">
-                            <input type="radio" name="layout-type" value="ushape" data-seat-type="single" aria-label="ㄷ자 2명 짝꿍 배치 (준비중)">
-                            <span>ㄷ자 2명 짝꿍 배치 (준비중)</span>
-                        </label>
+        </div>
+    </section>
+
+    <!-- 스크린샷 섹션 -->
+    <section class="section section-white">
+        <div class="container">
+            <h2 class="section-title">프로그램 미리보기</h2>
+            <p class="section-subtitle">실제 프로그램 화면을 확인해보세요</p>
+
+            <div class="screenshots-grid">
+                <div class="screenshot-card">
+                    <img src="assets/screenshot-seating-view.png" alt="자리 배치 화면">
+                    <div class="screenshot-caption">
+                        <h3>자동 생성된 자리 배치</h3>
+                        <p>학생 카드를 드래그하여 자유롭게 자리를 변경할 수 있습니다</p>
                     </div>
                 </div>
 
-                <div class="form-group" id="gender-pairing-option" style="display: none;">
-                    <h3>성별 조건 (2열 좌석만 해당)</h3>
-                    <label><input type="checkbox" id="gender-pairing" aria-label="남녀 짝꿍 배치 (남여 성비에 맞춘 짝꿍 배치)" /> 남녀 짝꿍 배치 (남여 성비에 맞춘 짝꿍 배치)</label>
-                </div>
-            </section>
-
-            <!-- 옵션2: 학생 자리 수 -->
-            <section id="input-section" class="step-section" aria-labelledby="input-section-title">
-                <h2 id="input-section-title">옵션2: 학생 자리 수</h2>
-                
-                <div class="form-group" style="display: flex; align-items: center; gap: 10px; flex-wrap: nowrap;">
-                    <div style="display: flex; align-items: center; gap: 5px;">
-                        <label for="male-students" style="white-space: nowrap; font-size: 0.95em;">남학생:</label>
-                        <input type="text" id="male-students" placeholder="0" value="12" 
-                               inputmode="numeric" pattern="[0-9]*"
-                               style="width: 60px; padding: 6px 8px;" 
-                               aria-label="남학생 수 입력" 
-                               aria-describedby="male-students-help male-students-desc"
-                               aria-required="false" />
-                        <span id="male-students-help" class="sr-only">남학생 수를 입력하세요. 0부터 100까지 입력 가능합니다.</span>
-                    </div>
-                    
-                    <div style="display: flex; align-items: center; gap: 5px;">
-                        <label for="female-students" style="white-space: nowrap; font-size: 0.95em;">여학생:</label>
-                        <input type="text" id="female-students" placeholder="0" value="12" 
-                               inputmode="numeric" pattern="[0-9]*"
-                               style="width: 60px; padding: 6px 8px;" 
-                               aria-label="여학생 수 입력" 
-                               aria-describedby="female-students-help female-students-desc"
-                               aria-required="false" />
-                        <span id="female-students-help" class="sr-only">여학생 수를 입력하세요. 0부터 100까지 입력 가능합니다.</span>
+                <div class="screenshot-card">
+                    <img src="assets/screenshot-student-table.png" alt="학생 입력 화면">
+                    <div class="screenshot-caption">
+                        <h3>간편한 학생 정보 입력</h3>
+                        <p>이름과 성별을 입력하거나 CSV 파일로 한 번에 불러올 수 있습니다</p>
                     </div>
                 </div>
-                
-                <p id="male-students-desc" class="help-text" style="margin-top: 8px; color: #666; font-size: 0.9em;">
-                    남학생 수와 여학생 수를 입력하면 우측에 미리보기가 자동으로 표시됩니다.
-                </p>
-                <p id="female-students-desc" class="sr-only">여학생 수와 남학생 수를 입력하면 우측에 미리보기가 자동으로 표시됩니다.</p>
-            </section>
+            </div>
+        </div>
+    </section>
 
-            <!-- 옵션3: 분단 개수 -->
-            <section id="partition-section" class="step-section" aria-labelledby="partition-section-title">
-                <h2 id="partition-section-title">옵션3: 분단 개수</h2>
-                
-                <div class="form-group">
-                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: nowrap;">
-                        <label for="number-of-partitions" style="margin-bottom: 0; white-space: nowrap; font-size: 0.95em;">분단 수:</label>
-                        <div class="count-input-container" style="flex: 0 0 auto;">
-                            <input type="number" id="number-of-partitions" min="1" max="10" placeholder="분단 수" value="5" 
-                                   style="width: 80px;" 
-                                   aria-label="분단 수 입력 (1-10개)" 
-                                   aria-describedby="partitions-help number-of-partitions-desc"
-                                   aria-required="true" />
-                            <span id="partitions-help" class="sr-only">교실의 분단 수를 입력하세요. 1개부터 10개까지 입력 가능합니다.</span>
-                        </div>
-                    </div>
-                    <p id="number-of-partitions-desc" class="help-text" style="margin-top: 8px; color: #666; font-size: 0.9em;">
-                        교실의 분단 수를 입력하세요 (예: 2분단, 3분단 등)
+
+
+    <!-- 주요 기능 -->
+    <section id="features" class="section section-white">
+        <div class="container">
+            <h2 class="section-title">주요 기능</h2>
+            <p class="section-subtitle">선생님들의 업무를 더 쉽고 빠르게 만들어드립니다</p>
+
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🎲</div>
+                    <h3 class="feature-title">스마트 랜덤 배치</h3>
+                    <p class="feature-description">
+                        남녀 성비를 고려한 지능형 자리 배치 알고리즘으로 공정하고 효율적인 자리 배치를 제공합니다.
                     </p>
                 </div>
-            </section>
 
-            <!-- 옵션4: 맞춤 구성 -->
-            <section id="custom2-section" class="step-section" aria-labelledby="custom2-section-title">
-                <h2 id="custom2-section-title">옵션4: 맞춤 구성</h2>
-                
-                <div class="form-group">
-                    <div class="radio-group">
-                        <label class="radio-option">
-                            <input type="radio" name="custom-mode-2" value="random" id="mode-random" checked>
-                            <span>랜덤 배치</span>
-                        </label>
-                        <label class="radio-option">
-                            <input type="radio" name="custom-mode-2" value="fixed-random" id="mode-fixed-random">
-                            <span>고정 좌석 지정 후 랜덤 배치</span>
-                        </label>
-                    </div>
-                </div>
-            </section>
-
-            <!-- 🪑 좌석 배치하기 -->
-            <section id="main-action-section" class="step-section" aria-labelledby="main-action-section-title">
-                <h2 id="main-action-section-title">🪑 좌석 배치하기</h2>
-                
-                <div class="form-group">
-                    <button id="create-student-table" class="primary-btn" aria-label="학생 이름 입력 테이블 생성">학생 이름 입력하기</button>
-                    <p class="help-text" style="margin-top: 8px; color: #666; font-size: 0.9em;">
-                        학생 정보를 입력할 테이블을 생성합니다.
+                <div class="feature-card">
+                    <div class="feature-icon">📌</div>
+                    <h3 class="feature-title">고정 좌석 지정</h3>
+                    <p class="feature-description">
+                        특정 학생의 자리를 미리 지정하고, 나머지 학생들만 랜덤 배치할 수 있습니다.
                     </p>
                 </div>
-            </section>
 
-            <!-- 옵션 설정 저장 버튼 -->
-            <div class="form-group" style="margin-top: 8px;">
-                <button id="save-options" class="secondary-btn" style="width: 100%;" aria-label="현재 옵션 설정을 저장">옵션 설정 기억하기</button>
-            </div>
-
-            </div>
-            <div class="sidebar-footer">Copyright (c) 2025 김신회(laguyo87@gmail.com)</div>
-        </aside>
-
-        <!-- 우측 메인창 (미리보기) -->
-        <main class="main-content">
-            <!-- 커튼 애니메이션용 오버레이 -->
-            <div id="curtain-overlay" class="curtain-overlay">
-                <div class="curtain-left"></div>
-                <div class="curtain-right"></div>
-            </div>
-            <!-- 폭죽 애니메이션용 컨테이너 -->
-            <div id="fireworks-container" class="fireworks-container"></div>
-            <div class="main-header">
-                <div style="display: flex; align-items: center; gap: 15px; flex-wrap: wrap;">
-                    <h2>자리 배치도</h2>
-                    <div style="color: #dc3545; font-size: 0.95em; font-weight: 500; font-style: italic;">
-                        🔄 드래그&드롭으로 자리를 서로 바꿀 수 있습니다
-                    </div>
-                    <!-- 고정 좌석 모드 도움말 (초기에는 숨김) -->
-                    <div id="fixed-seat-help" class="fixed-seat-help" style="display: none;">
-                        💡 학생 책상(카드)을 클릭하면 고정 자리가 됩니다
-                    </div>
+                <div class="feature-card">
+                    <div class="feature-icon">👥</div>
+                    <h3 class="feature-title">다양한 배치 옵션</h3>
+                    <p class="feature-description">
+                        1인 배치, 짝꿍 배치, 모둠 배치 등 다양한 형태를 지원하며, 남녀 분리/섞기 옵션도 제공합니다.
+                    </p>
                 </div>
-               <!-- 자리 배치도 액션 버튼들 (초기에는 숨김) -->
-               <div id="layout-action-buttons" style="display: none;">
-                   <div style="display: flex; gap: 10px;">
-                       <button id="confirm-seats" class="primary-btn" aria-label="자리 확정 및 저장">✅ 자리 확정하기(저장) 💾</button>
-                       <button id="print-layout" class="secondary-btn" style="white-space: nowrap;" aria-label="자리 배치도 인쇄">🖨️ 인쇄하기</button>
-                       <button id="print-layout-teacher" class="secondary-btn" style="white-space: nowrap;" aria-label="교탁용 자리 배치도 인쇄">👨‍🏫 교탁용 인쇄하기</button>
-                   </div>
-               </div>
-            </div>
-            
-            <div id="output-section" class="result-container">
-                <!-- 카드 배치 영역 -->
-                <div id="card-layout-container" style="padding: 20px; background: white; border-radius: 8px; margin: 1px 0;">
-                    <div id="classroom-layout" style="min-height: 600px; background: #f8f9fa; border: 2px dashed #ddd; border-radius: 10px; padding: 20px; position: relative;">
-                        <!-- 칠판 영역 -->
-                        <div class="classroom-item" id="blackboard-area" style="position: absolute; top: 20px; left: 50%; transform: translateX(-50%); width: 300px; height: 40px; background: #2c3e50; border: 3px solid #1a252f; border-radius: 5px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 16px;">
-                            📝 칠판
-                        </div>
-                        <!-- 좌석 배치 영역 -->
-                        <div id="seats-area" style="margin-top: 80px; display: grid; gap: 10px; justify-content: center;">
-                            <!-- 좌석 카드들이 여기에 동적으로 추가됨 -->
-                        </div>
-                    </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🖱️</div>
+                    <h3 class="feature-title">드래그 앤 드롭</h3>
+                    <p class="feature-description">
+                        자동 배치 후 간편하게 학생 카드를 드래그하여 자리를 변경할 수 있습니다.
+                    </p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🖨️</div>
+                    <h3 class="feature-title">인쇄 및 저장</h3>
+                    <p class="feature-description">
+                        완성된 자리 배치도를 인쇄하거나 이미지로 저장할 수 있으며, 교탁용 전용 인쇄 모드도 지원합니다.
+                    </p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">☁️</div>
+                    <h3 class="feature-title">클라우드 동기화</h3>
+                    <p class="feature-description">
+                        Google 로그인을 통해 여러 반의 자리 배치를 클라우드에 저장하고, 어디서나 불러올 수 있습니다.
+                    </p>
                 </div>
             </div>
-        </main>
+        </div>
+    </section>
+
+    <!-- 사용자 후기 섹션 -->
+    <section class="section section-gradient">
+        <div class="container">
+            <h2 class="section-title">선생님들의 후기</h2>
+            <p class="section-subtitle">실제 사용자들의 생생한 경험담</p>
+
+            <div class="testimonials-grid">
+                <div class="testimonial-card">
+                    <div class="testimonial-quote">"</div>
+                    <div class="testimonial-stars">⭐⭐⭐⭐⭐</div>
+                    <p class="testimonial-text">
+                        자리 배치를 수작업으로 하다가 이 프로그램을 알게 되었는데, 정말 시간이 많이 절약되었습니다. 특히 고정 좌석 기능이 너무 유용해요!
+                    </p>
+                    <div class="testimonial-author">
+                        <div class="testimonial-avatar">김</div>
+                        <div class="testimonial-info">
+                            <h4>김선생</h4>
+                            <p>서울 ○○초등학교 5학년 담임</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="testimonial-card">
+                    <div class="testimonial-quote">"</div>
+                    <div class="testimonial-stars">⭐⭐⭐⭐⭐</div>
+                    <p class="testimonial-text">
+                        드래그 앤 드롭으로 자리를 쉽게 바꿀 수 있어서 너무 편리합니다. 학생들도 자기 자리를 금방 찾을 수 있어요.
+                    </p>
+                    <div class="testimonial-author">
+                        <div class="testimonial-avatar">이</div>
+                        <div class="testimonial-info">
+                            <h4>이선생</h4>
+                            <p>경기 ○○중학교 2학년 담임</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="testimonial-card">
+                    <div class="testimonial-quote">"</div>
+                    <div class="testimonial-stars">⭐⭐⭐⭐⭐</div>
+                    <p class="testimonial-text">
+                        클라우드 동기화 덕분에 집에서도, 학교에서도 자리 배치를 관리할 수 있어요. 여러 반을 맡고 있는 저에게 딱입니다!
+                    </p>
+                    <div class="testimonial-author">
+                        <div class="testimonial-avatar">박</div>
+                        <div class="testimonial-info">
+                            <h4>박선생</h4>
+                            <p>인천 ○○고등학교 1학년 담임</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 사용 방법 -->
+    <section class="section section-white">
+        <div class="container">
+            <h2 class="section-title">사용 방법</h2>
+            <p class="section-subtitle">단 3단계로 자리 배치를 완성하세요</p>
+
+            <div class="steps">
+                <div class="step-card">
+                    <div class="step-number">1</div>
+                    <h3 class="step-title">학생 정보 입력</h3>
+                    <p class="step-description">
+                        남학생과 여학생 수를 입력하고, 학생 이름과 성별을 입력합니다. CSV 파일로 한 번에 불러올 수도 있습니다.
+                    </p>
+                </div>
+
+                <div class="step-card">
+                    <div class="step-number">2</div>
+                    <h3 class="step-title">배치 옵션 선택</h3>
+                    <p class="step-description">
+                        원하는 좌석 배치 형태(1인/짝꿍/모둠)를 선택하고, 분단 수와 추가 옵션을 설정합니다.
+                    </p>
+                </div>
+
+                <div class="step-card">
+                    <div class="step-number">3</div>
+                    <h3 class="step-title">자리 배치 완성</h3>
+                    <p class="step-description">
+                        자동으로 생성된 배치를 확인하고, 필요시 드래그로 조정한 후 인쇄하거나 저장합니다.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ 섹션 -->
+    <section class="section section-gradient">
+        <div class="container">
+            <h2 class="section-title">자주 묻는 질문</h2>
+            <p class="section-subtitle">궁금한 점을 확인해보세요</p>
+
+            <div class="faq-container">
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <span>회원가입이 필요한가요?</span>
+                        <span class="faq-icon">▼</span>
+                    </div>
+                    <div class="faq-answer">
+                        <div class="faq-answer-content">
+                            아니요! 회원가입 없이 바로 사용할 수 있습니다. 다만, 클라우드 동기화 기능을 사용하려면 Google 로그인이 필요합니다.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <span>무료로 사용할 수 있나요?</span>
+                        <span class="faq-icon">▼</span>
+                    </div>
+                    <div class="faq-answer">
+                        <div class="faq-answer-content">
+                            네, 완전 무료입니다! 모든 기능을 제한 없이 사용하실 수 있습니다.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <span>모바일에서도 사용할 수 있나요?</span>
+                        <span class="faq-icon">▼</span>
+                    </div>
+                    <div class="faq-answer">
+                        <div class="faq-answer-content">
+                            아직 모바일 앱은 준비중입니다.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <span>데이터가 안전하게 저장되나요?</span>
+                        <span class="faq-icon">▼</span>
+                    </div>
+                    <div class="faq-answer">
+                        <div class="faq-answer-content">
+                            네, Firebase를 사용하여 안전하게 데이터를 저장합니다. 로그인한 사용자만 자신의 데이터에 접근할 수 있으며, 모든 데이터는 암호화되어 전송됩니다.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <span>한 번에 몇 명까지 배치할 수 있나요?</span>
+                        <span class="faq-icon">▼</span>
+                    </div>
+                    <div class="faq-answer">
+                        <div class="faq-answer-content">
+                            최대 100명까지 배치할 수 있습니다. 대부분의 교실 환경에서 충분히 사용 가능한 인원수입니다.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="faq-item">
+                    <div class="faq-question">
+                        <span>자리 배치 이력을 저장할 수 있나요?</span>
+                        <span class="faq-icon">▼</span>
+                    </div>
+                    <div class="faq-answer">
+                        <div class="faq-answer-content">
+                            네, '자리 확정하기' 버튼을 누르면 자동으로 이력이 저장됩니다. 언제든지 이전 배치를 다시 불러와 확인할 수 있습니다.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA 섹션 -->
+    <section class="cta">
+        <div class="container">
+            <h2>지금 바로 시작해보세요!</h2>
+            <p>회원가입 없이 무료로 사용할 수 있습니다.</p>
+            <a href="app.html" class="btn-primary" style="background: white; color: #667eea;">프로그램 시작하기 →</a>
+        </div>
+    </section>
+
+    <!-- 푸터 -->
+    <footer class="footer">
+        <div class="footer-content">
+            <p>Made with ❤️ by 김신회</p>
+            <p>Email: <a href="mailto:laguyo87@gmail.com">laguyo87@gmail.com</a></p>
+            <p style="margin-top: 1rem; font-size: 0.9rem;">Copyright © 2025-2026. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- 방문자 수 배지 -->
+    <div class="visitor-badge">
+        👥 총 방문자: <span id="visitor-count">-</span>명
     </div>
 
-    <!-- 브라우저 호환성 체크 -->
-    <script type="module" src="browser-compatibility-check.js"></script>
-    <script type="module" src="/src/main.ts"></script>
-    <!-- Firebase 저장 상태 확인 스크립트 (개발 모드) -->
-    <script>
-        // 개발 모드에서만 로드
-        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-            // checkFirebaseStorage 함수 정의
-            window.checkFirebaseStorage = async function() {
-                console.log('🔍 Firebase 저장 상태 확인 시작...\n');
-                
-                const mainController = window.mainController;
-                
-                if (!mainController) {
-                    console.error('❌ MainController를 찾을 수 없습니다.');
-                    console.log('💡 팁: 페이지를 새로고침한 후 다시 시도하세요.');
-                    return;
+    <script type="module">
+        // Firebase 설정 및 방문자 수 가져오기
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getFirestore, doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBbMw7S49Md6gGGjYg-Y54sqzBLDFgnWdY",
+            authDomain: "seating-arrangement-back-7ffa1.firebaseapp.com",
+            projectId: "seating-arrangement-back-7ffa1",
+            storageBucket: "seating-arrangement-back-7ffa1.firebasestorage.app",
+            messagingSenderId: "878766127803",
+            appId: "1:878766127803:web:2e7d84c9a63c00f14c0a3e"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // 방문자 수 가져오기
+        async function loadVisitorCount() {
+            try {
+                const visitorDoc = await getDoc(doc(db, 'globalStats', 'visitorCount'));
+                if (visitorDoc.exists()) {
+                    const count = visitorDoc.data().count || 0;
+                    document.getElementById('visitor-count').textContent = count.toLocaleString('ko-KR');
                 }
-                
-                const firebaseStorageManager = mainController.firebaseStorageManager;
-                
-                if (!firebaseStorageManager) {
-                    console.error('❌ FirebaseStorageManager를 찾을 수 없습니다.');
-                    return;
-                }
-                
-                const isAuthenticated = firebaseStorageManager.getIsAuthenticated();
-                const currentUser = firebaseStorageManager.getCurrentUser();
-                
-                console.log('📊 인증 상태:');
-                console.log('  - 로그인 여부:', isAuthenticated ? '✅ 로그인됨' : '❌ 로그인 안 됨');
-                console.log('  - 사용자:', currentUser ? currentUser.email : '없음');
-                console.log('  - 사용자 ID:', currentUser ? currentUser.uid : '없음');
-                console.log('');
-                
-                if (!isAuthenticated || !currentUser) {
-                    console.warn('⚠️ 로그인이 필요합니다. Firebase에 저장하려면 먼저 로그인하세요.');
-                    return;
-                }
-                
-                const classManager = mainController.classManager;
-                
-                if (!classManager) {
-                    console.error('❌ ClassManager를 찾을 수 없습니다.');
-                    return;
-                }
-                
-                const classList = classManager.getClassList();
-                const currentClassId = classManager.getCurrentClassId();
-                
-                console.log('📚 반 정보:');
-                console.log('  - 반 개수:', classList.length);
-                console.log('  - 현재 선택된 반:', currentClassId || '없음');
-                console.log('  - 반 목록:', classList);
-                console.log('');
-                
-                try {
-                    console.log('🔄 Firebase에서 데이터 불러오기 시도...');
-                    
-                    const firebaseClassList = await firebaseStorageManager.loadClassList();
-                    console.log('  - Firebase 반 목록:', firebaseClassList);
-                    console.log('  - Firebase 반 개수:', firebaseClassList.length);
-                    console.log('');
-                    
-                    if (firebaseClassList.length === 0 && classList.length > 0) {
-                        console.warn('⚠️ Firebase에 반 목록이 없습니다. 저장이 필요합니다.');
-                    } else if (firebaseClassList.length > 0) {
-                        console.log('✅ Firebase에 반 목록이 저장되어 있습니다!');
-                    }
-                    
-                    if (currentClassId) {
-                        console.log('🔄 현재 반의 자리 배치도 확인...');
-                        const layout = await firebaseStorageManager.loadClassLayout(currentClassId);
-                        
-                        if (layout) {
-                            console.log('✅ Firebase에 자리 배치도가 저장되어 있습니다!');
-                            console.log('  - 반 이름:', layout.className);
-                            console.log('  - 좌석 수:', layout.seats.length);
-                            console.log('  - 학생 수:', layout.students.length);
-                            console.log('  - 저장 시간:', layout.timestamp);
-                        } else {
-                            console.warn('⚠️ Firebase에 자리 배치도가 없습니다.');
-                        }
-                    }
-                    
-                } catch (error) {
-                    console.error('❌ Firebase 데이터 불러오기 실패:', error);
-                }
-                
-                console.log('\n📝 저장 테스트 방법:');
-                console.log('1. 반을 선택하세요');
-                console.log('2. 자리 배치하기 버튼을 클릭하세요');
-                console.log('3. ✅ 자리 확정하기(저장) 💾 버튼을 클릭하세요');
-                console.log('4. 콘솔에서 "✅ Firebase에" 로그를 확인하세요');
-                console.log('\n🌐 Firebase Console에서 확인:');
-                console.log(`https://console.firebase.google.com/project/seating-arrangement-back-7ffa1/firestore/data/~2Fusers~2F${currentUser.uid}`);
-            };
-            
-            console.log('💡 Firebase 저장 상태 확인: 브라우저 콘솔에서 checkFirebaseStorage() 실행');
+            } catch (error) {
+                console.error('방문자 수 로드 실패:', error);
+                document.getElementById('visitor-count').textContent = '?';
+            }
         }
+
+        loadVisitorCount();
+
+        // 다크 모드 토글
+        const darkModeToggle = document.getElementById('darkModeToggle');
+        const themeIcon = document.getElementById('themeIcon');
+        const html = document.documentElement;
+
+        // 저장된 테마 불러오기
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        html.setAttribute('data-theme', savedTheme);
+        themeIcon.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+
+        darkModeToggle.addEventListener('click', () => {
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            themeIcon.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+        });
+
+        // FAQ 아코디언
+        document.querySelectorAll('.faq-question').forEach(question => {
+            question.addEventListener('click', () => {
+                const faqItem = question.parentElement;
+                const isActive = faqItem.classList.contains('active');
+
+                // 모든 FAQ 닫기
+                document.querySelectorAll('.faq-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+
+                // 클릭한 FAQ만 열기 (이미 열려있지 않은 경우)
+                if (!isActive) {
+                    faqItem.classList.add('active');
+                }
+            });
+        });
+
+        // 부드러운 스크롤
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
     </script>
 </body>
-</html>
 
+</html>
