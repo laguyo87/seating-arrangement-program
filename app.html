@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -22,9 +23,10 @@
     <meta name="twitter:image" content="https://laguyo87.github.io/seating-arrangement-program/og-image.png">
     <meta name="google-site-verification" content="xNE5LVH11OXsGxQ9RspfZlH-SF3M45DFMVU6_9oP174" />
     <title>교실 자리 배치 프로그램 online</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
     <link rel="stylesheet" href="style.css">
-    
+
     <!-- 구조화된 데이터 (Schema.org) -->
     <script type="application/ld+json">
     {
@@ -50,11 +52,15 @@
     }
     </script>
 </head>
+
 <body>
     <!-- 상단 헤더 -->
     <header class="top-header">
         <div class="header-content">
-            <h1><span class="title-icon" aria-hidden="true">🪑</span>교실 자리 배치 프로그램 <small style="font-size: 0.6em;">online</small></h1>
+            <h1><a href="index.html"
+                    style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 0.3rem;"><span
+                        class="title-icon" aria-hidden="true">🪑</span>교실 자리 배치 프로그램 <small
+                        style="font-size: 0.6em;">online</small></a></h1>
             <div class="header-info">
                 <div class="class-select-container" id="class-select-container">
                     <label for="class-select" class="class-select-label" aria-label="반 선택">반 만들기:</label>
@@ -62,20 +68,28 @@
                         <option value="">반 선택</option>
                     </select>
                     <button id="add-class-btn" class="icon-btn" title="새 반 추가" aria-label="새 반 추가">➕</button>
-                    <button id="delete-class-btn" class="icon-btn" title="선택한 반 삭제" aria-label="선택한 반 삭제" style="display: none;">🗑️</button>
+                    <button id="delete-class-btn" class="icon-btn" title="선택한 반 삭제" aria-label="선택한 반 삭제"
+                        style="display: none;">🗑️</button>
                 </div>
-                <button id="firebase-login-btn" class="login-btn" title="로그인 (클라우드 동기화)" aria-label="로그인">🔐 로그인</button>
+                <button id="firebase-login-btn" class="login-btn" title="로그인 (클라우드 동기화)" aria-label="로그인">🔐
+                    로그인</button>
                 <span id="firebase-status" class="firebase-status" style="display: none;" aria-live="polite"></span>
-                <button id="undo-layout" class="icon-btn" title="되돌리기 (Ctrl+Z / Cmd+Z)" aria-label="되돌리기 (Ctrl+Z 또는 Cmd+Z)">↶</button>
-                <button id="redo-layout" class="icon-btn" title="다시 실행하기 (Ctrl+Y / Cmd+Y)" aria-label="다시 실행하기 (Ctrl+Y 또는 Cmd+Y)">↷</button>
+                <button id="undo-layout" class="icon-btn" title="되돌리기 (Ctrl+Z / Cmd+Z)"
+                    aria-label="되돌리기 (Ctrl+Z 또는 Cmd+Z)">↶</button>
+                <button id="redo-layout" class="icon-btn" title="다시 실행하기 (Ctrl+Y / Cmd+Y)"
+                    aria-label="다시 실행하기 (Ctrl+Y 또는 Cmd+Y)">↷</button>
                 <div class="history-dropdown" id="history-dropdown">
-                    <button class="history-dropdown-btn" id="history-dropdown-btn" aria-label="확정된 자리 이력 보기" aria-expanded="false" aria-haspopup="true">📋 확정된 자리 이력</button>
-                    <div class="history-dropdown-content" id="history-dropdown-content" role="menu" aria-labelledby="history-dropdown-btn">
+                    <button class="history-dropdown-btn" id="history-dropdown-btn" aria-label="확정된 자리 이력 보기"
+                        aria-expanded="false" aria-haspopup="true">📋 확정된 자리 이력</button>
+                    <div class="history-dropdown-content" id="history-dropdown-content" role="menu"
+                        aria-labelledby="history-dropdown-btn">
                         <div class="history-empty" id="history-empty">확정된 자리 이력이 없습니다.</div>
                     </div>
                 </div>
-                <button id="user-manual-btn" class="user-manual-btn" title="사용설명서" aria-label="사용설명서 열기">📖 사용설명서</button>
-                <p class="visitor-count" id="visitor-count" aria-live="polite">총 방문자 수: <span id="visitor-number">-</span></p>
+                <button id="user-manual-btn" class="user-manual-btn" title="사용설명서" aria-label="사용설명서 열기">📖
+                    사용설명서</button>
+                <p class="visitor-count" id="visitor-count" aria-live="polite">총 방문자 수: <span
+                        id="visitor-number">-</span></p>
             </div>
         </div>
     </header>
@@ -85,201 +99,218 @@
         <!-- 사이드바 오버레이 (모바일용) -->
         <div class="sidebar-overlay" id="sidebar-overlay" aria-hidden="true"></div>
         <!-- 사이드바 토글 버튼 -->
-        <button id="sidebar-toggle-btn" class="sidebar-toggle-btn" title="사이드바 접기/펼치기" aria-label="사이드바 접기/펼치기" aria-expanded="true">
+        <button id="sidebar-toggle-btn" class="sidebar-toggle-btn" title="사이드바 접기/펼치기" aria-label="사이드바 접기/펼치기"
+            aria-expanded="true">
             <span class="toggle-icon" aria-hidden="true">◀</span>
         </button>
         <!-- 좌측 사이드바 (설정) -->
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-content">
-            <!-- 초기화 버튼 -->
-            <div class="form-group" style="margin-top: 0; margin-bottom: 16px;">
-                <button id="reset-app" class="secondary-btn" style="width: 100%;" aria-label="모든 설정 및 데이터 초기화">초기화(새 자리배치 시작)</button>
-            </div>
-            
-            <!-- 옵션1: 좌석 배치 형태 -->
-            <section id="layout-section" class="step-section" aria-labelledby="layout-section-title">
-                <h2 id="layout-section-title">옵션1: 좌석 배치 형태</h2>
-                
-                <div class="form-group">
-                    <div class="radio-group">
-                        <label class="radio-option">
-                            <input type="radio" name="layout-type" value="single-uniform" data-seat-type="single" checked aria-label="1명씩 한 줄로 배치">
-                            <span>1명씩 한 줄로 배치</span>
-                        </label>
-                        
-                        <!-- 1명씩 한 줄로 배치 서브 옵션 (기본 표시) -->
-                        <div id="single-submenu" style="display: block; margin-left: 30px; margin-top: 2px; margin-bottom: 2px;">
-                            <label class="radio-option" style="border: none; padding: 2px 15px; margin: 0;">
-                                <input type="radio" name="single-mode" value="basic-row" checked aria-label="기본 1줄 배치">
-                                <span>기본 1줄 배치</span>
-                            </label>
-                            <label class="radio-option" style="border: none; padding: 2px 15px; margin: 0;">
-                                <input type="radio" name="single-mode" value="gender-row" aria-label="남녀 1줄 배치">
-                                <span>남녀 1줄 배치</span>
-                            </label>
-                            <label class="radio-option" style="border: none; padding: 2px 15px; margin: 0;">
-                                <input type="radio" name="single-mode" value="gender-symmetric-row" aria-label="남녀 대칭 1줄 배치">
-                                <span>남녀 대칭 1줄 배치</span>
-                            </label>
-                            <label style="display: flex; align-items: center; padding: 2px 15px; margin: 0; margin-left: 0px;">
-                                <input type="checkbox" id="reverse-gender-order" aria-label="남녀 순서 바꾸기" />
-                                <span style="margin-left: 8px;">남녀 순서 바꾸기</span>
-                            </label>
-                        </div>
-                        
-                        <label class="radio-option">
-                            <input type="radio" name="layout-type" value="pair-uniform" data-seat-type="pair" aria-label="2명씩 짝꿍 배치">
-                            <span>2명씩 짝꿍 배치</span>
-                        </label>
-                        
-                        <!-- 2명씩 짝꿍 배치 서브 옵션 (기본 숨김) -->
-                        <div id="pair-submenu" style="display: none; margin-left: 30px; margin-top: 5px; margin-bottom: 5px;">
-                            <label class="radio-option" style="border: none; padding: 1px 1px;">
-                                <input type="radio" name="pair-mode" value="gender-pair" checked aria-label="남녀 짝꿍 하기">
-                                <span>남녀 짝꿍 하기</span>
-                            </label>
-                            <label class="radio-option" style="border: none; padding: 1px 1px;">
-                                <input type="radio" name="pair-mode" value="same-gender-pair" aria-label="같은 성끼리 짝꿍하기">
-                                <span>같은 성끼리 짝꿍하기</span>
-                            </label>
-                        </div>
-                        
-                        <label class="radio-option">
-                            <input type="radio" name="layout-type" value="group" data-seat-type="single" id="radio-group" aria-label="모둠 배치">
-                            <span>모둠 배치</span>
-                        </label>
-                        
-                        <!-- 모둠 배치 서브 옵션 (기본 숨김) -->
-                        <div id="group-submenu" style="display: none; margin-left: 30px; margin-top: 0px; margin-bottom: 0px;">
-                            <label class="radio-option" style="border: none; padding: 2px 15px; line-height: 1.2;">
-                                <input type="radio" name="group-size" value="group-3" data-seat-type="single" aria-label="3명 모둠 배치">
-                                <span>3명 모둠 배치</span>
-                            </label>
-                            <label class="radio-option" style="border: none; padding: 2px 15px; line-height: 1.2;">
-                                <input type="radio" name="group-size" value="group-4" data-seat-type="single" aria-label="4명 모둠 배치">
-                                <span>4명 모둠 배치</span>
-                            </label>
-                            <label class="radio-option" style="border: none; padding: 2px 15px; line-height: 1.2;">
-                                <input type="radio" name="group-size" value="group-5" data-seat-type="single" aria-label="5명 모둠 배치">
-                                <span>5명 모둠 배치</span>
-                            </label>
-                            <label class="radio-option" style="border: none; padding: 2px 15px; line-height: 1.2;">
-                                <input type="radio" name="group-size" value="group-6" data-seat-type="single" aria-label="6명 모둠 배치">
-                                <span>6명 모둠 배치</span>
-                            </label>
-                        </div>
-                        
-                        <!-- 모둠 배치 남녀 섞기 옵션 (기본 숨김) -->
-                        <div id="group-gender-mix-option" style="display: none; margin-left: 30px; margin-top: 0px; margin-bottom: 0px;">
-                            <label style="display: flex; align-items: center; padding: 2px 15px; line-height: 1.2;">
-                                <input type="checkbox" id="group-gender-mix" aria-label="남녀 섞기" />
-                                <span style="margin-left: 8px;">남녀 섞기</span>
-                            </label>
-                        </div>
-                        
-                        <label class="radio-option">
-                            <input type="radio" name="layout-type" value="ushape" data-seat-type="single" aria-label="ㄷ자 2명 짝꿍 배치 (준비중)">
-                            <span>ㄷ자 2명 짝꿍 배치 (준비중)</span>
-                        </label>
-                    </div>
+                <!-- 초기화 버튼 -->
+                <div class="form-group" style="margin-top: 0; margin-bottom: 16px;">
+                    <button id="reset-app" class="secondary-btn" style="width: 100%;" aria-label="모든 설정 및 데이터 초기화">초기화(새
+                        자리배치 시작)</button>
                 </div>
 
-                <div class="form-group" id="gender-pairing-option" style="display: none;">
-                    <h3>성별 조건 (2열 좌석만 해당)</h3>
-                    <label><input type="checkbox" id="gender-pairing" aria-label="남녀 짝꿍 배치 (남여 성비에 맞춘 짝꿍 배치)" /> 남녀 짝꿍 배치 (남여 성비에 맞춘 짝꿍 배치)</label>
-                </div>
-            </section>
+                <!-- 옵션1: 좌석 배치 형태 -->
+                <section id="layout-section" class="step-section" aria-labelledby="layout-section-title">
+                    <h2 id="layout-section-title">옵션1: 좌석 배치 형태</h2>
 
-            <!-- 옵션2: 학생 자리 수 -->
-            <section id="input-section" class="step-section" aria-labelledby="input-section-title">
-                <h2 id="input-section-title">옵션2: 학생 자리 수</h2>
-                
-                <div class="form-group" style="display: flex; align-items: center; gap: 10px; flex-wrap: nowrap;">
-                    <div style="display: flex; align-items: center; gap: 5px;">
-                        <label for="male-students" style="white-space: nowrap; font-size: 0.95em;">남학생:</label>
-                        <input type="text" id="male-students" placeholder="0" value="12" 
-                               inputmode="numeric" pattern="[0-9]*"
-                               style="width: 60px; padding: 6px 8px;" 
-                               aria-label="남학생 수 입력" 
-                               aria-describedby="male-students-help male-students-desc"
-                               aria-required="false" />
-                        <span id="male-students-help" class="sr-only">남학생 수를 입력하세요. 0부터 100까지 입력 가능합니다.</span>
-                    </div>
-                    
-                    <div style="display: flex; align-items: center; gap: 5px;">
-                        <label for="female-students" style="white-space: nowrap; font-size: 0.95em;">여학생:</label>
-                        <input type="text" id="female-students" placeholder="0" value="12" 
-                               inputmode="numeric" pattern="[0-9]*"
-                               style="width: 60px; padding: 6px 8px;" 
-                               aria-label="여학생 수 입력" 
-                               aria-describedby="female-students-help female-students-desc"
-                               aria-required="false" />
-                        <span id="female-students-help" class="sr-only">여학생 수를 입력하세요. 0부터 100까지 입력 가능합니다.</span>
-                    </div>
-                </div>
-                
-                <p id="male-students-desc" class="help-text" style="margin-top: 8px; color: #666; font-size: 0.9em;">
-                    남학생 수와 여학생 수를 입력하면 우측에 미리보기가 자동으로 표시됩니다.
-                </p>
-                <p id="female-students-desc" class="sr-only">여학생 수와 남학생 수를 입력하면 우측에 미리보기가 자동으로 표시됩니다.</p>
-            </section>
+                    <div class="form-group">
+                        <div class="radio-group">
+                            <label class="radio-option">
+                                <input type="radio" name="layout-type" value="single-uniform" data-seat-type="single"
+                                    checked aria-label="1명씩 한 줄로 배치">
+                                <span>1명씩 한 줄로 배치</span>
+                            </label>
 
-            <!-- 옵션3: 분단 개수 -->
-            <section id="partition-section" class="step-section" aria-labelledby="partition-section-title">
-                <h2 id="partition-section-title">옵션3: 분단 개수</h2>
-                
-                <div class="form-group">
-                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: nowrap;">
-                        <label for="number-of-partitions" style="margin-bottom: 0; white-space: nowrap; font-size: 0.95em;">분단 수:</label>
-                        <div class="count-input-container" style="flex: 0 0 auto;">
-                            <input type="number" id="number-of-partitions" min="1" max="10" placeholder="분단 수" value="5" 
-                                   style="width: 80px;" 
-                                   aria-label="분단 수 입력 (1-10개)" 
-                                   aria-describedby="partitions-help number-of-partitions-desc"
-                                   aria-required="true" />
-                            <span id="partitions-help" class="sr-only">교실의 분단 수를 입력하세요. 1개부터 10개까지 입력 가능합니다.</span>
+                            <!-- 1명씩 한 줄로 배치 서브 옵션 (기본 표시) -->
+                            <div id="single-submenu"
+                                style="display: block; margin-left: 30px; margin-top: 2px; margin-bottom: 2px;">
+                                <label class="radio-option" style="border: none; padding: 2px 15px; margin: 0;">
+                                    <input type="radio" name="single-mode" value="basic-row" checked
+                                        aria-label="기본 1줄 배치">
+                                    <span>기본 1줄 배치</span>
+                                </label>
+                                <label class="radio-option" style="border: none; padding: 2px 15px; margin: 0;">
+                                    <input type="radio" name="single-mode" value="gender-row" aria-label="남녀 1줄 배치">
+                                    <span>남녀 1줄 배치</span>
+                                </label>
+                                <label class="radio-option" style="border: none; padding: 2px 15px; margin: 0;">
+                                    <input type="radio" name="single-mode" value="gender-symmetric-row"
+                                        aria-label="남녀 대칭 1줄 배치">
+                                    <span>남녀 대칭 1줄 배치</span>
+                                </label>
+                                <label
+                                    style="display: flex; align-items: center; padding: 2px 15px; margin: 0; margin-left: 0px;">
+                                    <input type="checkbox" id="reverse-gender-order" aria-label="남녀 순서 바꾸기" />
+                                    <span style="margin-left: 8px;">남녀 순서 바꾸기</span>
+                                </label>
+                            </div>
+
+                            <label class="radio-option">
+                                <input type="radio" name="layout-type" value="pair-uniform" data-seat-type="pair"
+                                    aria-label="2명씩 짝꿍 배치">
+                                <span>2명씩 짝꿍 배치</span>
+                            </label>
+
+                            <!-- 2명씩 짝꿍 배치 서브 옵션 (기본 숨김) -->
+                            <div id="pair-submenu"
+                                style="display: none; margin-left: 30px; margin-top: 5px; margin-bottom: 5px;">
+                                <label class="radio-option" style="border: none; padding: 1px 1px;">
+                                    <input type="radio" name="pair-mode" value="gender-pair" checked
+                                        aria-label="남녀 짝꿍 하기">
+                                    <span>남녀 짝꿍 하기</span>
+                                </label>
+                                <label class="radio-option" style="border: none; padding: 1px 1px;">
+                                    <input type="radio" name="pair-mode" value="same-gender-pair"
+                                        aria-label="같은 성끼리 짝꿍하기">
+                                    <span>같은 성끼리 짝꿍하기</span>
+                                </label>
+                            </div>
+
+                            <label class="radio-option">
+                                <input type="radio" name="layout-type" value="group" data-seat-type="single"
+                                    id="radio-group" aria-label="모둠 배치">
+                                <span>모둠 배치</span>
+                            </label>
+
+                            <!-- 모둠 배치 서브 옵션 (기본 숨김) -->
+                            <div id="group-submenu"
+                                style="display: none; margin-left: 30px; margin-top: 0px; margin-bottom: 0px;">
+                                <label class="radio-option" style="border: none; padding: 2px 15px; line-height: 1.2;">
+                                    <input type="radio" name="group-size" value="group-3" data-seat-type="single"
+                                        aria-label="3명 모둠 배치">
+                                    <span>3명 모둠 배치</span>
+                                </label>
+                                <label class="radio-option" style="border: none; padding: 2px 15px; line-height: 1.2;">
+                                    <input type="radio" name="group-size" value="group-4" data-seat-type="single"
+                                        aria-label="4명 모둠 배치">
+                                    <span>4명 모둠 배치</span>
+                                </label>
+                                <label class="radio-option" style="border: none; padding: 2px 15px; line-height: 1.2;">
+                                    <input type="radio" name="group-size" value="group-5" data-seat-type="single"
+                                        aria-label="5명 모둠 배치">
+                                    <span>5명 모둠 배치</span>
+                                </label>
+                                <label class="radio-option" style="border: none; padding: 2px 15px; line-height: 1.2;">
+                                    <input type="radio" name="group-size" value="group-6" data-seat-type="single"
+                                        aria-label="6명 모둠 배치">
+                                    <span>6명 모둠 배치</span>
+                                </label>
+                            </div>
+
+                            <!-- 모둠 배치 남녀 섞기 옵션 (기본 숨김) -->
+                            <div id="group-gender-mix-option"
+                                style="display: none; margin-left: 30px; margin-top: 0px; margin-bottom: 0px;">
+                                <label style="display: flex; align-items: center; padding: 2px 15px; line-height: 1.2;">
+                                    <input type="checkbox" id="group-gender-mix" aria-label="남녀 섞기" />
+                                    <span style="margin-left: 8px;">남녀 섞기</span>
+                                </label>
+                            </div>
+
+                            <label class="radio-option">
+                                <input type="radio" name="layout-type" value="ushape" data-seat-type="single"
+                                    aria-label="ㄷ자 2명 짝꿍 배치 (준비중)">
+                                <span>ㄷ자 2명 짝꿍 배치 (준비중)</span>
+                            </label>
                         </div>
                     </div>
-                    <p id="number-of-partitions-desc" class="help-text" style="margin-top: 8px; color: #666; font-size: 0.9em;">
-                        교실의 분단 수를 입력하세요 (예: 2분단, 3분단 등)
+
+                    <div class="form-group" id="gender-pairing-option" style="display: none;">
+                        <h3>성별 조건 (2열 좌석만 해당)</h3>
+                        <label><input type="checkbox" id="gender-pairing" aria-label="남녀 짝꿍 배치 (남여 성비에 맞춘 짝꿍 배치)" /> 남녀
+                            짝꿍 배치 (남여 성비에 맞춘 짝꿍 배치)</label>
+                    </div>
+                </section>
+
+                <!-- 옵션2: 학생 자리 수 -->
+                <section id="input-section" class="step-section" aria-labelledby="input-section-title">
+                    <h2 id="input-section-title">옵션2: 학생 자리 수</h2>
+
+                    <div class="form-group" style="display: flex; align-items: center; gap: 10px; flex-wrap: nowrap;">
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <label for="male-students" style="white-space: nowrap; font-size: 0.95em;">남학생:</label>
+                            <input type="text" id="male-students" placeholder="0" value="12" inputmode="numeric"
+                                pattern="[0-9]*" style="width: 60px; padding: 6px 8px;" aria-label="남학생 수 입력"
+                                aria-describedby="male-students-help male-students-desc" aria-required="false" />
+                            <span id="male-students-help" class="sr-only">남학생 수를 입력하세요. 0부터 100까지 입력 가능합니다.</span>
+                        </div>
+
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <label for="female-students" style="white-space: nowrap; font-size: 0.95em;">여학생:</label>
+                            <input type="text" id="female-students" placeholder="0" value="12" inputmode="numeric"
+                                pattern="[0-9]*" style="width: 60px; padding: 6px 8px;" aria-label="여학생 수 입력"
+                                aria-describedby="female-students-help female-students-desc" aria-required="false" />
+                            <span id="female-students-help" class="sr-only">여학생 수를 입력하세요. 0부터 100까지 입력 가능합니다.</span>
+                        </div>
+                    </div>
+
+                    <p id="male-students-desc" class="help-text"
+                        style="margin-top: 8px; color: #666; font-size: 0.9em;">
+                        남학생 수와 여학생 수를 입력하면 우측에 미리보기가 자동으로 표시됩니다.
                     </p>
-                </div>
-            </section>
+                    <p id="female-students-desc" class="sr-only">여학생 수와 남학생 수를 입력하면 우측에 미리보기가 자동으로 표시됩니다.</p>
+                </section>
 
-            <!-- 옵션4: 맞춤 구성 -->
-            <section id="custom2-section" class="step-section" aria-labelledby="custom2-section-title">
-                <h2 id="custom2-section-title">옵션4: 맞춤 구성</h2>
-                
-                <div class="form-group">
-                    <div class="radio-group">
-                        <label class="radio-option">
-                            <input type="radio" name="custom-mode-2" value="random" id="mode-random" checked>
-                            <span>랜덤 배치</span>
-                        </label>
-                        <label class="radio-option">
-                            <input type="radio" name="custom-mode-2" value="fixed-random" id="mode-fixed-random">
-                            <span>고정 좌석 지정 후 랜덤 배치</span>
-                        </label>
+                <!-- 옵션3: 분단 개수 -->
+                <section id="partition-section" class="step-section" aria-labelledby="partition-section-title">
+                    <h2 id="partition-section-title">옵션3: 분단 개수</h2>
+
+                    <div class="form-group">
+                        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: nowrap;">
+                            <label for="number-of-partitions"
+                                style="margin-bottom: 0; white-space: nowrap; font-size: 0.95em;">분단 수:</label>
+                            <div class="count-input-container" style="flex: 0 0 auto;">
+                                <input type="number" id="number-of-partitions" min="1" max="10" placeholder="분단 수"
+                                    value="5" style="width: 80px;" aria-label="분단 수 입력 (1-10개)"
+                                    aria-describedby="partitions-help number-of-partitions-desc" aria-required="true" />
+                                <span id="partitions-help" class="sr-only">교실의 분단 수를 입력하세요. 1개부터 10개까지 입력 가능합니다.</span>
+                            </div>
+                        </div>
+                        <p id="number-of-partitions-desc" class="help-text"
+                            style="margin-top: 8px; color: #666; font-size: 0.9em;">
+                            교실의 분단 수를 입력하세요 (예: 2분단, 3분단 등)
+                        </p>
                     </div>
-                </div>
-            </section>
+                </section>
 
-            <!-- 🪑 좌석 배치하기 -->
-            <section id="main-action-section" class="step-section" aria-labelledby="main-action-section-title">
-                <h2 id="main-action-section-title">🪑 좌석 배치하기</h2>
-                
-                <div class="form-group">
-                    <button id="create-student-table" class="primary-btn" aria-label="학생 이름 입력 테이블 생성">학생 이름 입력하기</button>
-                    <p class="help-text" style="margin-top: 8px; color: #666; font-size: 0.9em;">
-                        학생 정보를 입력할 테이블을 생성합니다.
-                    </p>
-                </div>
-            </section>
+                <!-- 옵션4: 맞춤 구성 -->
+                <section id="custom2-section" class="step-section" aria-labelledby="custom2-section-title">
+                    <h2 id="custom2-section-title">옵션4: 맞춤 구성</h2>
 
-            <!-- 옵션 설정 저장 버튼 -->
-            <div class="form-group" style="margin-top: 8px;">
-                <button id="save-options" class="secondary-btn" style="width: 100%;" aria-label="현재 옵션 설정을 저장">옵션 설정 기억하기</button>
-            </div>
+                    <div class="form-group">
+                        <div class="radio-group">
+                            <label class="radio-option">
+                                <input type="radio" name="custom-mode-2" value="random" id="mode-random" checked>
+                                <span>랜덤 배치</span>
+                            </label>
+                            <label class="radio-option">
+                                <input type="radio" name="custom-mode-2" value="fixed-random" id="mode-fixed-random">
+                                <span>고정 좌석 지정 후 랜덤 배치</span>
+                            </label>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 🪑 좌석 배치하기 -->
+                <section id="main-action-section" class="step-section" aria-labelledby="main-action-section-title">
+                    <h2 id="main-action-section-title">🪑 좌석 배치하기</h2>
+
+                    <div class="form-group">
+                        <button id="create-student-table" class="primary-btn" aria-label="학생 이름 입력 테이블 생성">학생 이름
+                            입력하기</button>
+                        <p class="help-text" style="margin-top: 8px; color: #666; font-size: 0.9em;">
+                            학생 정보를 입력할 테이블을 생성합니다.
+                        </p>
+                    </div>
+                </section>
+
+                <!-- 옵션 설정 저장 버튼 -->
+                <div class="form-group" style="margin-top: 8px;">
+                    <button id="save-options" class="secondary-btn" style="width: 100%;" aria-label="현재 옵션 설정을 저장">옵션 설정
+                        기억하기</button>
+                </div>
 
             </div>
             <div class="sidebar-footer">Copyright (c) 2025 김신회(laguyo87@gmail.com)</div>
@@ -305,26 +336,32 @@
                         💡 학생 책상(카드)을 클릭하면 고정 자리가 됩니다
                     </div>
                 </div>
-               <!-- 자리 배치도 액션 버튼들 (초기에는 숨김) -->
-               <div id="layout-action-buttons" style="display: none;">
-                   <div style="display: flex; gap: 10px;">
-                       <button id="confirm-seats" class="primary-btn" aria-label="자리 확정 및 저장">✅ 자리 확정하기(저장) 💾</button>
-                       <button id="print-layout" class="secondary-btn" style="white-space: nowrap;" aria-label="자리 배치도 인쇄">🖨️ 인쇄하기</button>
-                       <button id="print-layout-teacher" class="secondary-btn" style="white-space: nowrap;" aria-label="교탁용 자리 배치도 인쇄">👨‍🏫 교탁용 인쇄하기</button>
-                   </div>
-               </div>
+                <!-- 자리 배치도 액션 버튼들 (초기에는 숨김) -->
+                <div id="layout-action-buttons" style="display: none;">
+                    <div style="display: flex; gap: 10px;">
+                        <button id="confirm-seats" class="primary-btn" aria-label="자리 확정 및 저장">✅ 자리 확정하기(저장) 💾</button>
+                        <button id="print-layout" class="secondary-btn" style="white-space: nowrap;"
+                            aria-label="자리 배치도 인쇄">🖨️ 인쇄하기</button>
+                        <button id="print-layout-teacher" class="secondary-btn" style="white-space: nowrap;"
+                            aria-label="교탁용 자리 배치도 인쇄">👨‍🏫 교탁용 인쇄하기</button>
+                    </div>
+                </div>
             </div>
-            
+
             <div id="output-section" class="result-container">
                 <!-- 카드 배치 영역 -->
-                <div id="card-layout-container" style="padding: 20px; background: white; border-radius: 8px; margin: 1px 0;">
-                    <div id="classroom-layout" style="min-height: 600px; background: #f8f9fa; border: 2px dashed #ddd; border-radius: 10px; padding: 20px; position: relative;">
+                <div id="card-layout-container"
+                    style="padding: 20px; background: white; border-radius: 8px; margin: 1px 0;">
+                    <div id="classroom-layout"
+                        style="min-height: 600px; background: #f8f9fa; border: 2px dashed #ddd; border-radius: 10px; padding: 20px; position: relative;">
                         <!-- 칠판 영역 -->
-                        <div class="classroom-item" id="blackboard-area" style="position: absolute; top: 20px; left: 50%; transform: translateX(-50%); width: 300px; height: 40px; background: #2c3e50; border: 3px solid #1a252f; border-radius: 5px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 16px;">
+                        <div class="classroom-item" id="blackboard-area"
+                            style="position: absolute; top: 20px; left: 50%; transform: translateX(-50%); width: 300px; height: 40px; background: #2c3e50; border: 3px solid #1a252f; border-radius: 5px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 16px;">
                             📝 칠판
                         </div>
                         <!-- 좌석 배치 영역 -->
-                        <div id="seats-area" style="margin-top: 80px; display: grid; gap: 10px; justify-content: center;">
+                        <div id="seats-area"
+                            style="margin-top: 80px; display: grid; gap: 10px; justify-content: center;">
                             <!-- 좌석 카드들이 여기에 동적으로 추가됨 -->
                         </div>
                     </div>
@@ -341,72 +378,72 @@
         // 개발 모드에서만 로드
         if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
             // checkFirebaseStorage 함수 정의
-            window.checkFirebaseStorage = async function() {
+            window.checkFirebaseStorage = async function () {
                 console.log('🔍 Firebase 저장 상태 확인 시작...\n');
-                
+
                 const mainController = window.mainController;
-                
+
                 if (!mainController) {
                     console.error('❌ MainController를 찾을 수 없습니다.');
                     console.log('💡 팁: 페이지를 새로고침한 후 다시 시도하세요.');
                     return;
                 }
-                
+
                 const firebaseStorageManager = mainController.firebaseStorageManager;
-                
+
                 if (!firebaseStorageManager) {
                     console.error('❌ FirebaseStorageManager를 찾을 수 없습니다.');
                     return;
                 }
-                
+
                 const isAuthenticated = firebaseStorageManager.getIsAuthenticated();
                 const currentUser = firebaseStorageManager.getCurrentUser();
-                
+
                 console.log('📊 인증 상태:');
                 console.log('  - 로그인 여부:', isAuthenticated ? '✅ 로그인됨' : '❌ 로그인 안 됨');
                 console.log('  - 사용자:', currentUser ? currentUser.email : '없음');
                 console.log('  - 사용자 ID:', currentUser ? currentUser.uid : '없음');
                 console.log('');
-                
+
                 if (!isAuthenticated || !currentUser) {
                     console.warn('⚠️ 로그인이 필요합니다. Firebase에 저장하려면 먼저 로그인하세요.');
                     return;
                 }
-                
+
                 const classManager = mainController.classManager;
-                
+
                 if (!classManager) {
                     console.error('❌ ClassManager를 찾을 수 없습니다.');
                     return;
                 }
-                
+
                 const classList = classManager.getClassList();
                 const currentClassId = classManager.getCurrentClassId();
-                
+
                 console.log('📚 반 정보:');
                 console.log('  - 반 개수:', classList.length);
                 console.log('  - 현재 선택된 반:', currentClassId || '없음');
                 console.log('  - 반 목록:', classList);
                 console.log('');
-                
+
                 try {
                     console.log('🔄 Firebase에서 데이터 불러오기 시도...');
-                    
+
                     const firebaseClassList = await firebaseStorageManager.loadClassList();
                     console.log('  - Firebase 반 목록:', firebaseClassList);
                     console.log('  - Firebase 반 개수:', firebaseClassList.length);
                     console.log('');
-                    
+
                     if (firebaseClassList.length === 0 && classList.length > 0) {
                         console.warn('⚠️ Firebase에 반 목록이 없습니다. 저장이 필요합니다.');
                     } else if (firebaseClassList.length > 0) {
                         console.log('✅ Firebase에 반 목록이 저장되어 있습니다!');
                     }
-                    
+
                     if (currentClassId) {
                         console.log('🔄 현재 반의 자리 배치도 확인...');
                         const layout = await firebaseStorageManager.loadClassLayout(currentClassId);
-                        
+
                         if (layout) {
                             console.log('✅ Firebase에 자리 배치도가 저장되어 있습니다!');
                             console.log('  - 반 이름:', layout.className);
@@ -417,11 +454,11 @@
                             console.warn('⚠️ Firebase에 자리 배치도가 없습니다.');
                         }
                     }
-                    
+
                 } catch (error) {
                     console.error('❌ Firebase 데이터 불러오기 실패:', error);
                 }
-                
+
                 console.log('\n📝 저장 테스트 방법:');
                 console.log('1. 반을 선택하세요');
                 console.log('2. 자리 배치하기 버튼을 클릭하세요');
@@ -430,10 +467,10 @@
                 console.log('\n🌐 Firebase Console에서 확인:');
                 console.log(`https://console.firebase.google.com/project/seating-arrangement-back-7ffa1/firestore/data/~2Fusers~2F${currentUser.uid}`);
             };
-            
+
             console.log('💡 Firebase 저장 상태 확인: 브라우저 콘솔에서 checkFirebaseStorage() 실행');
         }
     </script>
 </body>
-</html>
 
+</html>
