@@ -193,7 +193,7 @@ export class UIManager {
             // 삭제 버튼 추가
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'history-delete-btn';
-            deleteBtn.innerHTML = '🗑️';
+            deleteBtn.textContent = '🗑️';
             deleteBtn.title = '삭제';
             deleteBtn.style.cssText = 'background: transparent; border: none; cursor: pointer; font-size: 1em; padding: 4px 8px; color: #dc3545; opacity: 0.7; transition: opacity 0.2s; margin-left: 8px;';
             this.deps.addEventListenerSafe(deleteBtn, 'click', (e) => {

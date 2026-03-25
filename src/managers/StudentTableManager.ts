@@ -407,7 +407,7 @@ export class StudentTableManager {
                 actionCell.style.textAlign = 'center';
                 actionCell.style.padding = '8px';
                 const deleteBtn = document.createElement('button');
-                deleteBtn.innerHTML = '🗑️'; // 삭제 아이콘
+                deleteBtn.textContent = '🗑️'; // 삭제 아이콘
                 deleteBtn.type = 'button';
                 deleteBtn.className = 'delete-row-btn';
                 deleteBtn.title = '삭제';

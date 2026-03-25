@@ -138,7 +138,13 @@ export class DragDropManager {
                 }
             }
             // 콜백 호출
-            this.onDropCallback(source, targetCard, insertPosition);
+            try {
+                this.onDropCallback(source, targetCard, insertPosition);
+            }
+            catch (error) {
+                console.error('드래그&드롭 처리 중 오류:', error);
+                this.cleanupDragState();
+            }
         });
         // 터치 이벤트 지원 (모바일)
         this.setupTouchEvents();
@@ -243,7 +249,12 @@ export class DragDropManager {
                 this.touchCurrentCard.style.pointerEvents = '';
                 // 콜백 호출
                 if (this.onDropCallback && targetCard) {
-                    this.onDropCallback(this.touchCurrentCard, targetCard);
+                    try {
+                        this.onDropCallback(this.touchCurrentCard, targetCard);
+                    }
+                    catch (error) {
+                        console.error('터치 드롭 처리 중 오류:', error);
+                    }
                 }
                 this.cleanupDragState();
             }

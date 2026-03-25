@@ -81,42 +81,26 @@ export class OutputModule {
         messageElement.style.margin = '20px 0';
         messageElement.style.borderRadius = '5px';
         messageElement.style.fontWeight = 'bold';
-        if (type === 'success') {
-            // WCAG 2.1 AA 기준 충족: #155724 on #d4edda (대비율 4.8:1)
-            messageElement.style.background = '#d4edda';
-            messageElement.style.color = '#155724';
-            messageElement.style.border = '1px solid #c3e6cb';
-            messageElement.setAttribute('aria-label', `성공: ${message}`);
-            // 아이콘 추가 (색상 외 시각적 구분)
-            messageElement.innerHTML = `✅ <span>${message}</span>`;
-        }
-        else if (type === 'error') {
-            // WCAG 2.1 AA 기준 충족: #721c24 on #f8d7da (대비율 5.2:1)
-            messageElement.style.background = '#f8d7da';
-            messageElement.style.color = '#721c24';
-            messageElement.style.border = '1px solid #f5c6cb';
-            messageElement.setAttribute('aria-label', `오류: ${message}`);
-            // 아이콘 추가 (색상 외 시각적 구분)
-            messageElement.innerHTML = `❌ <span>${message}</span>`;
-        }
-        else if (type === 'warning') {
-            // WCAG 2.1 AA 기준 충족: #856404 on #fff3cd (대비율 4.5:1)
-            messageElement.style.background = '#fff3cd';
-            messageElement.style.color = '#856404';
-            messageElement.style.border = '1px solid #ffeaa7';
-            messageElement.setAttribute('aria-label', `경고: ${message}`);
-            // 아이콘 추가 (색상 외 시각적 구분)
-            messageElement.innerHTML = `⚠️ <span>${message}</span>`;
-        }
-        else {
-            // WCAG 2.1 AA 기준 충족: #0c5460 on #d1ecf1 (대비율 4.6:1)
-            messageElement.style.background = '#d1ecf1';
-            messageElement.style.color = '#0c5460';
-            messageElement.style.border = '1px solid #bee5eb';
-            messageElement.setAttribute('aria-label', `정보: ${message}`);
-            // 아이콘 추가 (색상 외 시각적 구분)
-            messageElement.innerHTML = `ℹ️ <span>${message}</span>`;
-        }
+        // 타입별 아이콘 및 스타일 설정
+        const typeConfig = {
+            success: { bg: '#d4edda', color: '#155724', border: '#c3e6cb', icon: '✅', label: '성공' },
+            error: { bg: '#f8d7da', color: '#721c24', border: '#f5c6cb', icon: '❌', label: '오류' },
+            warning: { bg: '#fff3cd', color: '#856404', border: '#ffeaa7', icon: '⚠️', label: '경고' },
+            info: { bg: '#d1ecf1', color: '#0c5460', border: '#bee5eb', icon: 'ℹ️', label: '정보' },
+        };
+        const config = typeConfig[type] || typeConfig.info;
+        messageElement.style.background = config.bg;
+        messageElement.style.color = config.color;
+        messageElement.style.border = `1px solid ${config.border}`;
+        messageElement.setAttribute('aria-label', `${config.label}: ${message}`);
+        // XSS 방지: innerHTML 대신 DOM API 사용
+        const iconSpan = document.createElement('span');
+        iconSpan.textContent = config.icon + ' ';
+        const textSpan = document.createElement('span');
+        textSpan.textContent = message;
+        messageElement.textContent = ''; // 기존 textContent 제거
+        messageElement.appendChild(iconSpan);
+        messageElement.appendChild(textSpan);
         this.container.appendChild(messageElement);
         // 스크린 리더를 위한 aria-live 영역 업데이트
         if (this.ariaLiveRegion) {

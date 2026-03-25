@@ -810,11 +810,13 @@ export class MainController {
             });
         }
 
-        // 초기화 버튼
+        // 초기화 버튼 (확인 대화상자 추가)
         const resetBtn = document.getElementById('reset-app');
         if (resetBtn) {
             this.addEventListenerSafe(resetBtn, 'click', () => {
-                this.resetApp();
+                if (confirm('모든 설정 및 데이터가 초기화됩니다. 계속하시겠습니까?')) {
+                    this.resetApp();
+                }
             });
         }
 
@@ -3540,7 +3542,7 @@ export class MainController {
                 deleteCell.style.padding = '8px';
                 const deleteBtn = document.createElement('button');
                 deleteBtn.className = 'delete-row-btn';
-                deleteBtn.innerHTML = '🗑️';
+                deleteBtn.textContent = '🗑️';
                 deleteBtn.type = 'button';
                 deleteBtn.title = '삭제';
                 deleteBtn.onclick = () => this.handleDeleteStudentRow(row);
@@ -4172,7 +4174,7 @@ export class MainController {
                 actionCell.style.textAlign = 'center';
                 actionCell.style.padding = '8px';
                 const deleteBtn = document.createElement('button');
-                deleteBtn.innerHTML = '🗑️'; // 삭제 아이콘
+                deleteBtn.textContent = '🗑️'; // 삭제 아이콘
                 deleteBtn.type = 'button';
                 deleteBtn.className = 'delete-row-btn';
                 deleteBtn.title = '삭제';
@@ -4812,6 +4814,12 @@ export class MainController {
                 }
             }
             
+            // 학생 수 > 좌석 수 경고
+            if (this.students.length > existingCards.length) {
+                const unassignedCount = this.students.length - existingCards.length;
+                this.outputModule.showWarning(`학생 수(${this.students.length}명)가 좌석 수(${existingCards.length}개)보다 많습니다. ${unassignedCount}명의 학생이 배정되지 않습니다.`);
+            }
+
             if (updateProgress) {
                 updateProgress(50, '좌석 배치 준비 중...');
             }
@@ -5487,11 +5495,7 @@ export class MainController {
                 });
             }
 
-            // 이쁘고 가독성 있는 메시지 생성 (HTML 형식)
-            const successMessage = `✅ <strong>자리가 확정되었습니다.</strong><br><br>📋 확정된 자리 이력에 기록하였습니다.<br><br>💾 <strong>저장도 완료되었습니다.</strong><br><br>📅 날짜: <strong>${dateString}</strong>`;
-            
-            // OutputModule의 showSuccess는 innerHTML을 사용하므로 HTML 지원
-            // 하지만 기본적으로 textContent를 사용하므로, 직접 메시지 요소를 생성
+            // XSS 방지: DOM API를 사용하여 메시지 생성
             const container = (this.outputModule as any).container;
             if (container) {
                 // 기존 메시지 제거
@@ -5499,11 +5503,28 @@ export class MainController {
                 if (existingMessage) {
                     existingMessage.remove();
                 }
-                
-                // 새 메시지 생성
+
+                // 새 메시지 생성 (textContent 사용으로 XSS 방지)
                 const messageElement = document.createElement('div');
                 messageElement.className = 'output-message success';
-                messageElement.innerHTML = successMessage;
+                const lines = [
+                    '✅ 자리가 확정되었습니다.',
+                    '',
+                    '📋 확정된 자리 이력에 기록하였습니다.',
+                    '',
+                    '💾 저장도 완료되었습니다.',
+                    '',
+                    `📅 날짜: ${dateString}`
+                ];
+                lines.forEach((line, i) => {
+                    if (i > 0) messageElement.appendChild(document.createElement('br'));
+                    if (line) {
+                        const span = document.createElement('span');
+                        span.textContent = line;
+                        if (i === 0 || i === 4 || i === 6) span.style.fontWeight = 'bold';
+                        messageElement.appendChild(span);
+                    }
+                });
                 messageElement.style.cssText = `
                     padding: 18px;
                     margin: 20px 0;
