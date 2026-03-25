@@ -205,55 +205,56 @@ export class LayoutService {
         canvasWidth: number = 800
     ): Seat[] {
         const seats: Seat[] = [];
-        
-        // ㄷ자 모양으로 배치 (앞, 양쪽 측면, 뒤쪽)
-        const sideLength = Math.floor(totalSeats / 4);
-        const frontLength = sideLength;
-        const backLength = totalSeats - sideLength * 2 - frontLength;
-        
+
+        if (totalSeats === 0) return seats;
+
+        // ㄷ자 모양: 왼쪽 측면 + 아래쪽(앞) + 오른쪽 측면
+        // 좌석을 3면에 균등 분배
+        const bottomLength = Math.ceil(totalSeats / 3);
+        const remaining = totalSeats - bottomLength;
+        const leftLength = Math.ceil(remaining / 2);
+        const rightLength = remaining - leftLength;
+
         const spacing = 80;
-        
-        const startX = canvasWidth / 2 - (sideLength - 1) * spacing / 2;
-        const startY = 80;
-        
+        const seatWidth = 60;
+
+        // ㄷ자 전체 크기 계산
+        const uWidth = (bottomLength - 1) * spacing + seatWidth;
+        const uHeight = (Math.max(leftLength, rightLength) - 1) * spacing + seatWidth;
+
+        // 캔버스 중앙 정렬
+        const startX = (canvasWidth - uWidth) / 2;
+        const startY = 100;
+
         let seatIndex = 0;
-        
-        // 앞쪽 좌석 (하단 중앙)
-        for (let i = 0; i < frontLength && seatIndex < totalSeats; i++) {
+
+        // 왼쪽 측면 (위에서 아래로)
+        for (let i = 0; i < leftLength && seatIndex < totalSeats; i++) {
             seats.push(SeatModel.create({
-                x: startX + i * spacing,
-                y: startY + sideLength * spacing
-            }));
-            seatIndex++;
-        }
-        
-        // 오른쪽 측면
-        for (let i = 0; i < sideLength && seatIndex < totalSeats; i++) {
-            seats.push(SeatModel.create({
-                x: startX + (sideLength - 1) * spacing,
+                x: startX,
                 y: startY + i * spacing
             }));
             seatIndex++;
         }
-        
-        // 왼쪽 측면
-        for (let i = 0; i < sideLength && seatIndex < totalSeats; i++) {
+
+        // 아래쪽 (왼쪽에서 오른쪽으로, 교탁 반대편)
+        for (let i = 0; i < bottomLength && seatIndex < totalSeats; i++) {
             seats.push(SeatModel.create({
-                x: startX,
-                y: startY + (sideLength - 1 - i) * spacing
+                x: startX + i * spacing,
+                y: startY + uHeight
             }));
             seatIndex++;
         }
-        
-        // 뒤쪽 좌석
-        for (let i = 0; i < backLength && seatIndex < totalSeats; i++) {
+
+        // 오른쪽 측면 (아래에서 위로, 아래쪽 좌석과 겹치지 않도록 한 칸 위부터)
+        for (let i = 0; i < rightLength && seatIndex < totalSeats; i++) {
             seats.push(SeatModel.create({
-                x: startX - i * spacing,
-                y: startY
+                x: startX + uWidth - seatWidth,
+                y: startY + uHeight - (i + 1) * spacing
             }));
             seatIndex++;
         }
-        
+
         return seats;
     }
 
@@ -288,11 +289,19 @@ export class LayoutService {
                 case LayoutType.GROUP:
                     seats = this.createGroupLayout(totalSeats, 4, canvasWidth, canvasHeight);
                     break;
-                
+
+                case LayoutType.GROUP_3:
+                    seats = this.createGroupLayout(totalSeats, 3, canvasWidth, canvasHeight);
+                    break;
+
                 case LayoutType.GROUP_4:
                     seats = this.createGroupLayout(totalSeats, 4, canvasWidth, canvasHeight);
                     break;
-                
+
+                case LayoutType.GROUP_5:
+                    seats = this.createGroupLayout(totalSeats, 5, canvasWidth, canvasHeight);
+                    break;
+
                 case LayoutType.GROUP_6:
                     seats = this.createGroupLayout(totalSeats, 6, canvasWidth, canvasHeight);
                     break;

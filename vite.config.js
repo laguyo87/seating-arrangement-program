@@ -36,6 +36,11 @@ export default defineConfig(({ command, mode }) => {
     // xlsx 같은 외부 의존성을 번들에 포함
     optimizeDeps: {
       include: ['xlsx', 'qrcode']
+    },
+    // Vitest 테스트 설정
+    test: {
+      include: ['src/**/*.test.ts'],
+      globals: true
     }
   };
 });

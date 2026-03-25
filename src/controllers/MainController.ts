@@ -92,8 +92,12 @@ interface ShareInfo {
     type?: string;
     s?: SharedStudentData[];
     students?: SharedStudentData[];
+    n?: string[];
+    names?: string[];
     l?: string;
     layout?: string;
+    e?: string | number;
+    p?: string;
     [key: string]: unknown; // 확장 가능한 구조
 }
 
@@ -6078,8 +6082,8 @@ export class MainController {
                     actual: {
                         layoutType: actualLayoutType,
                         pairMode: actualPairMode,
-                        singleMode: document.querySelector('input[name="single-mode"]:checked')?.value || null,
-                        groupSize: document.querySelector('input[name="group-size"]:checked')?.value || null
+                        singleMode: (document.querySelector('input[name="single-mode"]:checked') as HTMLInputElement | null)?.value || null,
+                        groupSize: (document.querySelector('input[name="group-size"]:checked') as HTMLInputElement | null)?.value || null
                     }
                 });
                 
@@ -7398,7 +7402,8 @@ export class MainController {
             
             // html2canvas로 이미지 변환 (전체 캡처, 스마트폰 최적화)
             // width와 height를 명시하지 않으면 자동으로 전체 영역을 캡처
-            const canvas = await html2canvas(classroomLayout, {
+            // html2canvas v1.x 옵션 (타입 정의가 v0.5 기준이므로 any 캐스트)
+            const canvas = await (html2canvas as any)(classroomLayout, {
                 backgroundColor: '#ffffff',
                 scale: 2, // 고해상도 (스마트폰에서도 선명하게)
                 logging: false,
@@ -7406,7 +7411,7 @@ export class MainController {
                 allowTaint: false,
                 scrollX: 0,
                 scrollY: 0,
-                ignoreElements: (element) => {
+                ignoreElements: (element: Element) => {
                     // 숨겨진 요소는 제외
                     const style = window.getComputedStyle(element);
                     return style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0';
@@ -7805,405 +7810,25 @@ export class MainController {
      * @param password 비밀번호 (선택사항)
      * @deprecated 공유 기능이 제거되었습니다. 이 메서드는 더 이상 사용되지 않습니다.
      */
-    private generateShareUrl(seatsHtml: string, gridColumns: string, dateString: string, expiresIn?: number, password?: string): string {
+    private generateShareUrl(_seatsHtml: string, _gridColumns: string, _dateString: string, _expiresIn?: number, _password?: string): string {
         // 공유 기능이 제거되었으므로 빈 문자열 반환
         return '';
-        // 학생 정보 추출 (이름과 성별)
-        const studentData: Array<{name: string, gender: 'M' | 'F'}> = [];
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = seatsHtml;
-        
-        const cards = tempDiv.querySelectorAll('.student-seat-card');
-        cards.forEach(card => {
-            const nameElement = card.querySelector('.student-name');
-            const name = nameElement?.textContent?.trim() || '';
-            if (name && name !== '') {
-                const isMale = card.classList.contains('gender-m');
-                studentData.push({
-                    name: name,
-                    gender: isMale ? 'M' : 'F'
-                });
-            }
-        });
-
-        // 공유 데이터 생성 (최적화된 형식 - 더 짧게 압축)
-        // 학생 데이터를 더 짧게 압축: [이름축약, 성별] 형식
-        // 이름을 숫자로 매핑하여 더 짧게 만들기
-        const nameMap = new Map<string, number>();
-        let nameIndex = 0;
-        const compressedStudents = studentData.map(s => {
-            let nameId: number;
-            if (nameMap.has(s.name)) {
-                nameId = nameMap.get(s.name)!;
-            } else {
-                nameId = nameIndex++;
-                nameMap.set(s.name, nameId);
-            }
-            return [nameId, s.gender];
-        });
-        
-        // 이름 맵을 배열로 변환 (인덱스 순서대로)
-        const nameArray: string[] = [];
-        nameMap.forEach((id, name) => {
-            nameArray[id] = name;
-        });
-        
-        // 그리드 컬럼을 더 짧게 압축
-        let compressedLayout = gridColumns || '';
-        if (compressedLayout.includes('repeat')) {
-            // 'repeat(6, 1fr)' -> 'r6' 같은 형식으로 압축
-            compressedLayout = compressedLayout.replace(/repeat\((\d+),\s*1fr\)/g, 'r$1');
-            compressedLayout = compressedLayout.replace(/repeat\((\d+),\s*(\d+)px\)/g, 'r$1-$2px');
-        }
-        // 빈 문자열이면 생략
-        if (!compressedLayout) {
-            compressedLayout = undefined;
-        }
-        
-        // 최소한의 데이터만 포함
-        const shareData: any = {
-            t: 'sa', // type
-            n: nameArray, // names
-            s: compressedStudents // students
-        };
-        
-        // 레이아웃이 있으면 추가
-        if (compressedLayout) {
-            shareData.l = compressedLayout;
-        }
-        
-        // 만료 시간 추가 (선택사항) - 36진수로 변환하여 짧게 저장
-        if (expiresIn && expiresIn > 0) {
-            const expiresAt = Date.now() + (expiresIn * 60 * 60 * 1000);
-            shareData.e = expiresAt.toString(36); // 36진수로 변환하여 단축
-        }
-        
-        // 비밀번호 해시 추가 (선택사항)
-        if (password && password.length > 0) {
-            let hash = 0;
-            for (let i = 0; i < password.length; i++) {
-                const char = password.charCodeAt(i);
-                hash = ((hash << 5) - hash) + char;
-                hash = hash & hash;
-            }
-            shareData.p = Math.abs(hash).toString(36); // 36진수로 단축
-        }
-
-        // JSON 문자열 생성 (공백 제거하여 더 짧게)
-        const jsonString = JSON.stringify(shareData);
-        
-        // Base64 URL-safe 인코딩 (+, /, = 문자를 URL-safe 문자로 변환)
-        const encodedData = btoa(unescape(encodeURIComponent(jsonString)))
-            .replace(/\+/g, '-')
-            .replace(/\//g, '_')
-            .replace(/=/g, '');
-        
-        // 현재 페이지의 기본 URL 가져오기
-        const baseUrl = window.location.origin + window.location.pathname;
-        
-        // 공유 URL 생성 (뷰어 모드용 ?v= 파라미터 사용)
-        const shareUrl = `${baseUrl}?v=${encodedData}`;
-        
-        return shareUrl;
     }
 
     /**
      * 모달 창으로 자리 배치도 공유하기 (개선된 버전: QR 코드, 만료 시간, 비밀번호 지원)
      * @deprecated 공유 기능이 제거되었습니다. 이 메서드는 더 이상 사용되지 않습니다.
      */
-    private async showShareModal(shareUrl: string, options?: {expiresIn?: number, password?: string}): Promise<void> {
+    private async showShareModal(_shareUrl: string, _options?: {expiresIn?: number, password?: string}): Promise<void> {
         // 공유 기능이 제거되었으므로 아무 작업도 하지 않음
-        return;
-        // 모달 창 생성
-        const modal = document.createElement('div');
-        modal.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 10000;
-        `;
-
-        const modalContent = document.createElement('div');
-        modalContent.style.cssText = `
-            background: white;
-            padding: 30px;
-            border-radius: 12px;
-            max-width: 600px;
-            width: 90%;
-            max-height: 90vh;
-            overflow-y: auto;
-            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-        `;
-
-        const title = document.createElement('h3');
-        title.textContent = '📤 자리 배치도 공유';
-        title.style.cssText = 'margin-top: 0; margin-bottom: 20px; color: #333; font-size: 1.5em;';
-
-        // 옵션 설정 섹션
-        const optionsSection = document.createElement('div');
-        optionsSection.style.cssText = 'margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;';
-
-        // 만료 시간 설정
-        const expiresGroup = document.createElement('div');
-        expiresGroup.style.cssText = 'margin-bottom: 15px;';
-        const expiresLabel = document.createElement('label');
-        expiresLabel.innerHTML = '<strong>⏰ 만료 시간 설정 (선택사항):</strong>';
-        expiresLabel.style.cssText = 'display: block; margin-bottom: 5px; color: #555;';
-        const expiresSelect = document.createElement('select');
-        expiresSelect.id = 'share-expires-select';
-        expiresSelect.style.cssText = 'width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;';
-        expiresSelect.innerHTML = `
-            <option value="0">만료 시간 없음</option>
-            <option value="1">1시간 후</option>
-            <option value="6">6시간 후</option>
-            <option value="24">24시간 후</option>
-            <option value="72">3일 후</option>
-            <option value="168">7일 후</option>
-        `;
-        if (options?.expiresIn) {
-            expiresSelect.value = options.expiresIn.toString();
-        }
-        expiresGroup.appendChild(expiresLabel);
-        expiresGroup.appendChild(expiresSelect);
-
-        // 비밀번호 설정
-        const passwordGroup = document.createElement('div');
-        passwordGroup.style.cssText = 'margin-bottom: 15px;';
-        const passwordLabel = document.createElement('label');
-        passwordLabel.innerHTML = '<strong>🔒 비밀번호 보호 (선택사항):</strong>';
-        passwordLabel.style.cssText = 'display: block; margin-bottom: 5px; color: #555;';
-        const passwordInput = document.createElement('input');
-        passwordInput.type = 'password';
-        passwordInput.id = 'share-password-input';
-        passwordInput.placeholder = '비밀번호를 입력하세요 (4자 이상)';
-        passwordInput.style.cssText = 'width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;';
-        if (options?.password) {
-            passwordInput.value = options.password;
-        }
-        passwordGroup.appendChild(passwordLabel);
-        passwordGroup.appendChild(passwordInput);
-
-        // URL 재생성 버튼
-        const regenerateButton = document.createElement('button');
-        regenerateButton.textContent = '🔄 링크 재생성';
-        regenerateButton.className = 'secondary-btn';
-        regenerateButton.style.cssText = 'width: 100%; margin-top: 10px;';
-        
-        let currentShareUrl = shareUrl;
-        regenerateButton.onclick = async () => {
-            const expiresIn = parseInt(expiresSelect.value) || 0;
-            const password = passwordInput.value.trim();
-            
-            if (password && password.length < 4) {
-                this.outputModule.showError('비밀번호는 4자 이상이어야 합니다.');
-                return;
-            }
-            
-            // 현재 seatsArea에서 데이터 가져오기
-            const seatsArea = document.getElementById('seats-area');
-            const currentGridTemplateColumns = seatsArea?.style.gridTemplateColumns || '';
-            const seatsAreaHtml = seatsArea?.innerHTML || '';
-            const now = new Date();
-            const dateString = now.toLocaleDateString('ko-KR', {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-            
-            currentShareUrl = this.generateShareUrl(seatsAreaHtml, currentGridTemplateColumns, dateString, expiresIn > 0 ? expiresIn : undefined, password || undefined);
-            
-            // QR 코드 재생성
-            await this.generateQRCode(currentShareUrl, qrCodeContainer);
-            
-            this.outputModule.showSuccess('QR 코드가 재생성되었습니다.');
-        };
-
-        optionsSection.appendChild(expiresGroup);
-        optionsSection.appendChild(passwordGroup);
-        optionsSection.appendChild(regenerateButton);
-
-        // QR 코드 컨테이너
-        const qrCodeContainer = document.createElement('div');
-        qrCodeContainer.id = 'share-qrcode-container';
-        qrCodeContainer.style.cssText = 'text-align: center; margin: 20px 0;';
-        
-        // QR 코드 생성
-        await this.generateQRCode(currentShareUrl, qrCodeContainer);
-
-        // QR 코드 사용 안내
-        const instruction = document.createElement('div');
-        instruction.innerHTML = `
-            <p style="margin-bottom: 15px; color: #666; font-size: 0.9em; text-align: center;">
-                <strong>QR 코드를 스캔하여 자리 배치도를 확인하세요</strong>
-            </p>
-        `;
-
-        const buttonContainer = document.createElement('div');
-        buttonContainer.style.cssText = `
-            margin-top: 20px;
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-        `;
-
-        // 모달 닫기 함수
-        const closeModal = () => {
-            try {
-                if (modal && modal.parentNode) {
-                    document.body.removeChild(modal);
-                }
-                document.removeEventListener('keydown', handleKeyDown);
-            } catch (error) {
-                logger.warn('모달 닫기 중 오류 (무시됨):', error);
-            }
-        };
-
-        // ESC 키로 모달 닫기
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') {
-                closeModal();
-            }
-        };
-
-        // QR 인쇄 버튼
-        const printQRButton = document.createElement('button');
-        printQRButton.textContent = '🖨️ QR 인쇄';
-        printQRButton.className = 'primary-btn';
-        printQRButton.onclick = () => {
-            this.printQRCode(currentShareUrl, qrCodeContainer);
-        };
-
-        const closeButton = document.createElement('button');
-        closeButton.textContent = '❌ 닫기';
-        closeButton.className = 'secondary-btn';
-        closeButton.onclick = closeModal;
-
-        buttonContainer.appendChild(printQRButton);
-        buttonContainer.appendChild(closeButton);
-
-        modalContent.appendChild(title);
-        modalContent.appendChild(optionsSection);
-        modalContent.appendChild(qrCodeContainer);
-        modalContent.appendChild(instruction);
-        modalContent.appendChild(buttonContainer);
-        modal.appendChild(modalContent);
-        document.body.appendChild(modal);
-
-        this.addEventListenerSafe(document, 'keydown', handleKeyDown as (e: Event) => void);
-
-        // 모달 배경 클릭으로 닫기
-        modal.onclick = (e) => {
-            if (e.target === modal) {
-                closeModal();
-            }
-        };
     }
 
     /**
      * QR 코드 인쇄
      * @deprecated 공유 기능이 제거되었습니다. 이 메서드는 더 이상 사용되지 않습니다.
      */
-    private printQRCode(url: string, qrContainer: HTMLElement): void {
+    private printQRCode(_url: string, _qrContainer: HTMLElement): void {
         // 공유 기능이 제거되었으므로 아무 작업도 하지 않음
-        return;
-        try {
-            // QR 코드 이미지 찾기
-            const qrCanvas = qrContainer.querySelector('canvas') as HTMLCanvasElement;
-            if (!qrCanvas) {
-                this.outputModule.showError('QR 코드를 찾을 수 없습니다.');
-                return;
-            }
-
-            // 인쇄용 HTML 생성
-            const printWindow = window.open('', '_blank');
-            if (!printWindow) {
-                this.outputModule.showError('팝업이 차단되었습니다. 브라우저 설정에서 팝업을 허용해주세요.');
-                return;
-            }
-
-            const qrImageData = qrCanvas.toDataURL('image/png');
-            
-            printWindow.document.write(`
-                <!DOCTYPE html>
-                <html lang="ko">
-                <head>
-                    <meta charset="UTF-8">
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <title>QR 코드 인쇄</title>
-                    <style>
-                        body {
-                            margin: 0;
-                            padding: 20px;
-                            display: flex;
-                            flex-direction: column;
-                            align-items: center;
-                            justify-content: center;
-                            min-height: 100vh;
-                            font-family: 'Malgun Gothic', sans-serif;
-                        }
-                        .qr-title {
-                            font-size: 24px;
-                            font-weight: bold;
-                            margin-bottom: 20px;
-                            text-align: center;
-                        }
-                        .qr-image {
-                            max-width: 100%;
-                            height: auto;
-                            border: 2px solid #333;
-                            padding: 10px;
-                            background: white;
-                        }
-                        .qr-instruction {
-                            margin-top: 20px;
-                            font-size: 14px;
-                            color: #666;
-                            text-align: center;
-                        }
-                        @media print {
-                            body {
-                                padding: 0;
-                            }
-                            .qr-title {
-                                font-size: 20px;
-                                margin-bottom: 10px;
-                            }
-                            .qr-image {
-                                border: 1px solid #333;
-                                padding: 5px;
-                            }
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div class="qr-title">자리 배치도 QR 코드</div>
-                    <img src="${qrImageData}" alt="QR Code" class="qr-image" />
-                    <div class="qr-instruction">QR 코드를 스캔하여 자리 배치도를 확인하세요</div>
-                </body>
-                </html>
-            `);
-            
-            printWindow.document.close();
-            
-            // 인쇄 창이 로드된 후 인쇄 대화상자 열기
-            printWindow.onload = () => {
-                setTimeout(() => {
-                    printWindow.print();
-                }, 250);
-            };
-            
-        } catch (error) {
-            logger.error('QR 코드 인쇄 실패:', error);
-            this.outputModule.showError('QR 코드 인쇄 중 오류가 발생했습니다.');
-        }
     }
 
     /**

@@ -170,35 +170,29 @@ export class ErrorHandler {
     }
     
     /**
-     * 동기 작업에 대한 재시도 메커니즘
+     * 동기 작업에 대한 재시도 메커니즘 (대기 없이 즉시 재시도)
      */
     public static withRetrySync<T>(
         operation: () => T,
         errorCode: ErrorCode,
         maxRetries: number = 3,
-        retryDelay: number = 1000,
+        _retryDelay: number = 0,
         context?: Record<string, unknown>
     ): T | ErrorHandlingResult {
         let lastError: unknown;
-        
+
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
                 return operation();
             } catch (error) {
                 lastError = error;
-                
+
                 if (attempt < maxRetries) {
-                    logger.warn(`작업 실패 (시도 ${attempt}/${maxRetries}), ${retryDelay}ms 후 재시도...`, {
+                    logger.warn(`작업 실패 (시도 ${attempt}/${maxRetries}), 즉시 재시도...`, {
                         error,
                         attempt,
                         context
                     });
-                    
-                    // 동기적으로 대기 (주의: 블로킹)
-                    const start = Date.now();
-                    while (Date.now() - start < retryDelay) {
-                        // 대기
-                    }
                 } else {
                     // 최대 재시도 횟수 초과
                     logger.error(`작업 실패 (최대 재시도 횟수 초과)`, {
@@ -206,7 +200,7 @@ export class ErrorHandler {
                         attempts: maxRetries,
                         context
                     });
-                    
+
                     return this.handleError(error, errorCode, {
                         ...context,
                         attempts: maxRetries,
@@ -215,7 +209,7 @@ export class ErrorHandler {
                 }
             }
         }
-        
+
         return this.handleError(lastError, errorCode, context);
     }
     
