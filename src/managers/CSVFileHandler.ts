@@ -322,7 +322,13 @@ export class CSVFileHandler {
                     errors.push(`${i + 1}번째 줄: 이름이 너무 깁니다 (최대 20자).`);
                     continue;
                 }
-                
+
+                // HTML 특수문자 포함 여부 검사 (XSS 방지)
+                if (/[<>"'&]/.test(name)) {
+                    errors.push(`${i + 1}번째 줄: 이름에 허용되지 않는 특수문자가 포함되어 있습니다.`);
+                    continue;
+                }
+
                 // 성별 검증
                 if (!gender || (gender !== '남' && gender !== '여' && gender !== 'M' && gender !== 'F')) {
                     errors.push(`${i + 1}번째 줄: 성별이 올바르지 않습니다 (남/여 또는 M/F).`);
@@ -670,7 +676,7 @@ export class CSVFileHandler {
         actionCell.style.textAlign = 'center';
         actionCell.style.padding = '8px';
         const deleteBtn = document.createElement('button');
-        deleteBtn.innerHTML = '🗑️';
+        deleteBtn.textContent = '🗑️';
         deleteBtn.type = 'button';
         deleteBtn.className = 'delete-row-btn';
         deleteBtn.title = '삭제';
@@ -776,7 +782,13 @@ export class CSVFileHandler {
                     errors.push(`${i + 1}번째 줄: 이름이 너무 깁니다 (최대 20자).`);
                     continue;
                 }
-                
+
+                // HTML 특수문자 포함 여부 검사 (XSS 방지)
+                if (/[<>"'&]/.test(name)) {
+                    errors.push(`${i + 1}번째 줄: 이름에 허용되지 않는 특수문자가 포함되어 있습니다.`);
+                    continue;
+                }
+
                 // 성별 검증
                 if (!gender || (gender !== '남' && gender !== '여' && gender !== 'M' && gender !== 'F')) {
                     errors.push(`${i + 1}번째 줄: 성별이 올바르지 않습니다 (남/여 또는 M/F).`);
@@ -1137,7 +1149,7 @@ export class CSVFileHandler {
                 actionCell.style.textAlign = 'center';
                 actionCell.style.padding = '8px';
                 const deleteBtn = document.createElement('button');
-                deleteBtn.innerHTML = '🗑️';
+                deleteBtn.textContent = '🗑️';
                 deleteBtn.type = 'button';
                 deleteBtn.className = 'delete-row-btn';
                 deleteBtn.title = '삭제';
@@ -1410,7 +1422,7 @@ export class CSVFileHandler {
                 actionCell.style.textAlign = 'center';
                 actionCell.style.padding = '8px';
                 const deleteBtn = document.createElement('button');
-                deleteBtn.innerHTML = '🗑️';
+                deleteBtn.textContent = '🗑️';
                 deleteBtn.type = 'button';
                 deleteBtn.className = 'delete-row-btn';
                 deleteBtn.title = '삭제';
