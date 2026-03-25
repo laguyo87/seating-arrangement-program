@@ -1,7 +1,7 @@
 /**
  * 랜덤 배치 및 셔플 서비스
  */
-import { Student } from '../models/Student.js';
+import { Student, StudentModel } from '../models/Student.js';
 import { Seat, SeatModel } from '../models/Seat.js';
 
 /**
@@ -80,7 +80,7 @@ export class RandomService {
      * @returns 배치된 좌석 배열
      */
     public static assignGenderPairs(students: Student[], seats: Seat[], seatType: 'single' | 'pair'): Seat[] {
-        const { male, female } = require('../models/Student').StudentModel.separateByGender(students);
+        const { male, female } = StudentModel.separateByGender(students);
         
         const shuffledMale = this.shuffleStudents(male);
         const shuffledFemale = this.shuffleStudents(female);
@@ -122,12 +122,14 @@ export class RandomService {
             const remainingMale = shuffledMale.slice(minLength);
             const remainingFemale = shuffledFemale.slice(minLength);
             const remainingStudents = [...remainingMale, ...remainingFemale];
-            
+
             if (remainingStudents.length > 0 && seatIndex < availableSeats.length) {
-                return this.assignRandomly(remainingStudents, seats);
+                this.assignRandomly(remainingStudents, seats);
             }
+
+            return seats;
         }
-        
+
         // 1열 좌석 배치인 경우
         return this.assignRandomly(students, seats);
     }
@@ -140,8 +142,6 @@ export class RandomService {
      * @returns 배치된 좌석 배열
      */
     public static assignWithFixedSeats(students: Student[], seats: Seat[]): Seat[] {
-        const { StudentModel } = require('../models/Student');
-        
         // 고정 좌석이 있는 학생들을 먼저 배치
         const assignedStudents = StudentModel.getAssignedStudents(students);
         
@@ -164,27 +164,36 @@ export class RandomService {
      * @param seats 좌석 배열 (수정됨)
      */
     public static reshuffleAssignments(seats: Seat[]): void {
+        // 기존 배정 정보를 먼저 저장
+        const assignments: Array<{ studentId: number; studentName: string }> = [];
+        for (const seat of seats) {
+            if (seat.studentId !== undefined && seat.studentId !== null) {
+                assignments.push({
+                    studentId: seat.studentId,
+                    studentName: seat.studentName || ''
+                });
+            }
+        }
+
         // 모든 배정을 초기화
         for (const seat of seats) {
             SeatModel.removeStudent(seat);
         }
-        
-        // 사용 가능한 좌석 찾기
+
+        // 사용 가능한 좌석 찾기 (고정되지 않은 활성 좌석)
         const availableSeats = SeatModel.getAvailableSeats(seats);
-        
-        // ID만 추출하여 순서 섞기
-        const shuffledIds = this.shuffle(availableSeats.map(s => s.id));
-        
-        // 좌석 ID를 섞어서 재배치
-        for (let i = 0; i < shuffledIds.length; i++) {
-            const seat = seats.find(s => s.id === shuffledIds[i]);
-            if (seat && SeatModel.isEmpty(seat)) {
-                // 원래 배정 정보를 재사용하되 순서만 변경
-                const originalSeat = availableSeats[i];
-                if (originalSeat && originalSeat.studentId) {
-                    SeatModel.assignStudent(seat, originalSeat.studentId, originalSeat.studentName || '');
-                }
-            }
+
+        // 학생 배정 목록을 셔플
+        const shuffledAssignments = this.shuffle(assignments);
+
+        // 셔플된 학생들을 좌석에 재배치
+        const minLength = Math.min(shuffledAssignments.length, availableSeats.length);
+        for (let i = 0; i < minLength; i++) {
+            SeatModel.assignStudent(
+                availableSeats[i],
+                shuffledAssignments[i].studentId,
+                shuffledAssignments[i].studentName
+            );
         }
     }
 }

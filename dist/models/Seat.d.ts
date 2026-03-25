@@ -37,8 +37,12 @@ export declare enum LayoutType {
     PAIR_UNIFORM = "pair-uniform",
     /** 모둠 배치 */
     GROUP = "group",
+    /** 3명 모둠 배치 */
+    GROUP_3 = "group-3",
     /** 4명 모둠 배치 */
     GROUP_4 = "group-4",
+    /** 5명 모둠 배치 */
+    GROUP_5 = "group-5",
     /** 6명 모둠 배치 */
     GROUP_6 = "group-6",
     /** ㄷ자 배치 */

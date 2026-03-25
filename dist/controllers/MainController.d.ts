@@ -8,6 +8,20 @@ export declare class MainController {
     private canvasModule;
     private outputModule;
     private customLayoutModule;
+    private layoutRenderer;
+    private animationManager;
+    private storageManager;
+    private csvFileHandler;
+    private printExportManager;
+    private uiManager;
+    private studentTableManager;
+    private inputValidator;
+    private keyboardDragDropManager;
+    private classManager;
+    private firebaseStorageManager;
+    private loginPageModule;
+    private signUpPageModule;
+    private visitorCounterModule;
     private students;
     private seats;
     private isInitialized;
@@ -15,26 +29,22 @@ export declare class MainController {
     private nextSeatId;
     private dragSourceCard;
     private dragOverIndicator;
+    private touchStartCard;
+    private touchStartPosition;
     private isSyncing;
     private layoutHistory;
     private historyIndex;
+    private isReadOnlyMode;
+    private eventListeners;
+    private timers;
     constructor();
     /**
      * 초기화 시 이력 드롭다운 업데이트
      */
-    private initializeHistoryDropdown;
     /**
      * 앱 초기 상태로 되돌리기
      */
     private resetApp;
-    /**
-     * 옵션 설정 저장
-     */
-    private saveOptions;
-    /**
-     * 저장된 옵션 설정 불러오기
-     */
-    private loadOptions;
     /**
      * 초기 캔버스에 칠판과 교탁 그리기
      */
@@ -42,6 +52,10 @@ export declare class MainController {
     /**
      * 이벤트 리스너 초기화
      */
+    /**
+     * 입력 필드 검증 설정
+     */
+    private setupInputValidation;
     private initializeEventListeners;
     /**
      * 라디오 버튼 이벤트 리스너 초기화
@@ -81,6 +95,10 @@ export declare class MainController {
      */
     private enableSeatSwapDragAndDrop;
     /**
+     * 모바일 터치 드래그&드롭 지원
+     */
+    private enableTouchDragAndDrop;
+    /**
      * 드롭 위치 삽입 인디케이터 표시
      */
     private showInsertIndicator;
@@ -97,7 +115,15 @@ export declare class MainController {
      */
     private handleUndoLayout;
     /**
-     * 되돌리기 버튼 활성화/비활성화 상태 업데이트
+     * 다시 실행하기 기능 실행
+     */
+    private handleRedoLayout;
+    /**
+     * 되돌리기/다시 실행하기 버튼 활성화/비활성화 상태 업데이트
+     */
+    private updateUndoRedoButtonState;
+    /**
+     * 되돌리기 버튼 활성화/비활성화 상태 업데이트 (하위 호환성)
      */
     private updateUndoButtonState;
     /**
@@ -117,6 +143,16 @@ export declare class MainController {
      */
     private updateFixedSeatDropdowns;
     /**
+     * 입력 값 검증 및 수정 (음수, 0, 큰 숫자 처리)
+     * InputValidator가 실시간 검증을 처리하므로, 여기서는 값 정규화만 수행
+     */
+    private validateAndFixStudentInput;
+    /**
+     * 분단 수 입력 값 검증 및 수정
+     * InputValidator가 실시간 검증을 처리하므로, 여기서는 값 정규화만 수행
+     */
+    private validateAndFixPartitionInput;
+    /**
      * 성별별 학생 수에 따라 미리보기 업데이트
      */
     private updatePreviewForGenderCounts;
@@ -129,9 +165,17 @@ export declare class MainController {
      */
     private renderStudentCards;
     /**
-     * 모둠 배치로 카드 렌더링 (그룹으로 묶어서 표시)
+     * localStorage 사용 가능 여부 확인
      */
-    private renderGroupCards;
+    private isLocalStorageAvailable;
+    /**
+     * 안전한 localStorage 저장
+     */
+    private safeSetItem;
+    /**
+     * 안전한 localStorage 읽기
+     */
+    private safeGetItem;
     /**
      * 좌석 배치 결과를 localStorage에 저장
      */
@@ -227,26 +271,12 @@ export declare class MainController {
      */
     private moveToCell;
     /**
-     * 양식 파일 다운로드
-     */
-    private downloadTemplateFile;
-    /**
-     * 파일 업로드 처리
-     * @param event 파일 선택 이벤트
-     */
-    private handleFileUpload;
-    /**
-     * CSV 파일 파싱 및 테이블에 데이터 입력
-     * @param csvText CSV 파일 내용
-     */
-    private parseCsvFile;
-    /**
-     * 학생 데이터로 테이블 생성
+     * 학생 데이터로 테이블 생성 (handleCreateStudentTable에서 사용)
      * @param students 학생 배열
      */
     private createTableWithStudents;
     /**
-     * 교탁과 칠판 그리기
+     * 칠판 그리기
      */
     private drawTeacherDeskAndBoard;
     /**
@@ -261,6 +291,10 @@ export declare class MainController {
     /**
      * 모둠 배치 서브 메뉴 토글
      */
+    /**
+     * '이전 짝 금지' 체크박스 활성화/비활성화
+     */
+    private toggleAvoidPrevPartnerOption;
     private toggleGroupSubmenu;
     /**
      * 모둠 배치 남녀 섞기 옵션 토글
@@ -287,15 +321,63 @@ export declare class MainController {
      */
     run(): void;
     /**
+     * 개발 모드 확인 (로컬호스트 또는 개발 환경)
+     */
+    private isDevelopmentMode;
+    /**
+     * 안전한 클립보드 복사 (브라우저 호환성 개선)
+     */
+    private copyToClipboard;
+    /**
+     * HTML 이스케이프 (XSS 방지)
+     * 향후 사용자 입력이 포함된 HTML 생성 시 사용
+     */
+    private escapeHtml;
+    /**
+     * 안전한 innerHTML 설정 (XSS 방지)
+     * 향후 사용자 입력이 포함된 HTML 생성 시 사용
+     */
+    private setSafeInnerHTML;
+    /**
+     * 안전한 이벤트 리스너 추가 (메모리 누수 방지)
+     * 향후 사용 예정
+     */
+    private addEventListenerSafe;
+    /**
+     * 안전한 setTimeout (메모리 누수 방지)
+     */
+    private setTimeoutSafe;
+    /**
+     * 모든 타이머 정리
+     */
+    private clearAllTimers;
+    /**
+     * 모든 이벤트 리스너 정리
+     */
+    private removeAllEventListeners;
+    /**
+     * 정리 메서드 (컨트롤러 종료 시 호출)
+     */
+    cleanup(): void;
+    /**
      * 좌석 배치하기 처리
      */
     private handleArrangeSeats;
+    /**
+     * 좌석 배치 처리 (내부 메서드)
+     */
+    private processArrangeSeats;
     /**
      * 자리 확정 처리
      */
     private handleConfirmSeats;
     /**
-     * 좌석 이력 가져오기 (최신순으로 정렬)
+     * 자리 확정 시 수집한 데이터로 현재 seats와 students 업데이트
+     */
+    private updateSeatsAndStudentsFromLayout;
+    /**
+     * 좌석 이력 가져오기 (반별로 관리, 최신순으로 정렬)
+     * @param classId 반 ID (없으면 현재 선택된 반의 ID 사용)
      */
     private getSeatHistory;
     /**
@@ -307,13 +389,25 @@ export declare class MainController {
      */
     private updateHistoryDropdown;
     /**
-     * 이력 항목 삭제
+     * 이력 항목 삭제 (반별로 관리)
      */
     private deleteHistoryItem;
     /**
-     * 이력 항목 불러오기
+     * 이력 항목 불러오기 (반별로 관리)
      */
     private loadHistoryItem;
+    /**
+     * 사이드바 옵션들 비활성화 (읽기 전용 모드)
+     */
+    private disableSidebarOptions;
+    /**
+     * 사이드바 옵션들 활성화 (읽기 전용 모드 해제)
+     */
+    private enableSidebarOptions;
+    /**
+     * 읽기 전용 모드 해제
+     */
+    private disableReadOnlyMode;
     /**
      * 남녀 짝꿍 배치 렌더링
      */
@@ -327,33 +421,65 @@ export declare class MainController {
      */
     private createStudentNameCard;
     /**
-     * 자리 배치도 인쇄 처리
-     */
-    private handlePrintLayout;
-    /**
-     * 교탁용 자리 배치도 인쇄 처리 (180도 회전)
-     */
-    private handlePrintLayoutForTeacher;
-    /**
      * 자리 배치도 저장 처리
      */
     private handleSaveLayout;
     /**
-     * 자리 배치도 공유하기
+     * 뷰어 모드 활성화 (자리 배치도만 표시)
      */
-    private handleShareLayout;
+    private enableViewerMode;
+    /**
+     * 좌석 카드에서 학생 정보 업데이트
+     */
+    private updateSeatsFromCards;
+    /**
+     * 인쇄용 화면 표시 (QR 스캔 시 사용)
+     */
+    private showPrintView;
+    /**
+     * 자리 배치도를 이미지로 변환하여 이미지만 표시
+     */
+    private convertLayoutToImage;
+    /**
+     * 뷰어 모드 UI 설정 (사이드바, 헤더 버튼 숨기기)
+     */
+    private setupViewerModeUI;
+    /**
+     * 공유된 배치 데이터 검증
+     */
+    private validateSharedData;
     /**
      * 공유된 배치 데이터 로드
      */
     private loadSharedLayout;
     /**
-     * 간단한 공유 주소(URL) 생성 (압축된 형식)
+     * 간단한 공유 주소(URL) 생성 (압축된 형식, 뷰어 모드)
+     * @param seatsHtml 좌석 HTML
+     * @param gridColumns 그리드 컬럼 설정
+     * @param dateString 날짜 문자열
+     * @param expiresIn 만료 시간 (시간 단위, 선택사항)
+     * @param password 비밀번호 (선택사항)
+     * @deprecated 공유 기능이 제거되었습니다. 이 메서드는 더 이상 사용되지 않습니다.
      */
     private generateShareUrl;
     /**
-     * 모달 창으로 자리 배치도 공유하기
+     * 모달 창으로 자리 배치도 공유하기 (개선된 버전: QR 코드, 만료 시간, 비밀번호 지원)
+     * @deprecated 공유 기능이 제거되었습니다. 이 메서드는 더 이상 사용되지 않습니다.
      */
     private showShareModal;
+    /**
+     * QR 코드 인쇄
+     * @deprecated 공유 기능이 제거되었습니다. 이 메서드는 더 이상 사용되지 않습니다.
+     */
+    private printQRCode;
+    /**
+     * QR 코드 생성
+     */
+    /**
+     * QR 코드 생성
+     * @deprecated 공유 기능이 제거되었습니다. 이 메서드는 더 이상 사용되지 않습니다.
+     */
+    private generateQRCode;
     /**
      * 사용설명서 모달 표시
      */
@@ -363,28 +489,109 @@ export declare class MainController {
      */
     private toggleSidebar;
     /**
-     * 커튼 애니메이션 시작 (닫기)
+     * 모바일 반응형 초기화
      */
-    private startCurtainAnimation;
+    private initializeMobileResponsive;
     /**
-     * 커튼 애니메이션 종료 (열기)
+     * 화면 크기 변경 처리
      */
-    private openCurtain;
+    private handleResize;
     /**
-     * 커튼 애니메이션 즉시 종료 (에러 시)
+     * 키보드 네비게이션 초기화
      */
-    private stopCurtainAnimation;
+    private initializeKeyboardNavigation;
     /**
-     * 폭죽 애니메이션 시작
+     * Tab 순서 최적화
      */
-    private startFireworks;
+    private optimizeTabOrder;
     /**
-     * 개별 폭죽 생성 및 파티클 애니메이션
+     * 포커스 표시 개선
      */
-    private createFirework;
+    private enhanceFocusStyles;
     /**
-     * 자리 배치 실행 시 음향 효과 재생 (3초)
+     * 키보드 드래그&드롭 설정
      */
-    private playArrangementSound;
+    private setupKeyboardDragDrop;
+    /**
+     * 키보드로 좌석 이동 처리
+     */
+    private handleKeyboardSeatMove;
+    /**
+     * 인접한 좌석 찾기
+     */
+    private findAdjacentSeat;
+    /**
+     * 좌석 교환
+     */
+    private swapSeats;
+    /**
+     * 반 관리 초기화
+     */
+    private initializeClassManagement;
+    /**
+     * 반이 없는 경우 '반 만들기' 하이라이트 애니메이션 적용
+     * 처음 방문자뿐만 아니라 데이터가 없는 사용자도 하이라이트 표시
+     */
+    private checkAndHighlightClassCreation;
+    /**
+     * 반 만들기 하이라이트 애니메이션 제거
+     */
+    private removeClassCreationHighlight;
+    /**
+     * 반 선택 셀렉트 메뉴 업데이트
+     */
+    private updateClassSelect;
+    /**
+     * 반 선택 변경 처리
+     */
+    private handleClassSelectChange;
+    /**
+     * 현재 화면의 자리 배치도 지우기
+     */
+    private clearCurrentLayout;
+    /**
+     * 초기 화면의 자리 배치도 표시 (1명씩 한 줄로 배치 --> 기본 1줄 배치)
+     */
+    private showInitialLayout;
+    /**
+     * 새 반 추가 처리
+     */
+    private handleAddClass;
+    /**
+     * 반 삭제 처리
+     */
+    private handleDeleteClass;
+    /**
+     * 현재 반의 자리 배치도 저장 처리
+     * @deprecated '저장하기' 버튼이 제거되어 자리 확정하기에서 통합되었습니다. 더 이상 사용되지 않습니다.
+     */
+    /**
+     * '저장하기' 버튼 하이라이트 (자리 확정했지만 아직 저장하지 않음을 표시)
+     * @deprecated '저장하기' 버튼이 제거되어 더 이상 사용되지 않습니다.
+     */
+    /**
+     * '저장하기' 버튼 하이라이트 제거
+     * @deprecated '저장하기' 버튼이 제거되어 더 이상 사용되지 않습니다.
+     */
+    /**
+     * Firebase 로그인 처리 (로그인 페이지 표시)
+     */
+    private handleFirebaseLogin;
+    /**
+     * Firebase 로그아웃 처리
+     */
+    private handleFirebaseLogout;
+    /**
+     * Firebase 상태 업데이트
+     */
+    private updateFirebaseStatus;
+    /**
+     * Firebase에서 데이터를 불러와서 localStorage에 동기화
+     */
+    private syncDataFromFirebase;
+    /**
+     * 특정 반의 자리 배치도와 확정된 자리 이력을 Firebase에서 불러와서 localStorage에 저장
+     */
+    private syncClassDataFromFirebase;
 }
 //# sourceMappingURL=MainController.d.ts.map

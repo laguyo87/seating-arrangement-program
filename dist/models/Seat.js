@@ -9,8 +9,12 @@ export var LayoutType;
     LayoutType["PAIR_UNIFORM"] = "pair-uniform";
     /** 모둠 배치 */
     LayoutType["GROUP"] = "group";
+    /** 3명 모둠 배치 */
+    LayoutType["GROUP_3"] = "group-3";
     /** 4명 모둠 배치 */
     LayoutType["GROUP_4"] = "group-4";
+    /** 5명 모둠 배치 */
+    LayoutType["GROUP_5"] = "group-5";
     /** 6명 모둠 배치 */
     LayoutType["GROUP_6"] = "group-6";
     /** ㄷ자 배치 */

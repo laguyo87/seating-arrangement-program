@@ -181,7 +181,7 @@ export class InputModule {
             // MainController의 createStudentTable 메서드를 호출하거나 직접 테이블 생성
             // 여기서는 간단히 데이터만 저장하고, MainController에서 테이블을 다시 생성하도록 함
             // 실제로는 MainController의 createStudentTable을 호출해야 함
-            console.log('학생 데이터 설정:', students);
+            
         }
     }
 
