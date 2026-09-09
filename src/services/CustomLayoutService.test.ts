@@ -333,3 +333,64 @@ describe('CustomLayoutService.boundingSize - 배치 전체 크기', () => {
             .toEqual({ width: 600 + CARD_SIZE, height: 400 + CARD_SIZE });
     });
 });
+
+describe('CustomLayoutService.normalizeToOrigin - 여백 걷어내기', () => {
+    it('배치를 원점으로 당긴다', () => {
+        const positions = [
+            { seatId: 1, x: 300, y: 200 },
+            { seatId: 2, x: 500, y: 400 },
+        ];
+
+        expect(CustomLayoutService.normalizeToOrigin(positions)).toEqual([
+            { seatId: 1, x: 0, y: 0 },
+            { seatId: 2, x: 200, y: 200 },
+        ]);
+    });
+
+    it('배치 모양(상대 위치)은 그대로 유지된다', () => {
+        const positions = [
+            { seatId: 1, x: 400, y: 100 },
+            { seatId: 2, x: 400, y: 300 },
+            { seatId: 3, x: 700, y: 100 },
+        ];
+
+        const result = CustomLayoutService.normalizeToOrigin(positions);
+
+        expect(result[1].x - result[0].x).toBe(0);
+        expect(result[1].y - result[0].y).toBe(200);
+        expect(result[2].x - result[0].x).toBe(300);
+    });
+
+    it('이미 원점에 붙어 있으면 그대로다', () => {
+        const positions = [{ seatId: 1, x: 0, y: 0 }, { seatId: 2, x: 120, y: 0 }];
+
+        expect(CustomLayoutService.normalizeToOrigin(positions)).toEqual(positions);
+    });
+
+    it('가로와 세로를 각각 따로 당긴다', () => {
+        const positions = [
+            { seatId: 1, x: 300, y: 0 },
+            { seatId: 2, x: 900, y: 500 },
+        ];
+
+        expect(CustomLayoutService.normalizeToOrigin(positions)).toEqual([
+            { seatId: 1, x: 0, y: 0 },
+            { seatId: 2, x: 600, y: 500 },
+        ]);
+    });
+
+    it('빈 배치에서도 안전하다', () => {
+        expect(CustomLayoutService.normalizeToOrigin([])).toEqual([]);
+    });
+
+    it('당긴 뒤 전체 크기가 실제 배치 크기와 같아진다', () => {
+        const positions = [
+            { seatId: 1, x: 300, y: 200 },
+            { seatId: 2, x: 500, y: 200 },
+        ];
+
+        const size = CustomLayoutService.boundingSize(CustomLayoutService.normalizeToOrigin(positions));
+
+        expect(size).toEqual({ width: 200 + CARD_SIZE, height: CARD_SIZE });
+    });
+});

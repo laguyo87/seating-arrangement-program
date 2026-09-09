@@ -59,11 +59,15 @@ export class PrintExportManager {
 
         const clonedCards = Array.from(clone.querySelectorAll('.student-seat-card')) as HTMLElement[];
 
-        const positions: SeatPosition[] = originalCards.map((card, index) => ({
+        const rawPositions: SeatPosition[] = originalCards.map((card, index) => ({
             seatId: index + 1,
             x: parseFloat(card.style.left || '0') || 0,
             y: parseFloat(card.style.top || '0') || 0
         }));
+
+        // 화면 한쪽에 몰아 둔 배치라면 반대편 여백이 인쇄물에 그대로 남는다.
+        // 모양은 유지한 채 원점으로 당겨 여백만 걷어낸다.
+        const positions = CustomLayoutService.normalizeToOrigin(rawPositions);
 
         positions.forEach((position, index) => {
             const target = clonedCards[index];
@@ -82,17 +86,20 @@ export class PrintExportManager {
                            좌석 영역 자체를 flex로 두고 그 안에 고정 크기 캔버스를 넣어 가운데 정렬한다.
                            부모(.classroom-layout)를 건드리면 스스로 가운데 정렬하는 칠판이 함께 밀린다. */
                         .seats-area {
-                            display: flex !important;
-                            justify-content: center !important;
-                            align-items: flex-start !important;
+                            display: block !important;
                             grid-template-columns: none !important;
                             margin-top: 10px !important;
                         }
                         .custom-layout-canvas {
                             position: relative !important;
+                            display: block !important;
                             width: ${width}px !important;
                             height: ${height}px !important;
-                            flex: none !important;
+                            margin: 0 auto !important;
+                            /* 교탁용 템플릿은 '.seats-area > div(카드가 아닌 것)'을 180도 돌린다.
+                               이 캔버스가 거기 걸리면 좌석 블록이 두 번 회전해
+                               이름과 번호가 거꾸로 인쇄된다. */
+                            transform: none !important;
                         }
                         .custom-layout-canvas .student-seat-card {
                             position: absolute !important;
@@ -104,9 +111,12 @@ export class PrintExportManager {
                         @media print {
                             /* 인쇄 전용 규칙이 좌석 영역을 다시 그리드로 되돌리지 못하게 한다 */
                             .seats-area {
-                                display: flex !important;
-                                justify-content: center !important;
+                                display: block !important;
                                 grid-template-columns: none !important;
+                            }
+                            .custom-layout-canvas {
+                                margin: 0 auto !important;
+                                transform: none !important;
                             }
                         }`;
 

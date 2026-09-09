@@ -224,6 +224,26 @@ export class CustomLayoutService {
     }
 
     /**
+     * 배치를 원점(0,0)에 맞춰 옮긴다.
+     *
+     * 교사가 화면 오른쪽이나 아래쪽에 책상을 몰아 두면 왼쪽·위쪽에 빈 공간이 생긴다.
+     * 인쇄물에서는 그 빈 공간까지 배치의 일부로 잡혀 종이 한쪽이 비어 보인다.
+     * 배치 모양은 그대로 두고 전체를 원점으로 당겨 여백만 걷어낸다.
+     */
+    public static normalizeToOrigin(positions: SeatPosition[]): SeatPosition[] {
+        if (positions.length === 0) return [];
+
+        const minX = positions.reduce((min, p) => Math.min(min, p.x), Infinity);
+        const minY = positions.reduce((min, p) => Math.min(min, p.y), Infinity);
+
+        return positions.map(p => ({
+            seatId: p.seatId,
+            x: p.x - minX,
+            y: p.y - minY
+        }));
+    }
+
+    /**
      * 저장된 값이 쓸 수 있는 위치 목록인지 확인한다.
      * 손상된 값을 그대로 적용하면 카드가 화면 밖으로 사라진다.
      */
