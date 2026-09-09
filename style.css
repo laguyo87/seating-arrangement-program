@@ -2848,3 +2848,46 @@ button:disabled {
 .history-delete-btn:hover {
     opacity: 1 !important;
 }
+
+/* 명단·배치 내보내기 / 불러오기 버튼
+   .icon-btn은 이모지 하나를 담도록 width: 32px로 고정되어 있어
+   한글 레이블을 넣으면 한 글자씩 세로로 쪼개진다. 그래서 별도 클래스를 쓴다. */
+.backup-btn {
+    font-size: 0.9em;
+    padding: 6px 14px;
+    background: rgba(255, 255, 255, 0.25);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+    font-weight: 500;
+    flex-shrink: 0;
+}
+
+.backup-btn:hover {
+    background: rgba(255, 255, 255, 0.35);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.backup-btn:active {
+    transform: translateY(0);
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.backup-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+/* 화면이 좁아지면 글자를 줄여 헤더가 넘치지 않게 한다 */
+@media (max-width: 1400px) {
+    .backup-btn {
+        padding: 6px 10px;
+        font-size: 0.85em;
+    }
+}
