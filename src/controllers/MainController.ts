@@ -2645,10 +2645,12 @@ export class MainController {
                     seatsArea.style.gridTemplateColumns = previousState.data.gridTemplateColumns;
                 }
                 
-                // 학생 데이터 복원
-                if (previousState.data.students) {
-                    // 학생 데이터 복원은 나중에 구현
-                    
+                // 복원된 화면에서 배치를 다시 읽어 모델을 맞춘다.
+                // 화면만 되돌리고 모델을 그대로 두면, 되돌린 직후 자리를 확정했을 때
+                // 방금 되돌린 배치가 아니라 되돌리기 전 배치가 저장된다.
+                const restoredLayout = this.collectLayoutFromDom();
+                if (restoredLayout.length > 0) {
+                    this.updateSeatsAndStudentsFromLayout(restoredLayout);
                 }
                 
                 // 드래그&드롭 기능 다시 활성화 (복원된 카드에 대해)
@@ -2702,10 +2704,10 @@ export class MainController {
                     seatsArea.style.gridTemplateColumns = nextState.data.gridTemplateColumns;
                 }
                 
-                // 학생 데이터 복원
-                if (nextState.data.students) {
-                    // 학생 데이터 복원은 나중에 구현
-                    
+                // 복원된 화면에서 배치를 다시 읽어 모델을 맞춘다 (되돌리기와 동일)
+                const restoredLayout = this.collectLayoutFromDom();
+                if (restoredLayout.length > 0) {
+                    this.updateSeatsAndStudentsFromLayout(restoredLayout);
                 }
                 
                 // 드래그&드롭 기능 다시 활성화 (복원된 카드에 대해)
@@ -5373,19 +5375,8 @@ export class MainController {
                 });
             }
             
-            allCards.forEach(card => {
-                const seatIdStr = card.getAttribute('data-seat-id');
-                if (!seatIdStr) return;
-                
-                const seatId = parseInt(seatIdStr, 10);
-                const nameDiv = card.querySelector('.student-name') as HTMLElement;
-                const studentName = nameDiv?.textContent?.trim() || '';
-                
-                if (studentName) {
-                    const gender = card.classList.contains('gender-m') ? 'M' : 'F';
-                    currentLayout.push({ seatId, studentName, gender });
-                }
-            });
+            // 화면의 카드에서 현재 배치를 읽는다 (되돌리기 복원과 같은 경로를 사용한다)
+            currentLayout.push(...this.collectLayoutFromDom());
 
             if (currentLayout.length === 0) {
                 this.outputModule.showError('확정할 자리 배치가 없습니다.');
@@ -5598,6 +5589,34 @@ export class MainController {
     /**
      * 자리 확정 시 수집한 데이터로 현재 seats와 students 업데이트
      */
+    private collectLayoutFromDom(): Array<{seatId: number, studentName: string, gender: 'M' | 'F'}> {
+        const seatsArea = document.getElementById('seats-area');
+        if (!seatsArea) return [];
+
+        const layout: Array<{seatId: number, studentName: string, gender: 'M' | 'F'}> = [];
+        const cards = Array.from(seatsArea.querySelectorAll('.student-seat-card')) as HTMLElement[];
+
+        cards.forEach(card => {
+            const seatIdStr = card.getAttribute('data-seat-id');
+            if (!seatIdStr) return;
+
+            const seatId = parseInt(seatIdStr, 10);
+            if (isNaN(seatId)) return;
+
+            const nameDiv = card.querySelector('.student-name') as HTMLElement | null;
+            const studentName = nameDiv?.textContent?.trim() || '';
+            if (!studentName) return;
+
+            const gender: 'M' | 'F' = card.classList.contains('gender-m') ? 'M' : 'F';
+            layout.push({ seatId, studentName, gender });
+        });
+
+        return layout;
+    }
+
+    /**
+     * 자리 확정 시 수집한 데이터로 현재 seats와 students 업데이트
+     */
     private updateSeatsAndStudentsFromLayout(
         currentLayout: Array<{seatId: number, studentName: string, gender: 'M' | 'F'}>
     ): void {
@@ -5607,16 +5626,14 @@ export class MainController {
                 return;
             }
 
-            // 학생 목록 생성/업데이트
-            const studentMap = new Map<string, Student>();
-            currentLayout.forEach(layoutItem => {
-                if (layoutItem.studentName && !studentMap.has(layoutItem.studentName)) {
-                    const student = StudentModel.create(layoutItem.studentName, layoutItem.gender);
-                    studentMap.set(layoutItem.studentName, student);
-                }
-            });
-            
-            this.students = Array.from(studentMap.values());
+            // 기존 명단을 최대한 그대로 유지한다 (규칙은 SeatOccupancyService에 있고 테스트로 고정되어 있다)
+            const merged = SeatOccupancyService.mergeRosterFromLayout(
+                this.students,
+                currentLayout,
+                (name, gender) => StudentModel.create(name, gender)
+            );
+            const studentBySeatId = merged.studentBySeatId;
+            this.students = merged.students;
             
             // 좌석 목록 업데이트 (기존 seats의 position 정보 유지)
             const seatIds = currentLayout.map(l => l.seatId).filter(id => id > 0);
@@ -5646,7 +5663,7 @@ export class MainController {
                 
                 if (layoutItem && layoutItem.studentName) {
                     // 학생이 배치된 좌석
-                    const student = studentMap.get(layoutItem.studentName);
+                    const student = studentBySeatId.get(layoutItem.seatId);
                     if (student) {
                         const seat: Seat = {
                             id: i,
@@ -8682,6 +8699,11 @@ export class MainController {
      * 반 선택 변경 처리
      */
     private handleClassSelectChange(classId: string): void {
+        // 반이 바뀌면 되돌리기 이력은 더 이상 유효하지 않다.
+        // 비우지 않으면 다른 반에서 Ctrl+Z를 눌렀을 때
+        // 이전 반의 자리 배치가 현재 반 화면에 복원된다.
+        this.resetHistory();
+
         if (!classId || classId === '') {
             // 선택 해제
             this.classManager.selectClass(null);

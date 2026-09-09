@@ -67,4 +67,52 @@ export class SeatOccupancyService {
 
         return result;
     }
+
+    /**
+     * 화면에서 읽은 배치로 명단을 갱신한다.
+     *
+     * 이름을 키로 학생을 새로 만들면 세 가지가 한꺼번에 망가진다.
+     *  - 동명이인이 한 명으로 합쳐진다 (30명 학급이 29명으로 저장된다)
+     *  - 학생 ID가 매번 새로 발급되어 좌석의 studentId와 어긋난다
+     *  - 고정석 지정(fixedSeatId)이 사라진다
+     *
+     * 그래서 기존 명단의 학생을 이름으로 찾아 재사용하고,
+     * 자리를 받지 못한 학생도 명단에는 남긴다. (반에서 사라지는 것이 아니다)
+     *
+     * @returns students 갱신된 명단 / studentBySeatId 좌석 번호별 배정 학생
+     */
+    public static mergeRosterFromLayout(
+        existingStudents: Student[],
+        layout: Array<{ seatId: number; studentName: string; gender: 'M' | 'F' }>,
+        createStudent: (name: string, gender: 'M' | 'F') => Student
+    ): { students: Student[]; studentBySeatId: Map<number, Student> } {
+        const unusedExisting: Student[] = Array.isArray(existingStudents) ? [...existingStudents] : [];
+
+        const takeExisting = (name: string): Student | undefined => {
+            const index = unusedExisting.findIndex(candidate => candidate.name === name);
+            return index === -1 ? undefined : unusedExisting.splice(index, 1)[0];
+        };
+
+        const seatedStudents: Student[] = [];
+        const studentBySeatId = new Map<number, Student>();
+
+        layout.forEach(item => {
+            if (!item.studentName) return;
+
+            const existing = takeExisting(item.studentName);
+            if (existing) {
+                // 화면에서 성별이 바뀌었을 수 있으므로 반영한다
+                existing.gender = item.gender;
+            }
+            const student = existing ?? createStudent(item.studentName, item.gender);
+
+            seatedStudents.push(student);
+            studentBySeatId.set(item.seatId, student);
+        });
+
+        return {
+            students: [...seatedStudents, ...unusedExisting],
+            studentBySeatId
+        };
+    }
 }
