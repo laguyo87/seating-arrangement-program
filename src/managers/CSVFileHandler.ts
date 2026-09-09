@@ -5,6 +5,7 @@
 
 import { OutputModule } from '../modules/OutputModule.js';
 import { logger } from '../utils/logger.js';
+import { decodeTextBytes } from '../utils/textEncoding.js';
 import * as XLSX from 'xlsx';
 
 /**
@@ -181,7 +182,7 @@ export class CSVFileHandler {
                 }
                 
                 try {
-                    const text = e.target?.result as string;
+                    const text = decodeTextBytes(new Uint8Array(e.target?.result as ArrayBuffer));
                     const students = this.parseCsvFile(text);
                     if (students) {
                         this.showPreviewAndConfirm(students, file.name);
@@ -194,7 +195,7 @@ export class CSVFileHandler {
         } else {
             reader.onload = (e) => {
                 try {
-                    const text = e.target?.result as string;
+                    const text = decodeTextBytes(new Uint8Array(e.target?.result as ArrayBuffer));
                     const students = this.parseCsvFile(text);
                     if (students) {
                         this.showPreviewAndConfirm(students, file.name);
@@ -213,7 +214,10 @@ export class CSVFileHandler {
             this.deps.outputModule.showError('파일을 읽는 중 오류가 발생했습니다.');
         };
         
-        reader.readAsText(file, 'UTF-8');
+        // 인코딩을 고정하지 않고 바이트로 읽어 판별한다.
+        // 한국어 Windows의 Excel은 CSV를 CP949로 저장하므로
+        // UTF-8로 고정하면 한글이 전부 깨진 채 명단 전체가 거부된다.
+        reader.readAsArrayBuffer(file);
     }
 
     /**
