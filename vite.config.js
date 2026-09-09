@@ -22,7 +22,14 @@ export default defineConfig(({ command, mode }) => {
       outDir: 'dist',
       sourcemap: true,
       rollupOptions: {
-        input: './app.html'
+        input: './app.html',
+        output: {
+          // Firebase는 앱 시작 시 바로 필요하지만 자주 바뀌지 않는다.
+          // 별도 청크로 분리하면 앱 코드를 수정해도 캐시가 유지된다.
+          manualChunks: {
+            firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore']
+          }
+        }
       },
       // 의존성을 번들에 포함
       commonjsOptions: {
@@ -35,7 +42,7 @@ export default defineConfig(({ command, mode }) => {
     publicDir: false,
     // xlsx 같은 외부 의존성을 번들에 포함
     optimizeDeps: {
-      include: ['xlsx', 'qrcode']
+      include: ['xlsx']
     },
     // Vitest 테스트 설정
     test: {

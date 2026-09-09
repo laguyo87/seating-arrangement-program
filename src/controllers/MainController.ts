@@ -32,8 +32,6 @@ import { FirebaseStorageManager, FirebaseStorageManagerDependencies } from '../m
 import { LoginPageModule, LoginPageModuleDependencies } from '../modules/LoginPageModule.js';
 import { SignUpPageModule, SignUpPageModuleDependencies } from '../modules/SignUpPageModule.js';
 import { VisitorCounterModule, VisitorCounterModuleDependencies } from '../modules/VisitorCounterModule.js';
-import QRCode from 'qrcode';
-import html2canvas from 'html2canvas';
 
 /**
  * 히스토리 데이터 타입
@@ -7307,6 +7305,8 @@ export class MainController {
             // html2canvas로 이미지 변환 (전체 캡처, 스마트폰 최적화)
             // width와 height를 명시하지 않으면 자동으로 전체 영역을 캡처
             // html2canvas v1.x 옵션 (타입 정의가 v0.5 기준이므로 any 캐스트)
+            // 이미지 저장을 누를 때만 불러온다 (약 200KB, 첫 화면에는 필요 없다)
+            const html2canvas = (await import('html2canvas')).default;
             const canvas = await (html2canvas as any)(classroomLayout, {
                 backgroundColor: '#ffffff',
                 scale: 2, // 고해상도 (스마트폰에서도 선명하게)
@@ -7738,34 +7738,6 @@ export class MainController {
     /**
      * QR 코드 생성
      */
-    /**
-     * QR 코드 생성
-     * @deprecated 공유 기능이 제거되었습니다. 이 메서드는 더 이상 사용되지 않습니다.
-     */
-    private async generateQRCode(url: string, container: HTMLElement): Promise<void> {
-        // 공유 기능이 제거되었으므로 아무 작업도 하지 않음
-        return;
-        try {
-            container.innerHTML = ''; // 기존 내용 제거
-            
-            const canvas = document.createElement('canvas');
-            await QRCode.toCanvas(canvas, url, {
-                width: 200,
-                margin: 2,
-                color: {
-                    dark: '#000000',
-                    light: '#FFFFFF'
-                }
-            });
-            
-            container.appendChild(canvas);
-            canvas.style.cssText = 'border: 2px solid #ddd; border-radius: 8px; padding: 10px; background: white;';
-        } catch (error) {
-            logger.error('QR 코드 생성 실패:', error);
-            container.innerHTML = '<p style="color: #dc3545;">QR 코드 생성에 실패했습니다.</p>';
-        }
-    }
-
     /**
      * 사용설명서 모달 표시
      */

@@ -6,7 +6,6 @@
 import { OutputModule } from '../modules/OutputModule.js';
 import { logger } from '../utils/logger.js';
 import { decodeTextBytes } from '../utils/textEncoding.js';
-import * as XLSX from 'xlsx';
 
 /**
  * CSVFileHandler가 필요로 하는 의존성 인터페이스
@@ -230,7 +229,7 @@ export class CSVFileHandler {
             updateProgress(20, '엑셀 파일 읽기 시작...');
         }
         
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
             try {
                 if (updateProgress) {
                     updateProgress(50, '엑셀 파일 파싱 중...');
@@ -241,7 +240,9 @@ export class CSVFileHandler {
                     throw new Error('파일 데이터를 읽을 수 없습니다.');
                 }
                 
-                // XLSX 라이브러리로 엑셀 파일 읽기
+                // XLSX는 엑셀 파일을 실제로 올릴 때만 불러온다.
+                // 번들에서 가장 큰 라이브러리라 첫 화면 로딩을 크게 늦춘다.
+                const XLSX = await import('xlsx');
                 const workbook = XLSX.read(data, { type: 'binary' });
                 
                 if (updateProgress) {
