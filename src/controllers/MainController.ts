@@ -8508,7 +8508,6 @@ export class MainController {
     private updateClassSelect(): void {
         const classSelect = document.getElementById('class-select') as HTMLSelectElement;
         const deleteBtn = document.getElementById('delete-class-btn') as HTMLButtonElement;
-        const saveBtn = document.getElementById('save-layout-btn') as HTMLButtonElement;
         
         if (!classSelect) return;
 
@@ -8535,13 +8534,16 @@ export class MainController {
             classSelect.value = '';
         }
 
-        // 버튼 표시/숨김
+        // 반 삭제 버튼은 항상 보이되, 삭제할 반이 없으면 누를 수 없게 한다.
+        // 숨겨 버리면 그런 기능이 있다는 것 자체를 알 수 없다.
         const hasSelection = classSelect.value !== '';
         if (deleteBtn) {
-            deleteBtn.style.display = hasSelection ? 'inline-block' : 'none';
-        }
-        if (saveBtn) {
-            saveBtn.style.display = hasSelection ? 'inline-block' : 'none';
+            deleteBtn.style.display = '';
+            deleteBtn.disabled = !hasSelection;
+            deleteBtn.title = hasSelection
+                ? '선택한 반 삭제'
+                : '삭제할 반을 먼저 선택하세요';
+            deleteBtn.setAttribute('aria-label', deleteBtn.title);
         }
         
         // 반 목록 업데이트 후 하이라이트 상태 확인 (반이 삭제된 경우를 대비)

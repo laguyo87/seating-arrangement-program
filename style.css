@@ -803,7 +803,6 @@ body {
 .icon-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
-    pointer-events: none;
 }
 
 /* 히스토리 컨트롤 */
