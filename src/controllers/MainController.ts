@@ -2999,7 +2999,7 @@ export class MainController {
             const occupants = SeatOccupancyService.resolveOccupants(seats, this.students);
             occupants.forEach((student, index) => {
                 if (!student) return;
-                const card = this.createStudentCard(student, this.students.indexOf(student));
+                const card = this.createStudentCard(student, index);
                 seatsArea.appendChild(card);
             });
 

@@ -100,9 +100,9 @@ export class LayoutRenderer {
 
             // 좌석에 기록된 배정 정보를 그대로 사용한다 (명단 순서로 되돌리지 않는다)
             const occupants = SeatOccupancyService.resolveOccupants(seats, students);
-            occupants.forEach((student) => {
+            occupants.forEach((student, index) => {
                 if (!student) return;
-                const card = this.createStudentCard(student, students.indexOf(student));
+                const card = this.createStudentCard(student, index);
                 seatsArea.appendChild(card);
             });
         }
