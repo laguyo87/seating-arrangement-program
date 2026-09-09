@@ -2850,8 +2850,11 @@ button:disabled {
 }
 
 /* 명단·배치 내보내기 / 불러오기 버튼
-   .icon-btn은 이모지 하나를 담도록 width: 32px로 고정되어 있어
-   한글 레이블을 넣으면 한 글자씩 세로로 쪼개진다. 그래서 별도 클래스를 쓴다. */
+   두 가지를 모두 눌러야 한다:
+   - .icon-btn은 이모지 하나를 담도록 width: 32px로 고정되어 있어
+     한글 레이블을 넣으면 한 글자씩 세로로 쪼개진다.
+   - 전역 button 규칙이 width: 100%를 주므로 헤더에서는 auto로 되돌려야 한다.
+     (되돌리지 않으면 버튼 하나가 헤더 전체를 차지해 뒤의 항목이 밀려난다) */
 .backup-btn {
     font-size: 0.9em;
     padding: 6px 14px;
@@ -2863,7 +2866,9 @@ button:disabled {
     transition: all 0.3s ease;
     white-space: nowrap;
     font-weight: 500;
-    flex-shrink: 0;
+    width: auto;
+    flex: none;
+    margin-bottom: 0;
 }
 
 .backup-btn:hover {
