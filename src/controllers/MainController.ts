@@ -10,6 +10,8 @@ import { CustomLayoutModule } from '../modules/CustomLayoutModule.js';
 import { StudentModel } from '../models/Student.js';
 import { LayoutService } from '../services/LayoutService.js';
 import { RandomService } from '../services/RandomService.js';
+import { PairingService } from '../services/PairingService.js';
+import { SeatOccupancyService } from '../services/SeatOccupancyService.js';
 // import { SeatType } from '../models/Seat.js'; // 향후 사용 예정
 import { Student } from '../models/Student.js';
 import { Seat } from '../models/Seat.js';
@@ -119,6 +121,9 @@ interface OptionsData {
  * 전체 프로그램의 흐름을 제어하고 모듈들을 조율합니다.
  */
 export class MainController {
+    /** 진행 중인 Firebase 동기화 (중복 실행 방지) */
+    private syncInFlight: Promise<void> | null = null;
+
     private inputModule!: InputModule;
     private layoutSelectorModule!: LayoutSelectorModule;
     private canvasModule!: SeatCanvasModule;
@@ -366,10 +371,13 @@ export class MainController {
                 }
             });
             
-            // Firebase 상태 업데이트
-            this.setTimeoutSafe(() => {
+            // Firebase 인증 상태가 확정되면 화면과 데이터를 갱신한다.
+            // 고정 시간(1초) 타이머로 기다리면 인증 복원이 그보다 늦은 기기에서
+            // 로그인 상태를 놓쳐 클라우드 데이터를 불러오지 못한다.
+            // 그 상태로 반을 만들면 클라우드의 기존 반 목록이 통째로 교체된다.
+            this.firebaseStorageManager.onAuthStateResolved(() => {
                 this.updateFirebaseStatus();
-            }, 1000);
+            });
             
             // 모바일 반응형 초기화
             this.initializeMobileResponsive();
@@ -956,7 +964,10 @@ export class MainController {
             const confirmBtn = target.id === 'confirm-seats' ? target : target.closest('#confirm-seats');
             if (confirmBtn) {
                 e.preventDefault();
-                this.handleConfirmSeats();
+                this.handleConfirmSeats().catch((error) => {
+                    logger.error('자리 확정 처리 실패:', error);
+                    this.outputModule.showError('자리 확정 중 오류가 발생했습니다.');
+                });
                 return;
             }
             
@@ -1438,12 +1449,18 @@ export class MainController {
                         pairContainer.style.width = '100%';
                         pairContainer.style.justifyContent = 'center';
                         
-                        // 각 행마다 올바른 패턴으로 배치
+                        // 각 행마다 남녀가 번갈아 오도록 배치한다.
                         // 첫 번째 행: 남남 -> 여여 -> 남남
                         // 두 번째 행: 여여 -> 남남 -> 여여  
-                        // 세 번째 행: 남남 -> 여여 -> 남남
-                        // 네 번째 행: 여여 -> 남남 -> 여여
-                        const shouldBeMale = (row + partition) % 2 === 0;
+                        // 다만 한쪽 성별이 먼저 소진되면 남은 성별로 채운다.
+                        // 패턴만 따르면 남는 학생의 자리가 아예 만들어지지 않는다.
+                        const preferMale = (row + partition) % 2 === 0;
+                        const malesLeft = maleIndex < maleStudents.length;
+                        const femalesLeft = femaleIndex < femaleStudents.length;
+                        if (!malesLeft && !femalesLeft) {
+                            break; // 남은 학생이 없으면 빈 컨테이너를 만들지 않는다
+                        }
+                        const shouldBeMale = preferMale ? malesLeft : !femalesLeft;
                         
                         if (shouldBeMale) {
                             // 남학생 짝꿍
@@ -1481,44 +1498,9 @@ export class MainController {
                 const maleStudents = this.students.filter(s => s.gender === 'M');
                 const femaleStudents = this.students.filter(s => s.gender === 'F');
                 
-                // 1단계: 남녀 짝꿍 생성
-                const genderPairs = Math.min(maleStudents.length, femaleStudents.length);
-                let maleIndex = 0;
-                let femaleIndex = 0;
-                
-                // 남녀 짝꿍 배치를 위한 배열 생성
-                const pairs: Array<{male: Student | null, female: Student | null}> = [];
-                for (let i = 0; i < genderPairs; i++) {
-                    pairs.push({
-                        male: maleStudents[maleIndex++],
-                        female: femaleStudents[femaleIndex++]
-                    });
-                }
-                
-                // 2단계: 남은 남자 학생 처리
-                const remainingMales = maleStudents.length - genderPairs;
-                if (remainingMales > 0) {
-                    // 남은 남자 수가 짝수면 남자끼리 짝꿍
-                    // 홀수면 (남은 수 - 1)명끼리 짝꿍 + 1명 혼자 배치
-                    const malePairs = Math.floor(remainingMales / 2);
-                    const singleMale = remainingMales % 2;
-                    
-                    // 남자끼리 짝꿍 추가 (한 쌍에 남자 2명)
-                    for (let i = 0; i < malePairs; i++) {
-                        pairs.push({
-                            male: maleStudents[maleIndex++],
-                            female: maleStudents[maleIndex++] // 남자끼리 짝꿍이므로 두 번째도 남자
-                        });
-                    }
-                    
-                    // 혼자 배치되는 남자 1명 추가
-                    if (singleMale === 1) {
-                        pairs.push({
-                            male: maleStudents[maleIndex++],
-                            female: null
-                        });
-                    }
-                }
+                // 1~2단계: 남녀 짝꿍을 만들고 남는 학생도 모두 자리를 받도록 묶는다.
+                // (규칙은 PairingService.buildPairs에 있고 단위 테스트로 고정되어 있다)
+                const pairs = PairingService.buildPairs(maleStudents, femaleStudents);
                 
                 // 3단계: 전체 짝꿍을 분단별로 배치
                 const rowsPerPartition = Math.ceil(pairs.length / partitionCount);
@@ -1536,13 +1518,13 @@ export class MainController {
                         pairContainer.style.width = '100%';
                         pairContainer.style.justifyContent = 'center';
                         
-                        if (pair.male) {
-                            const card1 = this.createStudentCard(pair.male, this.students.indexOf(pair.male));
+                        if (pair.first) {
+                            const card1 = this.createStudentCard(pair.first, this.students.indexOf(pair.first));
                             pairContainer.appendChild(card1);
                         }
                         
-                        if (pair.female) {
-                            const card2 = this.createStudentCard(pair.female, this.students.indexOf(pair.female));
+                        if (pair.second) {
+                            const card2 = this.createStudentCard(pair.second, this.students.indexOf(pair.second));
                             pairContainer.appendChild(card2);
                         }
                         
@@ -3012,10 +2994,11 @@ export class MainController {
             seatsArea.style.gap = '10px';
             seatsArea.style.display = 'grid';
 
-            seats.forEach((seat, index) => {
-                if (index >= this.students.length) return;
-                
-                const student = this.students[index];
+            // 좌석에 기록된 배정 정보를 그대로 사용한다.
+            // 명단 순서로 다시 그리면 저장해 둔 배치가 전혀 다른 배치로 복원된다.
+            const occupants = SeatOccupancyService.resolveOccupants(seats, this.students);
+            occupants.forEach((student, index) => {
+                if (!student) return;
                 const card = this.createStudentCard(student, index);
                 seatsArea.appendChild(card);
             });
@@ -3334,9 +3317,15 @@ export class MainController {
         });
 
         // localStorage에 학생 데이터 저장
+        // safeSetItem은 예외를 던지지 않고 false를 반환하므로 반환값을 반드시 확인해야 한다.
+        // 확인하지 않으면 저장 실패 시에도 아래에서 '등록되었습니다' 메시지가 표시된다.
         try {
-            this.storageManager.safeSetItem('classStudentData', JSON.stringify(studentData));
-            
+            const studentDataSaved = this.storageManager.safeSetItem('classStudentData', JSON.stringify(studentData));
+            if (!studentDataSaved) {
+                logger.error('학생 데이터 저장 실패', { count: studentData.length });
+                this.outputModule.showError('학생 명단을 저장하지 못했습니다. 브라우저 저장소 설정을 확인해주세요.');
+                return;
+            }
         } catch (error) {
             logger.error('학생 데이터 저장 중 오류:', error);
             this.outputModule.showError('학생 데이터 저장 중 오류가 발생했습니다.');
@@ -4864,8 +4853,8 @@ export class MainController {
                 // 고정 좌석에 배치된 학생들을 제외한 나머지 학생들
                 const allRemainingMales = maleStudents.filter(s => !s.fixedSeatId);
                 const allRemainingFemales = femaleStudents.filter(s => !s.fixedSeatId);
-                let shuffledMales = [...allRemainingMales].sort(() => Math.random() - 0.5);
-                let shuffledFemales = [...allRemainingFemales].sort(() => Math.random() - 0.5);
+                let shuffledMales = RandomService.shuffle(allRemainingMales);
+                let shuffledFemales = RandomService.shuffle(allRemainingFemales);
                 
                 // 고정 좌석이 아닌 좌석만 필터링
                 const nonFixedCards = Array.from(existingCards).filter(card => {
@@ -5053,8 +5042,8 @@ export class MainController {
                 });
             } else {
                 // 일반 랜덤 배치 모드
-                let shuffledMales = [...maleStudents].sort(() => Math.random() - 0.5);
-                let shuffledFemales = [...femaleStudents].sort(() => Math.random() - 0.5);
+                let shuffledMales = RandomService.shuffle(maleStudents);
+                let shuffledFemales = RandomService.shuffle(femaleStudents);
                 
                 // 페어 컨테이너 우선 처리
                 const seatsAreaEl = document.getElementById('seats-area')!;
@@ -5067,6 +5056,11 @@ export class MainController {
                     }
                 });
 
+                // 성별에 맞는 학생이 남아 있지 않으면 다른 성별 풀에서 채운다.
+                // (splice로 원본 배열을 직접 줄이므로 별도의 되돌려쓰기가 필요 없다)
+                const poolFor = (preferMale: boolean): Student[] =>
+                    PairingService.selectPool(preferMale, shuffledMales, shuffledFemales);
+
                 pairContainers.forEach(container => {
                     const cards = Array.from(container.querySelectorAll('.student-seat-card')) as HTMLElement[];
                     if (cards.length !== 2) return;
@@ -5078,41 +5072,31 @@ export class MainController {
                     const nameDivA = cardA.querySelector('.student-name') as HTMLElement;
                     const nameDivB = cardB.querySelector('.student-name') as HTMLElement;
 
-                    const poolA = isMaleA ? shuffledMales : shuffledFemales;
-                    const poolB = isMaleB ? shuffledMales : shuffledFemales;
-
-                    // poolA가 비어있으면 스킵
+                    // A 자리 배정
+                    // A의 성별 풀이 비었다고 해서 이 컨테이너 전체를 건너뛰면 안 된다.
+                    // 그렇게 하면 아직 학생이 남아 있는 B 자리까지 함께 비고,
+                    // 짝꿍 컨테이너는 아래 '단일 카드' 처리 대상에도 들어가지 않아
+                    // 끝까지 빈 자리로 남는다 (학생 수와 좌석 수가 같아 경고도 뜨지 않는다).
+                    const poolA = poolFor(isMaleA);
+                    let chosenA: Student | undefined;
                     if (poolA.length === 0) {
                         if (nameDivA) nameDivA.textContent = '';
-                        if (nameDivB) nameDivB.textContent = '';
-                        if (isMaleA) shuffledMales = poolA; else shuffledFemales = poolA;
-                        if (isMaleB) shuffledMales = poolB; else shuffledFemales = poolB;
-                        return;
-                    }
-
-                    let idxA = 0;
-                    if (avoidPrevSeat) {
-                        for (let i = 0; i < poolA.length; i++) {
-                            const cand = poolA[i];
-                            if (lastSeatByStudent[cand.name] !== seatIdA) { idxA = i; break; }
+                    } else {
+                        let idxA = 0;
+                        if (avoidPrevSeat) {
+                            for (let i = 0; i < poolA.length; i++) {
+                                const cand = poolA[i];
+                                if (lastSeatByStudent[cand.name] !== seatIdA) { idxA = i; break; }
+                            }
                         }
+                        chosenA = poolA.splice(idxA, 1)[0];
+                        if (nameDivA) nameDivA.textContent = chosenA?.name || '';
                     }
-                    const chosenA = poolA.splice(idxA, 1)[0];
-                    if (nameDivA) nameDivA.textContent = chosenA?.name || '';
 
-                    // poolB가 비어있으면 다른 성별에서 시도 (고정 좌석 모드)
+                    // B 자리 배정 (A가 소모한 결과를 반영해 풀을 다시 고른다)
+                    const poolB = poolFor(isMaleB);
                     if (poolB.length === 0) {
-                        // 성별에 맞는 학생이 없으면 다른 성별에서 가져오기
-                        const alternativePoolB = isMaleB ? shuffledFemales : shuffledMales;
-                        if (alternativePoolB.length > 0) {
-                            // 대체 풀에서 학생 선택
-                            const chosenB = alternativePoolB.splice(0, 1)[0];
-                            if (nameDivB && chosenB) nameDivB.textContent = chosenB.name || '';
-                            if (isMaleB) shuffledMales = alternativePoolB; else shuffledFemales = alternativePoolB;
-                        } else {
-                            if (nameDivB) nameDivB.textContent = '';
-                        }
-                        if (isMaleA) shuffledMales = poolA; else shuffledFemales = poolA;
+                        if (nameDivB) nameDivB.textContent = '';
                         return;
                     }
 
@@ -5120,8 +5104,12 @@ export class MainController {
                     for (let i = 0; i < poolB.length; i++) {
                         const cand = poolB[i];
                         const seatOk = !avoidPrevSeat || lastSeatByStudent[cand.name] !== seatIdB;
-                        const partnerOk = !avoidPrevPartner || (
-                            (chosenA && lastPartnerByStudent[chosenA.name] !== cand.name) && (lastPartnerByStudent[cand.name] !== (chosenA?.name || ''))
+                        // 짝꿍 회피는 A가 실제로 배정된 경우에만 판단할 수 있다.
+                        // chosenA가 없을 때 조건을 거짓으로 두면 모든 후보가 탈락해
+                        // 항상 강제 배치로 떨어진다.
+                        const partnerOk = !avoidPrevPartner || !chosenA || (
+                            lastPartnerByStudent[chosenA.name] !== cand.name &&
+                            lastPartnerByStudent[cand.name] !== chosenA.name
                         );
                         if (seatOk && partnerOk) { idxB = i; break; }
                     }
@@ -5133,9 +5121,6 @@ export class MainController {
                     
                     const chosenB = poolB.splice(idxB, 1)[0];
                     if (nameDivB) nameDivB.textContent = chosenB?.name || '';
-
-                    if (isMaleA) shuffledMales = poolA; else shuffledFemales = poolA;
-                    if (isMaleB) shuffledMales = poolB; else shuffledFemales = poolB;
                 });
 
                 // 나머지 단일 카드 처리
@@ -5296,7 +5281,7 @@ export class MainController {
     /**
      * 자리 확정 처리
      */
-    private handleConfirmSeats(): void {
+    private async handleConfirmSeats(): Promise<void> {
         try {
             // 현재 좌석 배치 데이터 수집
             const seatsArea = document.getElementById('seats-area');
@@ -5412,7 +5397,13 @@ export class MainController {
             // 반별 이력 키: seatHistory_${classId} (각 반마다 독립적으로 저장)
             const historyKey = `seatHistory_${currentClassId}`;
             logger.info(`반별 이력 저장 시작: 반ID=${currentClassId}, 키=${historyKey}`);
-            const existingHistory = this.getSeatHistory(currentClassId);
+            const existingHistory = this.readSeatHistory(currentClassId);
+            if (existingHistory === null) {
+                // 기존 이력을 읽지 못한 상태에서 저장하면 이력 전체가 새 항목 하나로 교체된다.
+                this.outputModule.showError('기존 이력을 읽을 수 없어 자리를 확정하지 않았습니다. 브라우저 저장소 설정을 확인한 뒤 다시 시도해주세요.');
+                logger.error('자리 확정 중단: 기존 이력 읽기 실패', { currentClassId });
+                return;
+            }
             existingHistory.unshift(historyItem); // 최신 항목을 맨 앞에 추가
             // 최대 50개까지만 저장
             if (existingHistory.length > 50) {
@@ -5427,27 +5418,17 @@ export class MainController {
                 return;
             }
             
-            // Firebase에 이력 저장 (로그인된 경우)
-            if (this.firebaseStorageManager?.getIsAuthenticated()) {
-                this.firebaseStorageManager.saveSeatHistory(currentClassId, existingHistory).then((firebaseSaved) => {
-                    if (firebaseSaved) {
-                        logger.info('✅ Firebase에 확정된 자리 이력 저장 완료');
-                    } else {
-                        logger.warn('⚠️ Firebase에 확정된 자리 이력 저장 실패 (localStorage에는 저장됨)');
-                    }
-                }).catch((error) => {
-                    logger.error('❌ Firebase에 확정된 자리 이력 저장 실패:', error);
-                });
-            }
+            // 클라우드 저장은 아래에서 한 번만, 결과를 기다려 수행한다.
+            // (같은 문서에 두 번 쓰면 나중 쓰기가 오래된 데이터로 앞선 쓰기를 덮을 수 있다.)
             
             // 저장 확인: 저장 직후 읽어서 검증
-            const verifyHistory = this.getSeatHistory(currentClassId);
-            if (verifyHistory.length === 0 || verifyHistory[0].id !== historyItem.id) {
+            const verifyHistory = this.readSeatHistory(currentClassId);
+            if (!verifyHistory || verifyHistory.length === 0 || verifyHistory[0].id !== historyItem.id) {
                 logger.error('이력 저장 검증 실패:', { 
                     saved: saved, 
-                    verifyLength: verifyHistory.length,
+                    verifyLength: verifyHistory?.length ?? null,
                     expectedId: historyItem.id,
-                    actualId: verifyHistory[0]?.id 
+                    actualId: verifyHistory?.[0]?.id 
                 });
                 this.outputModule.showError('이력 저장 후 검증에 실패했습니다. 다시 시도해주세요.');
                 return;
@@ -5463,36 +5444,50 @@ export class MainController {
             // 드롭다운 메뉴 업데이트
             this.updateHistoryDropdown();
 
-            // 반이 선택된 경우 Firebase에 자리 배치도 저장 (자리 확정과 동시에 저장)
-            if (this.classManager && this.classManager.getCurrentClassId()) {
-                // 현재 seats와 students를 화면 데이터로 업데이트한 후 저장
-                this.updateSeatsAndStudentsFromLayout(currentLayout);
-                this.classManager.saveCurrentLayout().then((saved) => {
-                    if (saved) {
-                        logger.info('✅ 자리 확정 및 저장 완료');
-                        
-                        // 확정된 자리 이력도 Firebase에 저장
-                        const currentClassId = this.classManager?.getCurrentClassId();
-                        if (currentClassId && this.firebaseStorageManager?.getIsAuthenticated()) {
-                            const history = this.getSeatHistory(currentClassId);
-                            if (history.length > 0) {
-                                this.firebaseStorageManager.saveSeatHistory(currentClassId, history).then((firebaseSaved) => {
-                                    if (firebaseSaved) {
-                                        logger.info('✅ Firebase에 확정된 자리 이력 저장 완료');
-                                    } else {
-                                        logger.warn('⚠️ Firebase에 확정된 자리 이력 저장 실패');
-                                    }
-                                }).catch((error) => {
-                                    logger.error('❌ Firebase에 확정된 자리 이력 저장 실패:', error);
-                                });
-                            }
-                        }
-                    } else {
-                        logger.warn('⚠️ 자리 확정 시 저장 실패');
-                    }
-                }).catch((error) => {
-                    logger.error('❌ 자리 확정 시 저장 실패:', error);
-                });
+            // 화면 데이터를 모델에 반영한 뒤 저장한다.
+            this.updateSeatsAndStudentsFromLayout(currentLayout);
+
+            // 저장 결과를 기다린 뒤에 안내한다.
+            // 기다리지 않고 성공 메시지를 띄우면, 저장이 실패해도 교사는 저장된 것으로 믿는다.
+            let cloudStatus: 'ok' | 'failed' | 'skipped' = 'skipped';
+            let localLayoutSaved = true;
+
+            if (this.classManager) {
+                const layoutResult = await this.classManager.saveCurrentLayoutDetailed({ silent: true });
+                localLayoutSaved = layoutResult.local;
+                cloudStatus = layoutResult.cloud;
+                if (!localLayoutSaved) {
+                    logger.error('자리 확정 시 자리 배치도 로컬 저장 실패');
+                }
+            }
+
+            // 확정된 자리 이력을 클라우드에 저장 (이 경로에서 단 한 번만 수행)
+            if (this.firebaseStorageManager?.getIsAuthenticated()) {
+                const historySaved = await this.firebaseStorageManager
+                    .saveSeatHistory(currentClassId, existingHistory)
+                    .catch((error) => {
+                        logger.error('❌ Firebase에 확정된 자리 이력 저장 실패:', error);
+                        return false;
+                    });
+
+                if (!historySaved) {
+                    cloudStatus = 'failed';
+                } else if (cloudStatus === 'skipped') {
+                    cloudStatus = 'ok';
+                }
+            }
+
+            // 실제 저장 결과에 따른 안내 문구
+            const saveOk = cloudStatus !== 'failed' && localLayoutSaved;
+            let saveLine: string;
+            if (!localLayoutSaved) {
+                saveLine = '⚠️ 자리 배치도 저장에 실패했습니다. 브라우저 저장소를 확인해주세요.';
+            } else if (cloudStatus === 'failed') {
+                saveLine = '⚠️ 이 기기에는 저장했지만 클라우드 저장에 실패했습니다. 다른 기기에서는 보이지 않습니다.';
+            } else if (cloudStatus === 'skipped') {
+                saveLine = '💾 이 기기에 저장되었습니다. (로그인하면 클라우드에도 저장됩니다)';
+            } else {
+                saveLine = '💾 저장도 완료되었습니다.';
             }
 
             // XSS 방지: DOM API를 사용하여 메시지 생성
@@ -5506,13 +5501,13 @@ export class MainController {
 
                 // 새 메시지 생성 (textContent 사용으로 XSS 방지)
                 const messageElement = document.createElement('div');
-                messageElement.className = 'output-message success';
+                messageElement.className = saveOk ? 'output-message success' : 'output-message warning';
                 const lines = [
                     '✅ 자리가 확정되었습니다.',
                     '',
                     '📋 확정된 자리 이력에 기록하였습니다.',
                     '',
-                    '💾 저장도 완료되었습니다.',
+                    saveLine,
                     '',
                     `📅 날짜: ${dateString}`
                 ];
@@ -5530,9 +5525,9 @@ export class MainController {
                     margin: 20px 0;
                     border-radius: 8px;
                     font-weight: 500;
-                    background: #d4edda;
-                    color: #155724;
-                    border: 1px solid #c3e6cb;
+                    background: ${saveOk ? '#d4edda' : '#fff3cd'};
+                    color: ${saveOk ? '#155724' : '#856404'};
+                    border: 1px solid ${saveOk ? '#c3e6cb' : '#ffeeba'};
                     line-height: 1.8;
                     font-size: 1.05em;
                     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -5540,7 +5535,7 @@ export class MainController {
                 messageElement.setAttribute('role', 'status');
                 messageElement.setAttribute('aria-live', 'polite');
                 messageElement.setAttribute('aria-atomic', 'true');
-                messageElement.setAttribute('aria-label', '자리가 확정되었습니다. 확정된 자리 이력에 기록되었습니다');
+                messageElement.setAttribute('aria-label', `자리가 확정되었습니다. 확정된 자리 이력에 기록되었습니다. ${saveLine}`);
                 
                 container.appendChild(messageElement);
                 
@@ -5552,7 +5547,12 @@ export class MainController {
                 }, 7000);
             } else {
                 // 폴백: 기본 showSuccess 사용
-                this.outputModule.showSuccess(`✅ 자리가 확정되었습니다. 📋 확정된 자리 이력에 기록하였습니다. 💾 저장도 완료되었습니다. 📅 날짜: ${dateString}`);
+                const fallbackMessage = `✅ 자리가 확정되었습니다. 📋 확정된 자리 이력에 기록하였습니다. ${saveLine} 📅 날짜: ${dateString}`;
+                if (saveOk) {
+                    this.outputModule.showSuccess(fallbackMessage);
+                } else {
+                    this.outputModule.showWarning(fallbackMessage);
+                }
             }
         } catch (error) {
             logger.error('자리 확정 중 오류:', error);
@@ -5652,6 +5652,23 @@ export class MainController {
      * @param classId 반 ID (없으면 현재 선택된 반의 ID 사용)
      */
     private getSeatHistory(classId?: string): SeatHistoryItem[] {
+        return this.readSeatHistory(classId) ?? [];
+    }
+
+    /**
+     * 좌석 이력 읽기 (엄격)
+     *
+     * 읽기/파싱에 실패하면 null을 반환한다.
+     * '이력이 없음'과 '읽지 못함'을 구분하지 않으면,
+     * 읽기가 한 번 실패했을 때 빈 배열에 새 항목 하나만 붙여 되쓰는 결과가 되어
+     * 저장돼 있던 이력 전체가 로컬과 클라우드 양쪽에서 사라진다.
+     *
+     * 이력을 덮어쓰는 경로에서는 반드시 이 메서드를 사용하고,
+     * null이면 쓰기를 중단해야 한다.
+     *
+     * 이 메서드는 저장소에 쓰지 않는다. 조회가 데이터를 바꾸면 안 된다.
+     */
+    private readSeatHistory(classId?: string): SeatHistoryItem[] | null {
         try {
             // 반 ID가 없으면 현재 선택된 반 ID 사용
             const targetClassId = classId || this.classManager?.getCurrentClassId();
@@ -5663,22 +5680,25 @@ export class MainController {
             
             // 반별 이력 키: seatHistory_${classId}
             const historyKey = `seatHistory_${targetClassId}`;
-            const historyStr = this.storageManager.safeGetItem(historyKey);
-            if (!historyStr) return [];
+            const read = this.storageManager.readItem(historyKey);
+            if (!read.ok) {
+                // 저장소 접근 실패 — '이력 없음'과 구분해야 한다
+                logger.error('좌석 이력 읽기 실패: 저장소에 접근할 수 없습니다.', { historyKey });
+                return null;
+            }
+            if (!read.value) return [];
             
             // JSON 파싱 시도 (데이터 손상 처리)
             let history: SeatHistoryItem[];
             try {
-                history = JSON.parse(historyStr) as SeatHistoryItem[];
+                history = JSON.parse(read.value) as SeatHistoryItem[];
                 if (!Array.isArray(history)) {
-                    return [];
+                    return null;
                 }
             } catch (parseError) {
-                // 데이터 손상 시 저장소에서 제거하고 빈 배열 반환
-                try {
-                    localStorage.removeItem(historyKey);
-                } catch {}
-                return [];
+                // 데이터 손상 — 손상된 값을 덮어쓰지 않도록 실패로 알린다
+                logger.error('좌석 이력 파싱 실패:', { historyKey, parseError });
+                return null;
             }
             
             // 반 ID로 필터링 (classId가 저장된 경우 검증)
@@ -5691,24 +5711,23 @@ export class MainController {
                 return item.classId === targetClassId;
             });
             
-            // 필터링된 결과가 원본과 다르면 저장 (데이터 정리)
+            // 다른 반의 항목이 섞여 있으면 기록만 남긴다.
+            // 조회 함수가 저장소를 정리(삭제)하면 읽기만 했는데 데이터가 사라진다.
             if (filteredHistory.length !== history.length) {
-                logger.warn('잘못된 반 ID를 가진 이력 항목 제거:', {
+                logger.error('잘못된 반 ID를 가진 이력 항목이 섞여 있습니다(표시에서만 제외):', {
                     targetClassId,
                     originalCount: history.length,
                     filteredCount: filteredHistory.length
                 });
-                // 정리된 이력 다시 저장
-                const cleanedHistoryKey = `seatHistory_${targetClassId}`;
-                this.storageManager.safeSetItem(cleanedHistoryKey, JSON.stringify(filteredHistory));
             }
             
             // 최신 항목이 앞에 오도록 timestamp 기준 내림차순 정렬
             return filteredHistory.sort((a, b) => {
                 return (b.timestamp || 0) - (a.timestamp || 0);
             });
-        } catch {
-            return [];
+        } catch (error) {
+            logger.error('좌석 이력 읽기 중 오류:', error);
+            return null;
         }
     }
 
@@ -6778,8 +6797,8 @@ export class MainController {
         if (!seatsArea) return;
 
         // 남학생과 여학생을 무작위로 섞기
-        const shuffledMales = [...maleStudents].sort(() => Math.random() - 0.5);
-        const shuffledFemales = [...femaleStudents].sort(() => Math.random() - 0.5);
+        const shuffledMales = RandomService.shuffle(maleStudents);
+        const shuffledFemales = RandomService.shuffle(femaleStudents);
 
         const totalPairs = Math.min(shuffledMales.length, shuffledFemales.length);
         const rowsPerPartition = Math.ceil(totalPairs / partitionCount);
@@ -6818,8 +6837,8 @@ export class MainController {
         if (!seatsArea) return;
 
         // 남학생과 여학생을 무작위로 섞기
-        const shuffledMales = [...maleStudents].sort(() => Math.random() - 0.5);
-        const shuffledFemales = [...femaleStudents].sort(() => Math.random() - 0.5);
+        const shuffledMales = RandomService.shuffle(maleStudents);
+        const shuffledFemales = RandomService.shuffle(femaleStudents);
 
         const allPairs: Array<{student1: Student, student2: Student | null}> = [];
 
@@ -8945,7 +8964,9 @@ export class MainController {
             statusSpan.style.fontWeight = '500';
             
             // 로그인 시 Firebase에서 데이터 동기화
-            this.syncDataFromFirebase();
+            this.syncDataFromFirebase().catch((error) => {
+                logger.error('Firebase 데이터 동기화 실패:', error);
+            });
         } else {
             loginBtn.textContent = '🔐 로그인';
             loginBtn.title = '로그인 (클라우드 동기화)';
@@ -8958,7 +8979,25 @@ export class MainController {
     /**
      * Firebase에서 데이터를 불러와서 localStorage에 동기화
      */
-    private async syncDataFromFirebase(): Promise<void> {
+    private syncDataFromFirebase(): Promise<void> {
+        // 동기화는 로컬 저장소를 통째로 덮어쓴다.
+        // 여러 번 겹쳐 실행되면 쓰기 순서가 보장되지 않아
+        // 반쯤 갱신된 데이터가 남을 수 있으므로 한 번에 하나만 수행한다.
+        if (this.syncInFlight) {
+            return this.syncInFlight;
+        }
+
+        this.syncInFlight = this.performSyncFromFirebase().finally(() => {
+            this.syncInFlight = null;
+        });
+
+        return this.syncInFlight;
+    }
+
+    /**
+     * Firebase 데이터 동기화 실제 수행 (syncDataFromFirebase를 통해서만 호출)
+     */
+    private async performSyncFromFirebase(): Promise<void> {
         if (!this.firebaseStorageManager.getIsAuthenticated()) {
             return;
         }

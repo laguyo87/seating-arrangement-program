@@ -81,15 +81,30 @@ export class StorageManager {
      * 안전한 localStorage 읽기
      */
     public safeGetItem(key: string): string | null {
+        return this.readItem(key).value;
+    }
+
+    /**
+     * localStorage 읽기 (성공 여부 포함)
+     *
+     * safeGetItem은 '키가 없음'과 '저장소 접근 실패'를 모두 null로 반환하므로
+     * 이 둘을 구분해야 하는 곳에서는 반드시 이 메서드를 사용한다.
+     * 구분하지 않으면 읽기 실패를 '데이터 없음'으로 오인하여
+     * 빈 값을 저장소나 클라우드에 덮어쓰고 기존 데이터를 파괴하게 된다.
+     *
+     * ok: 저장소를 실제로 읽었는지 여부 (값의 존재 여부와 무관)
+     * value: 읽은 값. 키가 없으면 null
+     */
+    public readItem(key: string): { ok: boolean; value: string | null } {
         if (!this.isLocalStorageAvailable()) {
-            return null;
+            return { ok: false, value: null };
         }
-        
+
         try {
-            return localStorage.getItem(key);
+            return { ok: true, value: localStorage.getItem(key) };
         } catch (error) {
             logger.error('localStorage 읽기 실패:', error);
-            return null;
+            return { ok: false, value: null };
         }
     }
 
