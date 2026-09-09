@@ -25,10 +25,15 @@ export class CustomLayoutManager {
     private deskEditing = false;
     /** 지금 끌고 있는 카드 */
     private movingCard: HTMLElement | null = null;
+    /** 끌고 있는 카드의 좌석 번호 (자석 계산에서 자신을 제외하기 위해) */
+    private movingSeatId: number | null = null;
     /** 카드 안에서 잡은 지점 (카드 좌상단으로부터의 거리) */
     private grabOffset = { x: 0, y: 0 };
     /** 리스너를 중복 등록하지 않기 위한 표시 */
     private listenersBound = false;
+    /** 줄이 맞았을 때 보여주는 안내선 */
+    private guideX: HTMLElement | null = null;
+    private guideY: HTMLElement | null = null;
 
     constructor(dependencies: CustomLayoutManagerDependencies) {
         this.deps = dependencies;
@@ -44,6 +49,10 @@ export class CustomLayoutManager {
     public applyLayout(positions: SeatPosition[]): void {
         const area = this.getArea();
         if (!area) return;
+
+        // 카드가 다시 그려지면서 안내선도 함께 사라졌으므로 참조를 버린다
+        this.guideX = null;
+        this.guideY = null;
 
         area.classList.add('custom-layout');
         area.style.height = `${CustomLayoutService.requiredHeight(positions)}px`;
@@ -71,6 +80,7 @@ export class CustomLayoutManager {
         const area = this.getArea();
         if (!area) return;
 
+        this.clearGuides();
         area.classList.remove('custom-layout', 'arranging-desks');
         area.style.height = '';
 
@@ -154,6 +164,8 @@ export class CustomLayoutManager {
         const cardRect = card.getBoundingClientRect();
 
         this.movingCard = card;
+        const seatId = parseInt(card.getAttribute('data-seat-id') || '', 10);
+        this.movingSeatId = Number.isNaN(seatId) ? null : seatId;
         this.grabOffset = {
             x: e.clientX - cardRect.left,
             y: e.clientY - cardRect.top
@@ -192,17 +204,72 @@ export class CustomLayoutManager {
         const rawX = clientX - areaRect.left - this.grabOffset.x;
         const rawY = clientY - areaRect.top - this.grabOffset.y;
 
+        // 옮기는 중인 책상을 뺀 나머지 책상에 자석처럼 달라붙게 한다
+        const others = this.readPositions().filter(p => p.seatId !== this.movingSeatId);
+        const magnet = CustomLayoutService.magnetize(rawX, rawY, others);
+
         // 아래로 끌면 영역이 함께 늘어나도록 현재 높이보다 넉넉히 잡는다
-        const areaHeight = Math.max(area.clientHeight, rawY + CARD_SIZE);
-        const resolved = CustomLayoutService.resolveDropPosition(
-            rawX,
-            rawY,
+        const areaHeight = Math.max(area.clientHeight, magnet.y + CARD_SIZE);
+        const resolved = CustomLayoutService.clampToArea(
+            magnet.x,
+            magnet.y,
             area.clientWidth,
             areaHeight
         );
 
         card.style.left = `${resolved.x}px`;
         card.style.top = `${resolved.y}px`;
+
+        // 붙은 줄이 어디인지 보여준다. 가둬지며 좌표가 바뀌었다면 안내선도 지운다.
+        this.showGuides(
+            magnet.guideX !== null && resolved.x === magnet.x ? resolved.x : null,
+            magnet.guideY !== null && resolved.y === magnet.y ? resolved.y : null
+        );
+    }
+
+    /**
+     * 줄이 맞았을 때 안내선을 보여준다.
+     * 멀리 떨어진 책상과 줄이 맞은 것은 선이 없으면 알아채기 어렵다.
+     */
+    private showGuides(x: number | null, y: number | null): void {
+        const area = this.getArea();
+        if (!area) return;
+
+        if (x === null) {
+            this.guideX?.remove();
+            this.guideX = null;
+        } else {
+            if (!this.guideX) {
+                this.guideX = this.createGuide('vertical');
+                area.appendChild(this.guideX);
+            }
+            this.guideX.style.left = `${x + CARD_SIZE / 2}px`;
+        }
+
+        if (y === null) {
+            this.guideY?.remove();
+            this.guideY = null;
+        } else {
+            if (!this.guideY) {
+                this.guideY = this.createGuide('horizontal');
+                area.appendChild(this.guideY);
+            }
+            this.guideY.style.top = `${y + CARD_SIZE / 2}px`;
+        }
+    }
+
+    private createGuide(orientation: 'vertical' | 'horizontal'): HTMLElement {
+        const guide = document.createElement('div');
+        guide.className = `desk-guide desk-guide-${orientation}`;
+        guide.setAttribute('aria-hidden', 'true');
+        return guide;
+    }
+
+    private clearGuides(): void {
+        this.guideX?.remove();
+        this.guideY?.remove();
+        this.guideX = null;
+        this.guideY = null;
     }
 
     private onPointerUp(e: PointerEvent): void {
@@ -224,6 +291,8 @@ export class CustomLayoutManager {
     private finishMove(): void {
         const card = this.movingCard;
         this.movingCard = null;
+        this.movingSeatId = null;
+        this.clearGuides();
         if (!card) return;
 
         card.classList.remove('desk-moving');

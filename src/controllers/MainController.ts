@@ -8067,6 +8067,7 @@ export class MainController {
                                 <ul style="padding-left: 15px; margin-top: 5px;">
                                     <li>ㄷ자, 원형, 섬 모양 등 정해진 틀에 없는 배치를 만들 수 있습니다</li>
                                     <li>책상을 원하는 모양으로 놓은 뒤 <strong>자리 배치하기</strong>를 누르면 학생이 배정됩니다</li>
+                                    <li>🧲 다른 책상 가까이 가면 자석처럼 달라붙습니다. 줄이 맞으면 분홍색 안내선이 나타납니다</li>
                                     <li>배정 전에는 카드를 끌면 <strong>책상이 이동</strong>하고, 배정 후에는 <strong>학생이 서로 교환</strong>됩니다</li>
                                     <li>만든 모양은 반별로 저장되어 다음에 열 때 그대로 나타납니다</li>
                                     <li>처음부터 다시 만들려면 "책상 위치 초기화"를 누르세요</li>

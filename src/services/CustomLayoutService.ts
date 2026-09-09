@@ -27,6 +27,25 @@ export const SNAP_STEP = 12;
 /** 배치 영역의 최소 높이(px) */
 export const MIN_AREA_HEIGHT = 420;
 
+/**
+ * 다른 책상에 달라붙는 거리(px).
+ * 격자 단위(SNAP_STEP)보다 커야 자석이 격자보다 우선한다.
+ */
+export const MAGNET_THRESHOLD = 18;
+
+/** 책상을 나란히 붙일 때 쓰는 간격(px). 0은 딱 붙이기. */
+export const ADJACENT_GAPS = [0, DEFAULT_GAP];
+
+/** 자석 결과 */
+export interface MagnetResult {
+    x: number;
+    y: number;
+    /** 세로 안내선을 그릴 위치. 다른 책상과 세로줄이 맞았을 때만 값이 있다. */
+    guideX: number | null;
+    /** 가로 안내선을 그릴 위치. 다른 책상과 가로줄이 맞았을 때만 값이 있다. */
+    guideY: number | null;
+}
+
 export class CustomLayoutService {
     /**
      * 처음 보여줄 기본 위치를 만든다.
@@ -90,6 +109,86 @@ export class CustomLayoutService {
     ): { x: number; y: number } {
         const snapped = { x: this.snap(x), y: this.snap(y) };
         return this.clampToArea(snapped.x, snapped.y, areaWidth, areaHeight);
+    }
+
+    /**
+     * 주어진 값에 가장 가까운 후보를 고른다. 기준 거리 밖이면 null.
+     */
+    private static nearestCandidate(value: number, candidates: number[], threshold: number): number | null {
+        let best: number | null = null;
+        let bestDistance = threshold;
+
+        for (const candidate of candidates) {
+            const distance = Math.abs(candidate - value);
+            if (distance <= bestDistance) {
+                bestDistance = distance;
+                best = candidate;
+            }
+        }
+
+        return best;
+    }
+
+    /**
+     * 다른 책상에 자석처럼 달라붙는 위치를 계산한다.
+     *
+     * 두 가지로 붙는다.
+     *  - 줄 맞추기: 다른 책상과 같은 세로줄/가로줄에 맞춘다. (교실은 줄이 맞아야 보기 좋다)
+     *  - 나란히 붙이기: 다른 책상 바로 옆/위아래에 정해진 간격으로 붙인다.
+     *
+     * 줄이 맞은 경우에만 안내선 위치를 함께 돌려준다.
+     * 나란히 붙인 것은 눈으로 바로 확인되지만, 멀리 떨어진 책상과 줄이 맞은 것은
+     * 선으로 보여주지 않으면 알아채기 어렵기 때문이다.
+     *
+     * 가까운 책상이 없으면 격자 맞춤으로 되돌아간다.
+     */
+    public static magnetize(
+        x: number,
+        y: number,
+        others: SeatPosition[],
+        threshold: number = MAGNET_THRESHOLD
+    ): MagnetResult {
+        const alignX = others.map(o => o.x);
+        const alignY = others.map(o => o.y);
+
+        const adjacentX = others.flatMap(o =>
+            ADJACENT_GAPS.flatMap(gap => [o.x + CARD_SIZE + gap, o.x - CARD_SIZE - gap])
+        );
+        const adjacentY = others.flatMap(o =>
+            ADJACENT_GAPS.flatMap(gap => [o.y + CARD_SIZE + gap, o.y - CARD_SIZE - gap])
+        );
+
+        const resolveAxis = (
+            value: number,
+            alignCandidates: number[],
+            adjacentCandidates: number[]
+        ): { value: number; guide: number | null } => {
+            const aligned = this.nearestCandidate(value, alignCandidates, threshold);
+            const adjacent = this.nearestCandidate(value, adjacentCandidates, threshold);
+
+            if (aligned !== null && adjacent !== null) {
+                // 둘 다 가능하면 더 가까운 쪽을 따른다
+                const alignedIsCloser = Math.abs(aligned - value) <= Math.abs(adjacent - value);
+                return alignedIsCloser
+                    ? { value: aligned, guide: aligned }
+                    : { value: adjacent, guide: null };
+            }
+            if (aligned !== null) return { value: aligned, guide: aligned };
+            if (adjacent !== null) return { value: adjacent, guide: null };
+
+            // 붙일 책상이 없으면 격자에 맞춘다
+            return { value: this.snap(value), guide: null };
+        };
+
+        const resolvedX = resolveAxis(x, alignX, adjacentX);
+        const resolvedY = resolveAxis(y, alignY, adjacentY);
+
+        return {
+            x: resolvedX.value,
+            y: resolvedY.value,
+            guideX: resolvedX.guide,
+            guideY: resolvedY.guide
+        };
     }
 
     /**

@@ -5,6 +5,7 @@ import {
     DEFAULT_GAP,
     SNAP_STEP,
     MIN_AREA_HEIGHT,
+    MAGNET_THRESHOLD,
 } from './CustomLayoutService';
 import type { SeatPosition } from './CustomLayoutService';
 
@@ -197,5 +198,106 @@ describe('CustomLayoutService.fitToCount - 인원이 바뀐 경우', () => {
         const result = CustomLayoutService.fitToCount([], 3, AREA_WIDTH);
 
         expect(result).toEqual(CustomLayoutService.defaultPositions(3, AREA_WIDTH));
+    });
+});
+
+describe('CustomLayoutService.magnetize - 자석처럼 달라붙기', () => {
+    const OTHER = { seatId: 9, x: 300, y: 200 };
+
+    it('가까운 책상이 없으면 격자에만 맞춘다', () => {
+        const result = CustomLayoutService.magnetize(101, 55, []);
+
+        expect(result.x % SNAP_STEP).toBe(0);
+        expect(result.y % SNAP_STEP).toBe(0);
+        expect(result.guideX).toBeNull();
+        expect(result.guideY).toBeNull();
+    });
+
+    it('다른 책상과 세로줄이 거의 맞으면 정확히 맞춰준다', () => {
+        // 300에서 5px 어긋난 위치 → 300으로 달라붙는다
+        const result = CustomLayoutService.magnetize(305, 600, [OTHER]);
+
+        expect(result.x).toBe(300);
+        expect(result.guideX).toBe(300);
+    });
+
+    it('다른 책상과 가로줄이 거의 맞으면 정확히 맞춰준다', () => {
+        const result = CustomLayoutService.magnetize(900, 194, [OTHER]);
+
+        expect(result.y).toBe(200);
+        expect(result.guideY).toBe(200);
+    });
+
+    it('줄이 맞았을 때만 안내선을 알려준다', () => {
+        // 오른쪽에 나란히 붙는 경우 → 눈으로 보이므로 안내선 없음
+        const result = CustomLayoutService.magnetize(OTHER.x + CARD_SIZE + 2, 600, [OTHER]);
+
+        expect(result.x).toBe(OTHER.x + CARD_SIZE);
+        expect(result.guideX).toBeNull();
+    });
+
+    it('바로 오른쪽에 딱 붙는다', () => {
+        const result = CustomLayoutService.magnetize(OTHER.x + CARD_SIZE + 5, 700, [OTHER]);
+
+        expect(result.x).toBe(OTHER.x + CARD_SIZE);
+    });
+
+    it('바로 왼쪽에 딱 붙는다', () => {
+        const result = CustomLayoutService.magnetize(OTHER.x - CARD_SIZE - 4, 700, [OTHER]);
+
+        expect(result.x).toBe(OTHER.x - CARD_SIZE);
+    });
+
+    it('기본 간격을 두고 옆에 붙일 수도 있다', () => {
+        const target = OTHER.x + CARD_SIZE + DEFAULT_GAP;
+        const result = CustomLayoutService.magnetize(target + 3, 700, [OTHER]);
+
+        expect(result.x).toBe(target);
+    });
+
+    it('아래에 딱 붙는다', () => {
+        const result = CustomLayoutService.magnetize(900, OTHER.y + CARD_SIZE - 6, [OTHER]);
+
+        expect(result.y).toBe(OTHER.y + CARD_SIZE);
+    });
+
+    it('기준 거리 밖이면 달라붙지 않는다', () => {
+        const result = CustomLayoutService.magnetize(300 + MAGNET_THRESHOLD + 20, 600, [OTHER]);
+
+        expect(result.x).not.toBe(300);
+        expect(result.guideX).toBeNull();
+    });
+
+    it('가로와 세로에 동시에 달라붙는다', () => {
+        const result = CustomLayoutService.magnetize(304, 196, [OTHER]);
+
+        expect(result).toMatchObject({ x: 300, y: 200, guideX: 300, guideY: 200 });
+    });
+
+    it('여러 책상 중 가장 가까운 것에 붙는다', () => {
+        const others = [
+            { seatId: 1, x: 300, y: 0 },
+            { seatId: 2, x: 340, y: 0 },
+        ];
+
+        expect(CustomLayoutService.magnetize(336, 600, others).x).toBe(340);
+        expect(CustomLayoutService.magnetize(304, 600, others).x).toBe(300);
+    });
+
+    it('줄 맞추기와 나란히 붙이기 중 더 가까운 쪽을 따른다', () => {
+        const others = [{ seatId: 1, x: 300, y: 0 }];
+        // 420(=300+120)에 나란히 붙는 위치가 훨씬 가깝다
+        const result = CustomLayoutService.magnetize(418, 600, others);
+
+        expect(result.x).toBe(420);
+        expect(result.guideX).toBeNull();
+    });
+
+    it('붙은 결과가 흔들리지 않는다 (같은 자리에 다시 계산해도 같다)', () => {
+        const first = CustomLayoutService.magnetize(305, 196, [OTHER]);
+        const second = CustomLayoutService.magnetize(first.x, first.y, [OTHER]);
+
+        expect(second.x).toBe(first.x);
+        expect(second.y).toBe(first.y);
     });
 });

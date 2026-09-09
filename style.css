@@ -2952,3 +2952,27 @@ button:disabled {
 #seats-area.custom-layout.arranging-desks .student-seat-card {
     cursor: grab;
 }
+
+/* 책상 줄 맞춤 안내선
+   멀리 떨어진 책상과 줄이 맞았을 때는 선으로 보여주지 않으면 알아채기 어렵다. */
+.desk-guide {
+    position: absolute;
+    background: #ff5d8f;
+    pointer-events: none;
+    z-index: 90;
+    opacity: 0.9;
+}
+
+.desk-guide-vertical {
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    margin-left: -1px;
+}
+
+.desk-guide-horizontal {
+    left: 0;
+    right: 0;
+    height: 2px;
+    margin-top: -1px;
+}
