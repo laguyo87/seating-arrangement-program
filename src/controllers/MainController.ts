@@ -10,6 +10,7 @@ import { CustomLayoutModule } from '../modules/CustomLayoutModule.js';
 import { StudentModel } from '../models/Student.js';
 import { LayoutService } from '../services/LayoutService.js';
 import { RandomService } from '../services/RandomService.js';
+import { PairingService } from '../services/PairingService.js';
 // import { SeatType } from '../models/Seat.js'; // 향후 사용 예정
 import { Student } from '../models/Student.js';
 import { Seat } from '../models/Seat.js';
@@ -1447,12 +1448,18 @@ export class MainController {
                         pairContainer.style.width = '100%';
                         pairContainer.style.justifyContent = 'center';
                         
-                        // 각 행마다 올바른 패턴으로 배치
+                        // 각 행마다 남녀가 번갈아 오도록 배치한다.
                         // 첫 번째 행: 남남 -> 여여 -> 남남
                         // 두 번째 행: 여여 -> 남남 -> 여여  
-                        // 세 번째 행: 남남 -> 여여 -> 남남
-                        // 네 번째 행: 여여 -> 남남 -> 여여
-                        const shouldBeMale = (row + partition) % 2 === 0;
+                        // 다만 한쪽 성별이 먼저 소진되면 남은 성별로 채운다.
+                        // 패턴만 따르면 남는 학생의 자리가 아예 만들어지지 않는다.
+                        const preferMale = (row + partition) % 2 === 0;
+                        const malesLeft = maleIndex < maleStudents.length;
+                        const femalesLeft = femaleIndex < femaleStudents.length;
+                        if (!malesLeft && !femalesLeft) {
+                            break; // 남은 학생이 없으면 빈 컨테이너를 만들지 않는다
+                        }
+                        const shouldBeMale = preferMale ? malesLeft : !femalesLeft;
                         
                         if (shouldBeMale) {
                             // 남학생 짝꿍
@@ -1490,44 +1497,9 @@ export class MainController {
                 const maleStudents = this.students.filter(s => s.gender === 'M');
                 const femaleStudents = this.students.filter(s => s.gender === 'F');
                 
-                // 1단계: 남녀 짝꿍 생성
-                const genderPairs = Math.min(maleStudents.length, femaleStudents.length);
-                let maleIndex = 0;
-                let femaleIndex = 0;
-                
-                // 남녀 짝꿍 배치를 위한 배열 생성
-                const pairs: Array<{male: Student | null, female: Student | null}> = [];
-                for (let i = 0; i < genderPairs; i++) {
-                    pairs.push({
-                        male: maleStudents[maleIndex++],
-                        female: femaleStudents[femaleIndex++]
-                    });
-                }
-                
-                // 2단계: 남은 남자 학생 처리
-                const remainingMales = maleStudents.length - genderPairs;
-                if (remainingMales > 0) {
-                    // 남은 남자 수가 짝수면 남자끼리 짝꿍
-                    // 홀수면 (남은 수 - 1)명끼리 짝꿍 + 1명 혼자 배치
-                    const malePairs = Math.floor(remainingMales / 2);
-                    const singleMale = remainingMales % 2;
-                    
-                    // 남자끼리 짝꿍 추가 (한 쌍에 남자 2명)
-                    for (let i = 0; i < malePairs; i++) {
-                        pairs.push({
-                            male: maleStudents[maleIndex++],
-                            female: maleStudents[maleIndex++] // 남자끼리 짝꿍이므로 두 번째도 남자
-                        });
-                    }
-                    
-                    // 혼자 배치되는 남자 1명 추가
-                    if (singleMale === 1) {
-                        pairs.push({
-                            male: maleStudents[maleIndex++],
-                            female: null
-                        });
-                    }
-                }
+                // 1~2단계: 남녀 짝꿍을 만들고 남는 학생도 모두 자리를 받도록 묶는다.
+                // (규칙은 PairingService.buildPairs에 있고 단위 테스트로 고정되어 있다)
+                const pairs = PairingService.buildPairs(maleStudents, femaleStudents);
                 
                 // 3단계: 전체 짝꿍을 분단별로 배치
                 const rowsPerPartition = Math.ceil(pairs.length / partitionCount);
@@ -1545,13 +1517,13 @@ export class MainController {
                         pairContainer.style.width = '100%';
                         pairContainer.style.justifyContent = 'center';
                         
-                        if (pair.male) {
-                            const card1 = this.createStudentCard(pair.male, this.students.indexOf(pair.male));
+                        if (pair.first) {
+                            const card1 = this.createStudentCard(pair.first, this.students.indexOf(pair.first));
                             pairContainer.appendChild(card1);
                         }
                         
-                        if (pair.female) {
-                            const card2 = this.createStudentCard(pair.female, this.students.indexOf(pair.female));
+                        if (pair.second) {
+                            const card2 = this.createStudentCard(pair.second, this.students.indexOf(pair.second));
                             pairContainer.appendChild(card2);
                         }
                         
@@ -5082,6 +5054,11 @@ export class MainController {
                     }
                 });
 
+                // 성별에 맞는 학생이 남아 있지 않으면 다른 성별 풀에서 채운다.
+                // (splice로 원본 배열을 직접 줄이므로 별도의 되돌려쓰기가 필요 없다)
+                const poolFor = (preferMale: boolean): Student[] =>
+                    PairingService.selectPool(preferMale, shuffledMales, shuffledFemales);
+
                 pairContainers.forEach(container => {
                     const cards = Array.from(container.querySelectorAll('.student-seat-card')) as HTMLElement[];
                     if (cards.length !== 2) return;
@@ -5093,41 +5070,31 @@ export class MainController {
                     const nameDivA = cardA.querySelector('.student-name') as HTMLElement;
                     const nameDivB = cardB.querySelector('.student-name') as HTMLElement;
 
-                    const poolA = isMaleA ? shuffledMales : shuffledFemales;
-                    const poolB = isMaleB ? shuffledMales : shuffledFemales;
-
-                    // poolA가 비어있으면 스킵
+                    // A 자리 배정
+                    // A의 성별 풀이 비었다고 해서 이 컨테이너 전체를 건너뛰면 안 된다.
+                    // 그렇게 하면 아직 학생이 남아 있는 B 자리까지 함께 비고,
+                    // 짝꿍 컨테이너는 아래 '단일 카드' 처리 대상에도 들어가지 않아
+                    // 끝까지 빈 자리로 남는다 (학생 수와 좌석 수가 같아 경고도 뜨지 않는다).
+                    const poolA = poolFor(isMaleA);
+                    let chosenA: Student | undefined;
                     if (poolA.length === 0) {
                         if (nameDivA) nameDivA.textContent = '';
-                        if (nameDivB) nameDivB.textContent = '';
-                        if (isMaleA) shuffledMales = poolA; else shuffledFemales = poolA;
-                        if (isMaleB) shuffledMales = poolB; else shuffledFemales = poolB;
-                        return;
-                    }
-
-                    let idxA = 0;
-                    if (avoidPrevSeat) {
-                        for (let i = 0; i < poolA.length; i++) {
-                            const cand = poolA[i];
-                            if (lastSeatByStudent[cand.name] !== seatIdA) { idxA = i; break; }
+                    } else {
+                        let idxA = 0;
+                        if (avoidPrevSeat) {
+                            for (let i = 0; i < poolA.length; i++) {
+                                const cand = poolA[i];
+                                if (lastSeatByStudent[cand.name] !== seatIdA) { idxA = i; break; }
+                            }
                         }
+                        chosenA = poolA.splice(idxA, 1)[0];
+                        if (nameDivA) nameDivA.textContent = chosenA?.name || '';
                     }
-                    const chosenA = poolA.splice(idxA, 1)[0];
-                    if (nameDivA) nameDivA.textContent = chosenA?.name || '';
 
-                    // poolB가 비어있으면 다른 성별에서 시도 (고정 좌석 모드)
+                    // B 자리 배정 (A가 소모한 결과를 반영해 풀을 다시 고른다)
+                    const poolB = poolFor(isMaleB);
                     if (poolB.length === 0) {
-                        // 성별에 맞는 학생이 없으면 다른 성별에서 가져오기
-                        const alternativePoolB = isMaleB ? shuffledFemales : shuffledMales;
-                        if (alternativePoolB.length > 0) {
-                            // 대체 풀에서 학생 선택
-                            const chosenB = alternativePoolB.splice(0, 1)[0];
-                            if (nameDivB && chosenB) nameDivB.textContent = chosenB.name || '';
-                            if (isMaleB) shuffledMales = alternativePoolB; else shuffledFemales = alternativePoolB;
-                        } else {
-                            if (nameDivB) nameDivB.textContent = '';
-                        }
-                        if (isMaleA) shuffledMales = poolA; else shuffledFemales = poolA;
+                        if (nameDivB) nameDivB.textContent = '';
                         return;
                     }
 
@@ -5135,8 +5102,12 @@ export class MainController {
                     for (let i = 0; i < poolB.length; i++) {
                         const cand = poolB[i];
                         const seatOk = !avoidPrevSeat || lastSeatByStudent[cand.name] !== seatIdB;
-                        const partnerOk = !avoidPrevPartner || (
-                            (chosenA && lastPartnerByStudent[chosenA.name] !== cand.name) && (lastPartnerByStudent[cand.name] !== (chosenA?.name || ''))
+                        // 짝꿍 회피는 A가 실제로 배정된 경우에만 판단할 수 있다.
+                        // chosenA가 없을 때 조건을 거짓으로 두면 모든 후보가 탈락해
+                        // 항상 강제 배치로 떨어진다.
+                        const partnerOk = !avoidPrevPartner || !chosenA || (
+                            lastPartnerByStudent[chosenA.name] !== cand.name &&
+                            lastPartnerByStudent[cand.name] !== chosenA.name
                         );
                         if (seatOk && partnerOk) { idxB = i; break; }
                     }
@@ -5148,9 +5119,6 @@ export class MainController {
                     
                     const chosenB = poolB.splice(idxB, 1)[0];
                     if (nameDivB) nameDivB.textContent = chosenB?.name || '';
-
-                    if (isMaleA) shuffledMales = poolA; else shuffledFemales = poolA;
-                    if (isMaleB) shuffledMales = poolB; else shuffledFemales = poolB;
                 });
 
                 // 나머지 단일 카드 처리
