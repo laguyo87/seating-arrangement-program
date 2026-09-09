@@ -90,15 +90,14 @@ export class PrintExportManager {
                             grid-template-columns: none !important;
                             margin-top: 10px !important;
                         }
+                        /* 캔버스의 핵심 속성은 인라인으로도 지정한다.
+                           교탁용 템플릿의 :not() 선택자가 이 규칙보다 명시도가 높기 때문이다. */
                         .custom-layout-canvas {
                             position: relative !important;
                             display: block !important;
                             width: ${width}px !important;
                             height: ${height}px !important;
                             margin: 0 auto !important;
-                            /* 교탁용 템플릿은 '.seats-area > div(카드가 아닌 것)'을 180도 돌린다.
-                               이 캔버스가 거기 걸리면 좌석 블록이 두 번 회전해
-                               이름과 번호가 거꾸로 인쇄된다. */
                             transform: none !important;
                         }
                         .custom-layout-canvas .student-seat-card {
@@ -120,8 +119,23 @@ export class PrintExportManager {
                             }
                         }`;
 
-        // 카드를 고정 크기 캔버스로 감싸면, 좌석 영역이 그 캔버스를 가운데 놓기만 하면 된다
-        const html = `<div class="custom-layout-canvas">${clone.innerHTML}</div>`;
+        // 캔버스 스타일은 인라인으로 준다.
+        //
+        // 교탁용 템플릿에는 '.seats-area > div:not(.student-seat-card):not(...)' 처럼
+        // :not()을 여러 개 단 선택자가 있는데, 그 명시도가 클래스 하나짜리 규칙보다 훨씬 높아
+        // 양쪽 다 !important를 붙여도 템플릿 규칙이 이긴다.
+        // 그러면 좌석 블록이 한 번 더 회전해 이름과 번호가 거꾸로 인쇄된다.
+        // 인라인 스타일의 !important는 어떤 선택자보다도 우선하므로 여기서 확실히 못 박는다.
+        const canvasStyle = [
+            'position: relative !important',
+            'display: block !important',
+            `width: ${width}px !important`,
+            `height: ${height}px !important`,
+            'margin: 0 auto !important',
+            'transform: none !important'
+        ].join('; ');
+
+        const html = `<div class="custom-layout-canvas" style="${canvasStyle}">${clone.innerHTML}</div>`;
 
         return { html, extraStyle };
     }
