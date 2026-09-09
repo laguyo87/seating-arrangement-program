@@ -124,6 +124,8 @@ interface OptionsData {
 export class MainController {
     /** 진행 중인 Firebase 동기화 (중복 실행 방지) */
     private syncInFlight: Promise<void> | null = null;
+    /** 자리 배치가 진행 중인지 (연출이 끝나기 전 재실행 방지) */
+    private arrangingSeats: boolean = false;
 
     private inputModule!: InputModule;
     private layoutSelectorModule!: LayoutSelectorModule;
@@ -988,6 +990,16 @@ export class MainController {
                 if (dropdown.style.display === 'block' && !dropdownContainer.contains(target)) {
                     dropdown.style.display = 'none';
                 }
+            }
+            
+            // 이력 항목 삭제 버튼 클릭 (이력 항목 클릭보다 먼저 처리)
+            if (target.classList.contains('history-delete-btn')) {
+                e.stopPropagation();
+                const deleteId = target.dataset.historyId;
+                if (deleteId) {
+                    this.deleteHistoryItem(deleteId);
+                }
+                return;
             }
             
             // 이력 항목 클릭
@@ -4658,9 +4670,31 @@ export class MainController {
     }
 
     /**
+     * 자리 배치 진행 상태 설정
+     * 진행 중에는 버튼을 비활성화해 중복 실행을 막는다.
+     */
+    private setArrangingSeats(arranging: boolean): void {
+        this.arrangingSeats = arranging;
+
+        const arrangeBtn = document.getElementById('arrange-seats') as HTMLButtonElement | null;
+        if (arrangeBtn) {
+            arrangeBtn.disabled = arranging;
+            arrangeBtn.setAttribute('aria-busy', arranging ? 'true' : 'false');
+        }
+    }
+
+    /**
      * 좌석 배치하기 처리
      */
     private handleArrangeSeats(): void {
+            // 배치 연출이 끝나기 전에 다시 실행하면 두 배치가 뒤엉킨다.
+            // 앞선 실행의 커튼 타이머가 뒤이은 실행의 연출을 도중에 뜯어내고,
+            // 되돌리기 이력에도 중복 항목이 쌓인다.
+            if (this.arrangingSeats) {
+                return;
+            }
+            this.setArrangingSeats(true);
+
             // 읽기 전용 모드 해제
             this.disableReadOnlyMode();
             
@@ -4669,6 +4703,7 @@ export class MainController {
             
             if (studentData.length === 0) {
                 this.outputModule.showError('학생 정보를 먼저 입력해주세요.');
+                this.setArrangingSeats(false);
                 return;
             }
 
@@ -4706,6 +4741,7 @@ export class MainController {
             }
             this.outputModule.showError('좌석 배치 중 오류가 발생했습니다.');
             this.animationManager.stopCurtainAnimation();
+            this.setArrangingSeats(false);
         }
     }
     
@@ -4764,6 +4800,7 @@ export class MainController {
             const seatsArea = document.getElementById('seats-area');
             if (!seatsArea) {
                 this.animationManager.stopCurtainAnimation();
+                this.setArrangingSeats(false);
                 this.outputModule.showError('좌석 배치 영역을 찾을 수 없습니다.');
                 return;
             }
@@ -4788,6 +4825,7 @@ export class MainController {
                 existingCards = seatsArea.querySelectorAll('.student-seat-card');
                 if (existingCards.length === 0) {
                     this.animationManager.stopCurtainAnimation();
+                    this.setArrangingSeats(false);
                     const loadingElement = document.querySelector('.loading');
                     if (loadingElement) {
                         loadingElement.remove();
@@ -5232,6 +5270,8 @@ export class MainController {
             // 자리 배치 완료 후 히스토리 저장
             this.setTimeoutSafe(() => {
                 this.saveLayoutToHistory();
+                // 연출이 모두 끝난 뒤에 다시 배치할 수 있게 한다
+                this.setArrangingSeats(false);
             }, 3100);
             
             // 배치 완료 후 화면을 맨 위로 스크롤 (스크롤 컨테이너와 윈도우 모두 시도)
@@ -5266,6 +5306,7 @@ export class MainController {
             }
             
             this.animationManager.stopCurtainAnimation();
+            this.setArrangingSeats(false);
             
             logger.error('좌석 배치 중 오류:', error);
             this.outputModule.showError('좌석 배치 중 오류가 발생했습니다. 콘솔을 확인해주세요.');

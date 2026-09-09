@@ -284,31 +284,17 @@ export class UIManager {
             deleteBtn.textContent = '🗑️';
             deleteBtn.title = '삭제';
             deleteBtn.style.cssText = 'background: transparent; border: none; cursor: pointer; font-size: 1em; padding: 4px 8px; color: #dc3545; opacity: 0.7; transition: opacity 0.2s; margin-left: 8px;';
-            this.deps.addEventListenerSafe(deleteBtn, 'click', (e) => {
-                e.stopPropagation(); // 클릭 이벤트 전파 방지
-                this.deps.deleteHistoryItem(item.id);
-            });
-            this.deps.addEventListenerSafe(deleteBtn, 'mouseenter', () => {
-                deleteBtn.style.opacity = '1';
-            });
-            this.deps.addEventListenerSafe(deleteBtn, 'mouseleave', () => {
-                deleteBtn.style.opacity = '0.7';
-            });
-            
+            deleteBtn.dataset.historyId = item.id;
+
             historyItemContainer.appendChild(deleteBtn);
             historyContent.appendChild(historyItemContainer);
-            
-            // 클릭 이벤트는 historyItem에만 추가
-            this.deps.addEventListenerSafe(historyItem, 'click', () => {
-                this.deps.loadHistoryItem(item.id);
-            });
-            
-            this.deps.addEventListenerSafe(historyItem, 'mouseenter', () => {
-                historyItemContainer.style.background = '#f0f0f0';
-            });
-            this.deps.addEventListenerSafe(historyItem, 'mouseleave', () => {
-                historyItemContainer.style.background = '';
-            });
+
+            // 클릭/호버 처리는 개별 리스너를 달지 않는다.
+            // 이 드롭다운은 열 때마다 통째로 다시 만들어지므로, 여기서 리스너를 달면
+            // 열 때마다 리스너가 쌓이고 떨어져 나간 DOM 노드가 메모리에 남는다.
+            // 클릭은 MainController의 위임 핸들러가, 호버는 CSS가 처리한다.
+            // (개별 클릭 리스너를 달면 위임 핸들러와 함께 두 번 실행되어
+            //  한 번 클릭에 이력이 두 번 복원된다)
         });
     }
 }
