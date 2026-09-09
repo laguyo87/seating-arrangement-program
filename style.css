@@ -181,15 +181,6 @@ body {
 }
 
 /* Firebase 상태 표시 */
-.firebase-status {
-    color: #ffeb3b; /* 노란색 */
-    font-size: 0.85em;
-    font-weight: 500;
-    margin-left: 8px;
-    writing-mode: horizontal-tb; /* 가로 방향 */
-    text-orientation: mixed;
-    white-space: nowrap; /* 텍스트 줄바꿈 방지 */
-}
 
 /* 로그인 페이지 컨테이너 */
 .login-page-container {

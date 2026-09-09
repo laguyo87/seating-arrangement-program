@@ -15,7 +15,6 @@ export interface LoginPageModuleDependencies {
     outputModule: OutputModule;
     onLoginSuccess?: () => void;
     onClose?: () => void;
-    onShowSignUp?: () => void;
 }
 
 /**
@@ -134,9 +133,6 @@ export class LoginPageModule {
                             </svg>
                             Google로 로그인
                         </button>
-                        <button id="login-page-signup-btn" class="login-page-signup-btn">
-                            회원가입
-                        </button>
                         <button id="login-page-cancel-btn" class="login-page-cancel-btn">
                             취소
                         </button>
@@ -186,17 +182,6 @@ export class LoginPageModule {
         if (googleBtn) {
             googleBtn.addEventListener('click', () => {
                 this.handleGoogleLogin();
-            });
-        }
-
-        // 회원가입 버튼
-        const signUpBtn = this.loginPageContainer.querySelector('#login-page-signup-btn');
-        if (signUpBtn) {
-            signUpBtn.addEventListener('click', () => {
-                this.hide();
-                if (this.deps.onShowSignUp) {
-                    this.deps.onShowSignUp();
-                }
             });
         }
 
