@@ -4,9 +4,7 @@
  */
 import { InputModule } from '../modules/InputModule.js';
 import { LayoutSelectorModule } from '../modules/LayoutSelectorModule.js';
-import { SeatCanvasModule } from '../modules/SeatCanvasModule.js';
 import { OutputModule } from '../modules/OutputModule.js';
-import { CustomLayoutModule } from '../modules/CustomLayoutModule.js';
 import { StudentModel } from '../models/Student.js';
 import { LayoutService } from '../services/LayoutService.js';
 import { RandomService } from '../services/RandomService.js';
@@ -129,9 +127,7 @@ export class MainController {
 
     private inputModule!: InputModule;
     private layoutSelectorModule!: LayoutSelectorModule;
-    private canvasModule!: SeatCanvasModule;
     private outputModule!: OutputModule;
-    private customLayoutModule!: CustomLayoutModule;
     private layoutRenderer!: LayoutRenderer;
     private animationManager!: AnimationManager;
     private storageManager!: StorageManager;
@@ -170,13 +166,6 @@ export class MainController {
             // 모듈 초기화
             this.inputModule = new InputModule('input-section');
             this.layoutSelectorModule = new LayoutSelectorModule('layout-section');
-            
-            // Canvas 관련 모듈은 선택적으로 초기화 (카드 기반 배치 사용 시)
-            const canvas = document.getElementById('seat-canvas');
-            if (canvas) {
-                this.canvasModule = new SeatCanvasModule('seat-canvas');
-                this.customLayoutModule = new CustomLayoutModule('seat-canvas');
-            }
             
             this.outputModule = new OutputModule('output-section');
             
@@ -395,7 +384,6 @@ export class MainController {
             const checkedLayoutType = document.querySelector('input[name="layout-type"]:checked') as HTMLInputElement;
             if (checkedLayoutType) {
                 if (checkedLayoutType.value === 'single-uniform') {
-                    this.toggleCustomMode1(true);
                     this.updatePartitionLimitForSingleUniform();
                     // '이전 짝 금지' 비활성화
                     this.toggleAvoidPrevPartnerOption(false);
@@ -549,36 +537,6 @@ export class MainController {
 
 
     /**
-     * 초기 캔버스에 칠판과 교탁 그리기
-     */
-    private drawInitialCanvas(): void {
-        const canvas = document.getElementById('seat-canvas') as HTMLCanvasElement;
-        if (!canvas) return;
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-
-        // 캔버스 클리어
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        // 배경 설정
-        ctx.fillStyle = '#f8f9fa';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // 교탁과 칠판 그리기
-        this.drawTeacherDeskAndBoard(ctx, canvas);
-        
-        // 안내 메시지
-        ctx.fillStyle = '#666';
-        ctx.font = 'bold 20px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('교실 자리 배치 프로그램', canvas.width / 2, canvas.height / 2 - 30);
-        ctx.font = '14px sans-serif';
-        ctx.fillStyle = '#999';
-        ctx.fillText('칠판과 교탁이 상단에 자동으로 배치됩니다.', canvas.width / 2, canvas.height / 2);
-    }
-
-    /**
      * 이벤트 리스너 초기화
      */
     /**
@@ -639,11 +597,9 @@ export class MainController {
                 // '1명 한 줄로 배치' 선택 시 4단계 비활성화 및 분단 개수 제한
                 if (layoutType === 'single-uniform') {
                     this.toggleSingleSubmenu(true);
-                    this.toggleCustomMode1(true);
                     this.updatePartitionLimitForSingleUniform();
                 } else {
                     this.toggleSingleSubmenu(false);
-                    this.toggleCustomMode1(false);
                 }
                 
                 // '2명씩 짝꿍 배치' 선택 시 서브 메뉴 표시 및 분단 개수 제한
@@ -903,26 +859,6 @@ export class MainController {
         }
 
 
-
-        // 결과 내보내기 버튼
-        const exportBtn = document.getElementById('export-result');
-        if (exportBtn) {
-            this.addEventListenerSafe(exportBtn, 'click', () => this.handleExport());
-        }
-
-        // 고정 좌석 모드 버튼
-        const fixedModeBtn = document.getElementById('enable-fixed-seats');
-        if (fixedModeBtn) {
-            this.addEventListenerSafe(fixedModeBtn, 'click', () => {
-                this.outputModule.showInfo('고정 좌석 모드: 캔버스의 좌석을 더블 클릭하여 고정/해제할 수 있습니다.');
-            });
-        }
-
-        // 나머지 랜덤 배치 버튼
-        const randomizeBtn = document.getElementById('randomize-remaining');
-        if (randomizeBtn) {
-            this.addEventListenerSafe(randomizeBtn, 'click', () => this.handleRandomizeRemaining());
-        }
 
 
         // 양식 파일 다운로드 버튼
@@ -2656,11 +2592,6 @@ export class MainController {
                 // 드래그&드롭 기능 다시 활성화 (복원된 카드에 대해)
                 this.enableSeatSwapDragAndDrop();
             }
-        } else if (previousState && previousState.type === 'student-input') {
-            // 학생 입력 상태 복원
-            if (previousState.data && previousState.data.students) {
-                this.inputModule.setStudentData(previousState.data.students);
-            }
         } else if (previousState && previousState.type === 'options') {
             // 옵션 설정 복원
             if (previousState.data && previousState.data.options) {
@@ -2712,11 +2643,6 @@ export class MainController {
                 
                 // 드래그&드롭 기능 다시 활성화 (복원된 카드에 대해)
                 this.enableSeatSwapDragAndDrop();
-            }
-        } else if (nextState && nextState.type === 'student-input') {
-            // 학생 입력 상태 복원
-            if (nextState.data && nextState.data.students) {
-                this.inputModule.setStudentData(nextState.data.students);
             }
         } else if (nextState && nextState.type === 'options') {
             // 옵션 설정 복원
@@ -3021,61 +2947,7 @@ export class MainController {
     }
 
 
-
-    /**
-     * localStorage 사용 가능 여부 확인
-     */
-    private isLocalStorageAvailable(): boolean {
-        try {
-            const test = '__localStorage_test__';
-            localStorage.setItem(test, test);
-            localStorage.removeItem(test);
-            return true;
-        } catch {
-            return false;
-        }
-    }
-    
-    /**
-     * 안전한 localStorage 저장
-     */
-    private safeSetItem(key: string, value: string): boolean {
-        if (!this.isLocalStorageAvailable()) {
-            this.outputModule.showError('브라우저의 저장소 기능이 비활성화되어 있습니다. 설정에서 쿠키 및 사이트 데이터를 허용해주세요.');
-            return false;
-        }
         
-        try {
-            localStorage.setItem(key, value);
-            return true;
-        } catch (error) {
-            if (error instanceof DOMException && error.code === 22) {
-                // 저장소 용량 초과
-                this.outputModule.showError('저장소 용량이 부족합니다. 브라우저 설정에서 저장된 데이터를 삭제해주세요.');
-            } else {
-                this.outputModule.showError('데이터 저장에 실패했습니다. 브라우저 설정을 확인해주세요.');
-            }
-            logger.error('localStorage 저장 실패:', error);
-            return false;
-        }
-    }
-    
-    /**
-     * 안전한 localStorage 읽기
-     */
-    private safeGetItem(key: string): string | null {
-        if (!this.isLocalStorageAvailable()) {
-            return null;
-        }
-        
-        try {
-            return localStorage.getItem(key);
-        } catch (error) {
-            logger.error('localStorage 읽기 실패:', error);
-            return null;
-        }
-    }
-
     /**
      * 좌석 배치 결과를 localStorage에 저장
      */
@@ -3132,9 +3004,6 @@ export class MainController {
                 layoutData.students && Array.isArray(layoutData.students)) {
                 this.seats = layoutData.seats;
                 this.students = layoutData.students;
-                if (this.canvasModule) {
-                    this.canvasModule.setData(this.seats, this.students);
-                }
             } else {
                 // 데이터 구조가 올바르지 않으면 제거
                 try {
@@ -3147,35 +3016,6 @@ export class MainController {
             try {
                 localStorage.removeItem('layoutResult');
             } catch {}
-        }
-    }
-
-    /**
-     * 나머지 랜덤 배치 처리
-     */
-    private handleRandomizeRemaining(): void {
-        if (this.seats.length === 0) {
-            this.outputModule.showError('먼저 자리 배치를 생성해주세요.');
-            return;
-        }
-
-        try {
-            const unassignedStudents = this.students.filter(s => !s.fixedSeatId);
-            
-            if (unassignedStudents.length === 0) {
-                this.outputModule.showInfo('배치할 학생이 없습니다.');
-                return;
-            }
-
-            this.seats = RandomService.assignRandomly(unassignedStudents, this.seats);
-            if (this.canvasModule) {
-                this.canvasModule.setData(this.seats, this.students);
-            }
-
-            this.outputModule.showSuccess(`나머지 ${unassignedStudents.length}명의 학생이 랜덤으로 배치되었습니다.`);
-        } catch (error) {
-            logger.error('랜덤 배치 중 오류:', error);
-            this.outputModule.showError('랜덤 배치 중 오류가 발생했습니다.');
         }
     }
 
@@ -4323,45 +4163,6 @@ export class MainController {
 
 
     /**
-     * 커스텀 모드 1 토글 (4단계 활성화/비활성화)
-     */
-    private toggleCustomMode1(disable: boolean): void {
-        const advancedSection = document.getElementById('advanced-section');
-        if (!advancedSection) return;
-
-        // 라디오 버튼들 가져오기
-        const radioOptions = advancedSection.querySelectorAll('input[name="custom-mode-1"]');
-        const labels = advancedSection.querySelectorAll('label.radio-option');
-        
-        radioOptions.forEach((radio, index) => {
-            const radioElement = radio as HTMLInputElement;
-            const label = labels[index] as HTMLElement;
-            
-            if (disable) {
-                // 비활성화
-                radioElement.disabled = true;
-                if (label) {
-                    label.style.opacity = '0.5';
-                    label.style.pointerEvents = 'none';
-                    label.style.cursor = 'not-allowed';
-                }
-                advancedSection.style.opacity = '0.5';
-                advancedSection.style.pointerEvents = 'none';
-            } else {
-                // 활성화
-                radioElement.disabled = false;
-                if (label) {
-                    label.style.opacity = '1';
-                    label.style.pointerEvents = 'auto';
-                    label.style.cursor = 'pointer';
-                }
-                advancedSection.style.opacity = '1';
-                advancedSection.style.pointerEvents = 'auto';
-            }
-        });
-    }
-
-    /**
      * 1명씩 한 줄로 배치 서브 메뉴 토글
      */
     private toggleSingleSubmenu(show: boolean): void {
@@ -4601,27 +4402,7 @@ export class MainController {
             return false;
         }
     }
-    
-    /**
-     * HTML 이스케이프 (XSS 방지)
-     * 향후 사용자 입력이 포함된 HTML 생성 시 사용
-     */
-    private escapeHtml(_text: string): string {
-        const div = document.createElement('div');
-        div.textContent = _text;
-        return div.innerHTML;
-    }
-    
-    /**
-     * 안전한 innerHTML 설정 (XSS 방지)
-     * 향후 사용자 입력이 포함된 HTML 생성 시 사용
-     */
-    private setSafeInnerHTML(_element: HTMLElement, _html: string): void {
-        // 사용자 입력이 포함된 경우 이스케이프 처리
-        // 단순 템플릿 리터럴은 그대로 사용 (성능 고려)
-        // _element.innerHTML = _html;
-    }
-    
+            
     /**
      * 안전한 이벤트 리스너 추가 (메모리 누수 방지)
      * 향후 사용 예정
