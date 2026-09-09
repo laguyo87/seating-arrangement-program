@@ -234,3 +234,79 @@ describe('RandomService', () => {
         });
     });
 });
+
+describe('RandomService.shuffle - 배치 공정성', () => {
+    /**
+     * 자리 배치 프로그램에서 셔플의 균등성은 타협할 수 없는 요구사항이다.
+     * `array.sort(() => Math.random() - 0.5)` 같은 비교 함수 기반 셔플은
+     * 결과가 균등하지 않아 명단 앞쪽 학생이 앞자리에 반복해서 앉게 된다.
+     * 교사가 눈으로 확인할 수 없는 종류의 편향이므로 테스트로 고정한다.
+     */
+    const TRIALS = 20000;
+
+    /** 각 원소가 각 위치에 온 횟수를 세어 카이제곱 통계량을 계산한다 */
+    function positionChiSquare(n: number, trials: number): number {
+        const counts: number[][] = Array.from({ length: n }, () => new Array(n).fill(0));
+        const base = Array.from({ length: n }, (_, i) => i);
+
+        for (let t = 0; t < trials; t++) {
+            const shuffled = RandomService.shuffle(base);
+            shuffled.forEach((value, position) => {
+                counts[value][position]++;
+            });
+        }
+
+        const expected = trials / n;
+        let chi2 = 0;
+        for (let value = 0; value < n; value++) {
+            for (let position = 0; position < n; position++) {
+                const diff = counts[value][position] - expected;
+                chi2 += (diff * diff) / expected;
+            }
+        }
+        return chi2;
+    }
+
+    it('모든 학생이 모든 자리에 고르게 배정된다', () => {
+        const n = 8;
+        const chi2 = positionChiSquare(n, TRIALS);
+
+        // 자유도 (8-1)^2 = 49. 올바른 셔플이면 대략 49 근처에 머문다.
+        // 편향된 비교 함수 셔플은 이 값이 1000을 훌쩍 넘는다.
+        expect(chi2).toBeLessThan(200);
+    });
+
+    it('명단 첫 학생이 첫 자리에 앉을 확률이 다른 학생과 같다', () => {
+        const n = 10;
+        const base = Array.from({ length: n }, (_, i) => i);
+        let firstStaysFirst = 0;
+
+        for (let t = 0; t < TRIALS; t++) {
+            if (RandomService.shuffle(base)[0] === 0) firstStaysFirst++;
+        }
+
+        const rate = firstStaysFirst / TRIALS;
+        const ideal = 1 / n;
+        // 편향된 셔플에서는 이 값이 이상치의 2배를 넘는다 (10명 기준 약 19%).
+        expect(rate).toBeGreaterThan(ideal * 0.8);
+        expect(rate).toBeLessThan(ideal * 1.2);
+    });
+
+    it('학생이 원래 순번 자리에 머무는 비율이 이상치와 같다', () => {
+        const n = 10;
+        const base = Array.from({ length: n }, (_, i) => i);
+        let fixedPoints = 0;
+
+        for (let t = 0; t < TRIALS; t++) {
+            const shuffled = RandomService.shuffle(base);
+            for (let i = 0; i < n; i++) {
+                if (shuffled[i] === i) fixedPoints++;
+            }
+        }
+
+        // 균등 셔플에서 고정점의 기댓값은 순열당 정확히 1개다.
+        const perShuffle = fixedPoints / TRIALS;
+        expect(perShuffle).toBeGreaterThan(0.85);
+        expect(perShuffle).toBeLessThan(1.15);
+    });
+});

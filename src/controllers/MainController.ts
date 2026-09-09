@@ -4873,8 +4873,8 @@ export class MainController {
                 // 고정 좌석에 배치된 학생들을 제외한 나머지 학생들
                 const allRemainingMales = maleStudents.filter(s => !s.fixedSeatId);
                 const allRemainingFemales = femaleStudents.filter(s => !s.fixedSeatId);
-                let shuffledMales = [...allRemainingMales].sort(() => Math.random() - 0.5);
-                let shuffledFemales = [...allRemainingFemales].sort(() => Math.random() - 0.5);
+                let shuffledMales = RandomService.shuffle(allRemainingMales);
+                let shuffledFemales = RandomService.shuffle(allRemainingFemales);
                 
                 // 고정 좌석이 아닌 좌석만 필터링
                 const nonFixedCards = Array.from(existingCards).filter(card => {
@@ -5062,8 +5062,8 @@ export class MainController {
                 });
             } else {
                 // 일반 랜덤 배치 모드
-                let shuffledMales = [...maleStudents].sort(() => Math.random() - 0.5);
-                let shuffledFemales = [...femaleStudents].sort(() => Math.random() - 0.5);
+                let shuffledMales = RandomService.shuffle(maleStudents);
+                let shuffledFemales = RandomService.shuffle(femaleStudents);
                 
                 // 페어 컨테이너 우선 처리
                 const seatsAreaEl = document.getElementById('seats-area')!;
@@ -6821,8 +6821,8 @@ export class MainController {
         if (!seatsArea) return;
 
         // 남학생과 여학생을 무작위로 섞기
-        const shuffledMales = [...maleStudents].sort(() => Math.random() - 0.5);
-        const shuffledFemales = [...femaleStudents].sort(() => Math.random() - 0.5);
+        const shuffledMales = RandomService.shuffle(maleStudents);
+        const shuffledFemales = RandomService.shuffle(femaleStudents);
 
         const totalPairs = Math.min(shuffledMales.length, shuffledFemales.length);
         const rowsPerPartition = Math.ceil(totalPairs / partitionCount);
@@ -6861,8 +6861,8 @@ export class MainController {
         if (!seatsArea) return;
 
         // 남학생과 여학생을 무작위로 섞기
-        const shuffledMales = [...maleStudents].sort(() => Math.random() - 0.5);
-        const shuffledFemales = [...femaleStudents].sort(() => Math.random() - 0.5);
+        const shuffledMales = RandomService.shuffle(maleStudents);
+        const shuffledFemales = RandomService.shuffle(femaleStudents);
 
         const allPairs: Array<{student1: Student, student2: Student | null}> = [];
 
