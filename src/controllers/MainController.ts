@@ -119,6 +119,9 @@ interface OptionsData {
  * 전체 프로그램의 흐름을 제어하고 모듈들을 조율합니다.
  */
 export class MainController {
+    /** 진행 중인 Firebase 동기화 (중복 실행 방지) */
+    private syncInFlight: Promise<void> | null = null;
+
     private inputModule!: InputModule;
     private layoutSelectorModule!: LayoutSelectorModule;
     private canvasModule!: SeatCanvasModule;
@@ -366,10 +369,13 @@ export class MainController {
                 }
             });
             
-            // Firebase 상태 업데이트
-            this.setTimeoutSafe(() => {
+            // Firebase 인증 상태가 확정되면 화면과 데이터를 갱신한다.
+            // 고정 시간(1초) 타이머로 기다리면 인증 복원이 그보다 늦은 기기에서
+            // 로그인 상태를 놓쳐 클라우드 데이터를 불러오지 못한다.
+            // 그 상태로 반을 만들면 클라우드의 기존 반 목록이 통째로 교체된다.
+            this.firebaseStorageManager.onAuthStateResolved(() => {
                 this.updateFirebaseStatus();
-            }, 1000);
+            });
             
             // 모바일 반응형 초기화
             this.initializeMobileResponsive();
@@ -8988,7 +8994,9 @@ export class MainController {
             statusSpan.style.fontWeight = '500';
             
             // 로그인 시 Firebase에서 데이터 동기화
-            this.syncDataFromFirebase();
+            this.syncDataFromFirebase().catch((error) => {
+                logger.error('Firebase 데이터 동기화 실패:', error);
+            });
         } else {
             loginBtn.textContent = '🔐 로그인';
             loginBtn.title = '로그인 (클라우드 동기화)';
@@ -9001,7 +9009,25 @@ export class MainController {
     /**
      * Firebase에서 데이터를 불러와서 localStorage에 동기화
      */
-    private async syncDataFromFirebase(): Promise<void> {
+    private syncDataFromFirebase(): Promise<void> {
+        // 동기화는 로컬 저장소를 통째로 덮어쓴다.
+        // 여러 번 겹쳐 실행되면 쓰기 순서가 보장되지 않아
+        // 반쯤 갱신된 데이터가 남을 수 있으므로 한 번에 하나만 수행한다.
+        if (this.syncInFlight) {
+            return this.syncInFlight;
+        }
+
+        this.syncInFlight = this.performSyncFromFirebase().finally(() => {
+            this.syncInFlight = null;
+        });
+
+        return this.syncInFlight;
+    }
+
+    /**
+     * Firebase 데이터 동기화 실제 수행 (syncDataFromFirebase를 통해서만 호출)
+     */
+    private async performSyncFromFirebase(): Promise<void> {
         if (!this.firebaseStorageManager.getIsAuthenticated()) {
             return;
         }

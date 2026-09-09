@@ -41,6 +41,10 @@ export class FirebaseStorageManager {
   private firebaseService: FirebaseService;
   private currentUser: User | null = null;
   private isAuthenticated: boolean = false;
+  /** 인증 상태가 한 번이라도 확정되었는지 (복원 완료 여부) */
+  private authStateResolved: boolean = false;
+  /** 인증 상태 확정 시 호출할 콜백들 */
+  private authStateListeners: Array<(authenticated: boolean) => void> = [];
   private snapshotUnsubscribes: Map<string, Unsubscribe> = new Map();
 
   constructor(dependencies: FirebaseStorageManagerDependencies) {
@@ -50,6 +54,9 @@ export class FirebaseStorageManager {
     // Firebase 초기화
     if (this.firebaseService.initialize()) {
       this.setupAuthListener();
+    } else {
+      // Firebase를 쓸 수 없는 환경. 인증 상태는 '비로그인'으로 확정된 것으로 본다.
+      this.markAuthStateResolved();
     }
   }
 
@@ -58,7 +65,10 @@ export class FirebaseStorageManager {
    */
   private setupAuthListener(): void {
     const auth = this.firebaseService.getAuth();
-    if (!auth) return;
+    if (!auth) {
+      this.markAuthStateResolved();
+      return;
+    }
 
     onAuthStateChanged(auth, (user) => {
       this.currentUser = user;
@@ -69,7 +79,45 @@ export class FirebaseStorageManager {
       } else {
         logger.info('Firebase 로그아웃됨');
       }
+
+      this.markAuthStateResolved();
     });
+  }
+
+  /**
+   * 인증 상태가 확정되었음을 구독자에게 알린다.
+   *
+   * 인증 복원(IndexedDB에서 세션을 되살리는 과정)은 걸리는 시간이 일정하지 않다.
+   * 고정 시간 타이머로 기다리면, 복원이 늦은 기기에서는 로그인 상태를 놓쳐
+   * 클라우드 데이터를 불러오지 못한 채 빈 로컬 데이터로 시작하게 된다.
+   * 그 상태에서 저장이 일어나면 클라우드의 기존 데이터가 지워진다.
+   */
+  private markAuthStateResolved(): void {
+    this.authStateResolved = true;
+    const listeners = [...this.authStateListeners];
+    listeners.forEach((listener) => {
+      try {
+        listener(this.isAuthenticated);
+      } catch (error) {
+        logger.error('인증 상태 리스너 실행 중 오류:', error);
+      }
+    });
+  }
+
+  /**
+   * 인증 상태가 확정될 때 호출될 콜백을 등록한다.
+   * 이미 확정된 뒤에 등록하면 즉시 한 번 호출된다.
+   * 이후 로그인/로그아웃이 일어날 때마다 다시 호출된다.
+   */
+  public onAuthStateResolved(listener: (authenticated: boolean) => void): void {
+    this.authStateListeners.push(listener);
+    if (this.authStateResolved) {
+      try {
+        listener(this.isAuthenticated);
+      } catch (error) {
+        logger.error('인증 상태 리스너 실행 중 오류:', error);
+      }
+    }
   }
 
   /**
