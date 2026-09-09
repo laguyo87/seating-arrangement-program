@@ -12,6 +12,7 @@ import { LayoutService } from '../services/LayoutService.js';
 import { RandomService } from '../services/RandomService.js';
 import { PairingService } from '../services/PairingService.js';
 import { SeatOccupancyService } from '../services/SeatOccupancyService.js';
+import { SeatReorderService } from '../services/SeatReorderService.js';
 // import { SeatType } from '../models/Seat.js'; // 향후 사용 예정
 import { Student } from '../models/Student.js';
 import { Seat } from '../models/Seat.js';
@@ -2213,8 +2214,12 @@ export class MainController {
                 }
             }
             
+            // 집었다가 제자리에 놓은 경우: 아무 일도 하지 않는다.
+            // 이 가드가 없으면 아래 '빈 공간 드롭' 분기로 떨어져 카드가 엉뚱한 위치로 튄다.
+            if (targetCard === source) return;
+
             // 카드에 직접 드롭한 경우: 교환
-            if (targetCard && targetCard !== source) {
+            if (targetCard) {
                 // 고정 좌석은 교환 불가
                 if (targetCard.classList.contains('fixed-seat') || source.classList.contains('fixed-seat')) return;
 
@@ -2253,8 +2258,7 @@ export class MainController {
                 );
                 
                 if (cardsOnly.length === 0) {
-                    // 다른 카드가 없으면 그냥 추가
-                    seatsArea.appendChild(source);
+                    // 다른 카드가 없으면 옮길 곳도 없다
                     return;
                 }
                 
@@ -2290,21 +2294,11 @@ export class MainController {
                     }
                 }
                 
-                // 카드 이동
+                // 카드 이동: DOM 요소를 옮기지 않고 '내용'만 회전시킨다.
+                // 요소를 옮기면 data-seat-id가 학생을 따라다녀서,
+                // 화면에 보이는 배치와 저장되는 배치가 어긋난다.
                 if (closestCard) {
-                    if (insertPosition === 'before') {
-                        seatsArea.insertBefore(source, closestCard);
-                    } else {
-                        // 다음 형제가 있으면 그 앞에, 없으면 맨 끝에
-                        const nextSibling = closestCard.nextElementSibling;
-                        if (nextSibling && nextSibling.classList.contains('student-seat-card')) {
-                            seatsArea.insertBefore(source, nextSibling);
-                        } else {
-                            seatsArea.insertBefore(source, closestCard.nextSibling);
-                        }
-                    }
-                } else {
-                    seatsArea.appendChild(source);
+                    this.moveCardContentTo(allCards, source, closestCard, insertPosition === 'before');
                 }
             }
             
@@ -8309,54 +8303,44 @@ export class MainController {
         // 키보드 드래그&드롭 매니저 초기화
         this.keyboardDragDropManager = new KeyboardDragDropManager(
             'seats-area',
-            (sourceCard: HTMLElement, direction: 'up' | 'down' | 'left' | 'right') => {
-                this.handleKeyboardSeatMove(sourceCard, direction);
-            },
+            (sourceCard: HTMLElement, direction: 'up' | 'down' | 'left' | 'right') =>
+                this.handleKeyboardSeatMove(sourceCard, direction),
             (seatId: number) => this.fixedSeatIds.has(seatId)
         );
 
-        // 좌석 카드가 생성될 때마다 활성화
-        const observer = new MutationObserver(() => {
-            const cards = seatsArea.querySelectorAll('.student-seat-card');
-            if (cards.length > 0) {
-                this.keyboardDragDropManager.enable();
-            }
-        });
-
-        observer.observe(seatsArea, {
-            childList: true,
-            subtree: true
-        });
-
-        // 초기 활성화
-        if (seatsArea.querySelectorAll('.student-seat-card').length > 0) {
-            this.keyboardDragDropManager.enable();
-        }
+        // 활성화는 한 번이면 된다.
+        // KeyboardDragDropManager가 자체 MutationObserver로 카드 목록 변화를 따라가므로
+        // 여기서 DOM 변경마다 enable()을 다시 부를 필요가 없다.
+        // (그렇게 하면 리스너가 겹쳐 쌓여 키 입력이 두 번 처리된다)
+        this.keyboardDragDropManager.enable();
     }
 
     /**
      * 키보드로 좌석 이동 처리
      */
-    private handleKeyboardSeatMove(sourceCard: HTMLElement, direction: 'up' | 'down' | 'left' | 'right'): void {
+    private handleKeyboardSeatMove(
+        sourceCard: HTMLElement,
+        direction: 'up' | 'down' | 'left' | 'right'
+    ): HTMLElement | null {
         const sourceSeatIdStr = sourceCard.getAttribute('data-seat-id');
-        if (!sourceSeatIdStr) return;
+        if (!sourceSeatIdStr) return null;
 
         const sourceSeatId = parseInt(sourceSeatIdStr, 10);
-        if (isNaN(sourceSeatId)) return;
+        if (isNaN(sourceSeatId)) return null;
 
         // 방향에 따라 인접한 좌석 찾기
         const targetCard = this.findAdjacentSeat(sourceCard, direction);
-        if (!targetCard) return;
+        if (!targetCard) return null;
 
         const targetSeatIdStr = targetCard.getAttribute('data-seat-id');
-        if (!targetSeatIdStr) return;
+        if (!targetSeatIdStr) return null;
 
         const targetSeatId = parseInt(targetSeatIdStr, 10);
-        if (isNaN(targetSeatId)) return;
+        if (isNaN(targetSeatId)) return null;
 
         // 고정 좌석은 이동 불가
         if (this.fixedSeatIds.has(targetSeatId)) {
-            return;
+            return null;
         }
 
         // 좌석 교환
@@ -8366,6 +8350,9 @@ export class MainController {
         this.setTimeoutSafe(() => {
             this.saveLayoutToHistory();
         }, 50);
+
+        // 학생이 옮겨간 자리를 알려 포커스가 따라가도록 한다
+        return targetCard;
     }
 
     /**
@@ -8385,6 +8372,9 @@ export class MainController {
         let bestMatch: HTMLElement | null = null;
         let minDistance = Infinity;
 
+        // 진행 방향과 수직인 어긋남에 곱할 가중치
+        const PERPENDICULAR_WEIGHT = 3;
+
         allCards.forEach((otherCard) => {
             if (otherCard === card || otherCard.classList.contains('fixed-seat')) return;
 
@@ -8396,21 +8386,24 @@ export class MainController {
             let distance = 0;
 
             switch (direction) {
+                // 진행 방향과 수직인 어긋남에 가중치를 준다.
+                // 같은 가중치로 더하면 위쪽 바로 옆 칸보다 두 칸 옆의 카드가
+                // 선택되는 일이 생겨, 화살표 방향과 다른 자리로 이동한다.
                 case 'up':
                     isInDirection = otherCenterY < cardCenterY;
-                    distance = Math.abs(otherCenterX - cardCenterX) + (cardCenterY - otherCenterY);
+                    distance = Math.abs(otherCenterX - cardCenterX) * PERPENDICULAR_WEIGHT + (cardCenterY - otherCenterY);
                     break;
                 case 'down':
                     isInDirection = otherCenterY > cardCenterY;
-                    distance = Math.abs(otherCenterX - cardCenterX) + (otherCenterY - cardCenterY);
+                    distance = Math.abs(otherCenterX - cardCenterX) * PERPENDICULAR_WEIGHT + (otherCenterY - cardCenterY);
                     break;
                 case 'left':
                     isInDirection = otherCenterX < cardCenterX;
-                    distance = Math.abs(otherCenterY - cardCenterY) + (cardCenterX - otherCenterX);
+                    distance = Math.abs(otherCenterY - cardCenterY) * PERPENDICULAR_WEIGHT + (cardCenterX - otherCenterX);
                     break;
                 case 'right':
                     isInDirection = otherCenterX > cardCenterX;
-                    distance = Math.abs(otherCenterY - cardCenterY) + (otherCenterX - cardCenterX);
+                    distance = Math.abs(otherCenterY - cardCenterY) * PERPENDICULAR_WEIGHT + (otherCenterX - cardCenterX);
                     break;
             }
 
@@ -8425,6 +8418,72 @@ export class MainController {
 
     /**
      * 좌석 교환
+     */
+    private moveCardContentTo(
+        allCards: HTMLElement[],
+        source: HTMLElement,
+        closestCard: HTMLElement,
+        insertBefore: boolean
+    ): void {
+        // 고정 좌석이 섞여 있으면 회전으로 내용이 밀려 고정이 깨진다
+        if (source.classList.contains('fixed-seat')) return;
+
+        const sourceIndex = allCards.indexOf(source);
+        const closestIndex = allCards.indexOf(closestCard);
+        if (sourceIndex === -1 || closestIndex === -1) return;
+
+        const targetIndex = SeatReorderService.resolveTargetIndex(closestIndex, insertBefore, sourceIndex);
+        if (targetIndex === sourceIndex) return;
+
+        // 이동 구간에 고정 좌석이 있으면 옮기지 않는다
+        const [rangeStart, rangeEnd] = sourceIndex < targetIndex
+            ? [sourceIndex, targetIndex]
+            : [targetIndex, sourceIndex];
+        for (let i = rangeStart; i <= rangeEnd; i++) {
+            if (allCards[i].classList.contains('fixed-seat')) return;
+        }
+
+        const contents = allCards.map(card => this.readCardContent(card));
+        const rotated = SeatReorderService.rotate(contents, sourceIndex, targetIndex);
+        rotated.forEach((content, index) => this.writeCardContent(allCards[index], content));
+    }
+
+    /**
+     * 카드에 표시된 내용(이름/성별) 읽기
+     */
+    private readCardContent(card: HTMLElement): { name: string; isMale: boolean; isFemale: boolean } {
+        const nameEl = card.querySelector('.student-name') as HTMLElement | null;
+        return {
+            name: nameEl?.textContent || '',
+            isMale: card.classList.contains('gender-m'),
+            isFemale: card.classList.contains('gender-f')
+        };
+    }
+
+    /**
+     * 카드에 내용 쓰기 (자리 번호는 그대로 둔다)
+     */
+    private writeCardContent(
+        card: HTMLElement,
+        content: { name: string; isMale: boolean; isFemale: boolean }
+    ): void {
+        const nameEl = card.querySelector('.student-name') as HTMLElement | null;
+        if (nameEl) nameEl.textContent = content.name;
+
+        card.classList.toggle('gender-m', content.isMale);
+        card.classList.toggle('gender-f', content.isFemale);
+
+        const seatId = card.getAttribute('data-seat-id');
+        if (seatId) {
+            const genderLabel = content.isMale ? '남학생 ♂' : (content.isFemale ? '여학생 ♀' : '');
+            const genderInfo = genderLabel ? ` (${genderLabel})` : '';
+            const displayName = content.name || '빈 좌석';
+            card.setAttribute('aria-label', `좌석 ${seatId}: ${displayName}${genderInfo}. 화살표 키로 이동, Enter로 선택`);
+        }
+    }
+
+    /**
+     * 두 좌석의 학생을 맞바꿈 (자리 번호는 자리에 남는다)
      */
     private swapSeats(sourceCard: HTMLElement, targetCard: HTMLElement): void {
         const srcNameEl = sourceCard.querySelector('.student-name') as HTMLElement | null;

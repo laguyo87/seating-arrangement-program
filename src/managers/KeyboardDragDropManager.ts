@@ -3,13 +3,24 @@
  * 화살표 키를 사용한 좌석 이동 기능
  */
 
-export type OnKeyboardMoveCallback = (sourceCard: HTMLElement, direction: 'up' | 'down' | 'left' | 'right') => void;
+/**
+ * 좌석 이동 콜백.
+ * 학생이 실제로 옮겨간 카드를 반환하면 그 카드로 포커스가 따라간다.
+ */
+export type OnKeyboardMoveCallback = (
+    sourceCard: HTMLElement,
+    direction: 'up' | 'down' | 'left' | 'right'
+) => HTMLElement | null | void;
 
 export class KeyboardDragDropManager {
     private seatsArea: HTMLElement | null = null;
     private onMoveCallback?: OnKeyboardMoveCallback;
     private isFixedSeat?: (seatId: number) => boolean;
     private selectedCard: HTMLElement | null = null;
+    /** 리스너가 이미 등록되었는지 (중복 등록 방지) */
+    private enabled: boolean = false;
+    /** 카드 목록 변화를 감시하는 옵저버 */
+    private cardObserver: MutationObserver | null = null;
 
     constructor(seatsAreaId: string, onMove?: OnKeyboardMoveCallback, isFixedSeat?: (seatId: number) => boolean) {
         this.seatsArea = document.getElementById(seatsAreaId);
@@ -22,6 +33,15 @@ export class KeyboardDragDropManager {
      */
     public enable(): void {
         if (!this.seatsArea) return;
+
+        // 이미 활성화되어 있으면 리스너를 다시 등록하지 않는다.
+        // 중복 등록되면 화살표 키 한 번에 교환이 두 번 일어나 서로 상쇄되고,
+        // 자리 이동이 아무 반응 없이 멈춘 것처럼 보인다.
+        if (this.enabled) {
+            this.updateFocusableCards();
+            return;
+        }
+        this.enabled = true;
 
         // 좌석 카드에 포커스 가능하도록 설정
         this.setupFocusableCards();
@@ -54,11 +74,13 @@ export class KeyboardDragDropManager {
     private setupFocusableCards(): void {
         if (!this.seatsArea) return;
 
-        const observer = new MutationObserver(() => {
+        // 기존 옵저버가 있으면 정리한 뒤 새로 등록한다 (누적 방지)
+        this.cardObserver?.disconnect();
+        this.cardObserver = new MutationObserver(() => {
             this.updateFocusableCards();
         });
 
-        observer.observe(this.seatsArea, {
+        this.cardObserver.observe(this.seatsArea, {
             childList: true,
             subtree: true
         });
@@ -153,10 +175,13 @@ export class KeyboardDragDropManager {
         }
 
         if (direction && this.onMoveCallback) {
-            this.onMoveCallback(card, direction);
-            // 이동 후 포커스 유지
+            const movedTo = this.onMoveCallback(card, direction);
+            // 학생이 옮겨간 카드로 포커스를 따라 보낸다.
+            // 원래 카드에 머무르면 화살표를 두 번 눌렀을 때 제자리로 돌아와,
+            // 키보드로는 학생을 한 칸 이상 옮길 수 없다.
             requestAnimationFrame(() => {
-                card.focus();
+                const focusTarget = movedTo instanceof HTMLElement ? movedTo : card;
+                focusTarget.focus();
             });
         }
     }
@@ -205,6 +230,10 @@ export class KeyboardDragDropManager {
         if (this.selectedCard) {
             this.deselectCard();
         }
+
+        this.cardObserver?.disconnect();
+        this.cardObserver = null;
+        this.enabled = false;
     }
 }
 
