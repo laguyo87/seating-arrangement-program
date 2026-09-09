@@ -2846,3 +2846,14 @@ button:disabled {
         break-inside: avoid;
     }
 }
+
+/* 확정 자리 이력 드롭다운 항목 호버
+   개별 mouseenter/mouseleave 리스너를 달면 드롭다운을 열 때마다 리스너가 쌓이므로
+   호버 표현은 CSS로 처리한다. */
+.history-item-container:hover {
+    background: #f0f0f0;
+}
+
+.history-delete-btn:hover {
+    opacity: 1 !important;
+}

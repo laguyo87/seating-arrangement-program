@@ -159,21 +159,31 @@ export class LayoutService {
         const seatWidth = 60;
         const seatHeight = 60;
         const withinGroupSpacing = 20;
-        const groupSpacing = 180;
-        
-        const totalWidth = (cols - 1) * groupSpacing + (Math.sqrt(groupSize) - 1) * withinGroupSpacing + seatWidth;
-        const totalHeight = (rows - 1) * groupSpacing + (Math.sqrt(groupSize) - 1) * withinGroupSpacing + seatHeight;
+        /** 모둠과 모둠 사이의 여백 */
+        const groupGap = 100;
+
+        // 모둠 하나가 차지하는 실제 크기에서 모둠 간격을 계산한다.
+        // 간격을 고정값(180)으로 두면 모둠이 그보다 커지는 5명/6명 배치에서
+        // 옆 모둠의 좌석과 물리적으로 겹친다.
+        const seatsPerRow = Math.ceil(Math.sqrt(groupSize));
+        const seatsPerCol = Math.ceil(groupSize / seatsPerRow);
+        const groupWidth = (seatsPerRow - 1) * (seatWidth + withinGroupSpacing) + seatWidth;
+        const groupHeight = (seatsPerCol - 1) * (seatHeight + withinGroupSpacing) + seatHeight;
+        const groupSpacingX = groupWidth + groupGap;
+        const groupSpacingY = groupHeight + groupGap;
+
+        const totalWidth = (cols - 1) * groupSpacingX + groupWidth;
+        const totalHeight = (rows - 1) * groupSpacingY + groupHeight;
         const startX = (canvasWidth - totalWidth) / 2;
         const startY = (canvasHeight - totalHeight) / 2;
         
         let seatIndex = 0;
         for (let groupRow = 0; groupRow < rows && seatIndex < totalSeats; groupRow++) {
             for (let groupCol = 0; groupCol < cols && seatIndex < totalSeats; groupCol++) {
-                const groupStartX = startX + groupCol * groupSpacing;
-                const groupStartY = startY + groupRow * groupSpacing;
+                const groupStartX = startX + groupCol * groupSpacingX;
+                const groupStartY = startY + groupRow * groupSpacingY;
                 
                 // 모둠 내 좌석 배치 (2x2 또는 적절한 형태)
-                const seatsPerRow = Math.ceil(Math.sqrt(groupSize));
                 for (let i = 0; i < groupSize && seatIndex < totalSeats; i++) {
                     const row = Math.floor(i / seatsPerRow);
                     const col = i % seatsPerRow;
@@ -275,6 +285,14 @@ export class LayoutService {
         partitionCount: number = 1
     ): LayoutResult {
         try {
+            if (!Number.isFinite(totalSeats) || totalSeats <= 0) {
+                return {
+                    seats: [],
+                    success: false,
+                    errorMessage: '좌석 수가 올바르지 않습니다.'
+                };
+            }
+
             let seats: Seat[];
             
             switch (layoutType) {
@@ -311,9 +329,13 @@ export class LayoutService {
                     break;
                 
                 case LayoutType.CUSTOM:
-                    // 사용자 임의 구성은 빈 배열 반환
-                    seats = [];
-                    break;
+                    // 사용자 임의 구성은 아직 구현되지 않았다.
+                    // 빈 배열을 성공으로 돌려주면 호출부가 정상 배치로 취급한다.
+                    return {
+                        seats: [],
+                        success: false,
+                        errorMessage: '사용자 임의 구성은 아직 지원하지 않습니다.'
+                    };
                 
                 default:
                     return {
@@ -323,6 +345,14 @@ export class LayoutService {
                     };
             }
             
+            if (seats.length === 0) {
+                return {
+                    seats: [],
+                    success: false,
+                    errorMessage: '좌석을 생성하지 못했습니다. 설정을 확인해주세요.'
+                };
+            }
+
             return {
                 seats,
                 success: true

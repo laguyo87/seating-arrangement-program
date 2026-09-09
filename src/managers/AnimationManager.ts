@@ -18,9 +18,40 @@ export interface AnimationManagerDependencies {
  */
 export class AnimationManager {
     private deps: AnimationManagerDependencies;
+    /**
+     * 재사용하는 오디오 컨텍스트
+     * 배치할 때마다 새로 만들면 브라우저의 동시 컨텍스트 상한(크롬 기준 약 6개)에 걸려
+     * 그 뒤로는 생성 자체가 실패하고 효과음이 세션 내내 나오지 않는다.
+     */
+    private audioContext: AudioContext | null = null;
 
     constructor(dependencies: AnimationManagerDependencies) {
         this.deps = dependencies;
+    }
+
+    /**
+     * 오디오 컨텍스트 가져오기 (없으면 생성, 있으면 재사용)
+     */
+    private getAudioContext(): AudioContext | null {
+        try {
+            if (!this.audioContext) {
+                const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+                if (!AudioContextClass) return null;
+                this.audioContext = new AudioContextClass();
+            }
+
+            // 사용자 조작 전에 만들어진 컨텍스트는 suspended 상태일 수 있다
+            if (this.audioContext.state === 'suspended') {
+                this.audioContext.resume().catch(() => {
+                    // 재개 실패는 무음으로 처리한다
+                });
+            }
+
+            return this.audioContext;
+        } catch (error) {
+            logger.warn('오디오 컨텍스트 생성 실패:', error);
+            return null;
+        }
     }
 
     /**
@@ -207,7 +238,8 @@ export class AnimationManager {
     public playArrangementSound(): void {
         try {
             // Web Audio API를 사용하여 음향 효과 생성
-            const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const audioContext = this.getAudioContext();
+            if (!audioContext) return;
             const duration = 3.0; // 3초
             const sampleRate = audioContext.sampleRate;
             const frameCount = Math.floor(sampleRate * duration);

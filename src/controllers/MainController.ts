@@ -4,14 +4,13 @@
  */
 import { InputModule } from '../modules/InputModule.js';
 import { LayoutSelectorModule } from '../modules/LayoutSelectorModule.js';
-import { SeatCanvasModule } from '../modules/SeatCanvasModule.js';
 import { OutputModule } from '../modules/OutputModule.js';
-import { CustomLayoutModule } from '../modules/CustomLayoutModule.js';
 import { StudentModel } from '../models/Student.js';
 import { LayoutService } from '../services/LayoutService.js';
 import { RandomService } from '../services/RandomService.js';
 import { PairingService } from '../services/PairingService.js';
 import { SeatOccupancyService } from '../services/SeatOccupancyService.js';
+import { SeatReorderService } from '../services/SeatReorderService.js';
 // import { SeatType } from '../models/Seat.js'; // 향후 사용 예정
 import { Student } from '../models/Student.js';
 import { Seat } from '../models/Seat.js';
@@ -33,8 +32,6 @@ import { FirebaseStorageManager, FirebaseStorageManagerDependencies } from '../m
 import { LoginPageModule, LoginPageModuleDependencies } from '../modules/LoginPageModule.js';
 import { SignUpPageModule, SignUpPageModuleDependencies } from '../modules/SignUpPageModule.js';
 import { VisitorCounterModule, VisitorCounterModuleDependencies } from '../modules/VisitorCounterModule.js';
-import QRCode from 'qrcode';
-import html2canvas from 'html2canvas';
 
 /**
  * 히스토리 데이터 타입
@@ -123,12 +120,12 @@ interface OptionsData {
 export class MainController {
     /** 진행 중인 Firebase 동기화 (중복 실행 방지) */
     private syncInFlight: Promise<void> | null = null;
+    /** 자리 배치가 진행 중인지 (연출이 끝나기 전 재실행 방지) */
+    private arrangingSeats: boolean = false;
 
     private inputModule!: InputModule;
     private layoutSelectorModule!: LayoutSelectorModule;
-    private canvasModule!: SeatCanvasModule;
     private outputModule!: OutputModule;
-    private customLayoutModule!: CustomLayoutModule;
     private layoutRenderer!: LayoutRenderer;
     private animationManager!: AnimationManager;
     private storageManager!: StorageManager;
@@ -167,13 +164,6 @@ export class MainController {
             // 모듈 초기화
             this.inputModule = new InputModule('input-section');
             this.layoutSelectorModule = new LayoutSelectorModule('layout-section');
-            
-            // Canvas 관련 모듈은 선택적으로 초기화 (카드 기반 배치 사용 시)
-            const canvas = document.getElementById('seat-canvas');
-            if (canvas) {
-                this.canvasModule = new SeatCanvasModule('seat-canvas');
-                this.customLayoutModule = new CustomLayoutModule('seat-canvas');
-            }
             
             this.outputModule = new OutputModule('output-section');
             
@@ -392,7 +382,6 @@ export class MainController {
             const checkedLayoutType = document.querySelector('input[name="layout-type"]:checked') as HTMLInputElement;
             if (checkedLayoutType) {
                 if (checkedLayoutType.value === 'single-uniform') {
-                    this.toggleCustomMode1(true);
                     this.updatePartitionLimitForSingleUniform();
                     // '이전 짝 금지' 비활성화
                     this.toggleAvoidPrevPartnerOption(false);
@@ -546,36 +535,6 @@ export class MainController {
 
 
     /**
-     * 초기 캔버스에 칠판과 교탁 그리기
-     */
-    private drawInitialCanvas(): void {
-        const canvas = document.getElementById('seat-canvas') as HTMLCanvasElement;
-        if (!canvas) return;
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-
-        // 캔버스 클리어
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        // 배경 설정
-        ctx.fillStyle = '#f8f9fa';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // 교탁과 칠판 그리기
-        this.drawTeacherDeskAndBoard(ctx, canvas);
-        
-        // 안내 메시지
-        ctx.fillStyle = '#666';
-        ctx.font = 'bold 20px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('교실 자리 배치 프로그램', canvas.width / 2, canvas.height / 2 - 30);
-        ctx.font = '14px sans-serif';
-        ctx.fillStyle = '#999';
-        ctx.fillText('칠판과 교탁이 상단에 자동으로 배치됩니다.', canvas.width / 2, canvas.height / 2);
-    }
-
-    /**
      * 이벤트 리스너 초기화
      */
     /**
@@ -636,11 +595,9 @@ export class MainController {
                 // '1명 한 줄로 배치' 선택 시 4단계 비활성화 및 분단 개수 제한
                 if (layoutType === 'single-uniform') {
                     this.toggleSingleSubmenu(true);
-                    this.toggleCustomMode1(true);
                     this.updatePartitionLimitForSingleUniform();
                 } else {
                     this.toggleSingleSubmenu(false);
-                    this.toggleCustomMode1(false);
                 }
                 
                 // '2명씩 짝꿍 배치' 선택 시 서브 메뉴 표시 및 분단 개수 제한
@@ -901,26 +858,6 @@ export class MainController {
 
 
 
-        // 결과 내보내기 버튼
-        const exportBtn = document.getElementById('export-result');
-        if (exportBtn) {
-            this.addEventListenerSafe(exportBtn, 'click', () => this.handleExport());
-        }
-
-        // 고정 좌석 모드 버튼
-        const fixedModeBtn = document.getElementById('enable-fixed-seats');
-        if (fixedModeBtn) {
-            this.addEventListenerSafe(fixedModeBtn, 'click', () => {
-                this.outputModule.showInfo('고정 좌석 모드: 캔버스의 좌석을 더블 클릭하여 고정/해제할 수 있습니다.');
-            });
-        }
-
-        // 나머지 랜덤 배치 버튼
-        const randomizeBtn = document.getElementById('randomize-remaining');
-        if (randomizeBtn) {
-            this.addEventListenerSafe(randomizeBtn, 'click', () => this.handleRandomizeRemaining());
-        }
-
 
         // 양식 파일 다운로드 버튼
         const downloadTemplateBtn = document.getElementById('download-template');
@@ -987,6 +924,16 @@ export class MainController {
                 if (dropdown.style.display === 'block' && !dropdownContainer.contains(target)) {
                     dropdown.style.display = 'none';
                 }
+            }
+            
+            // 이력 항목 삭제 버튼 클릭 (이력 항목 클릭보다 먼저 처리)
+            if (target.classList.contains('history-delete-btn')) {
+                e.stopPropagation();
+                const deleteId = target.dataset.historyId;
+                if (deleteId) {
+                    this.deleteHistoryItem(deleteId);
+                }
+                return;
             }
             
             // 이력 항목 클릭
@@ -2213,8 +2160,12 @@ export class MainController {
                 }
             }
             
+            // 집었다가 제자리에 놓은 경우: 아무 일도 하지 않는다.
+            // 이 가드가 없으면 아래 '빈 공간 드롭' 분기로 떨어져 카드가 엉뚱한 위치로 튄다.
+            if (targetCard === source) return;
+
             // 카드에 직접 드롭한 경우: 교환
-            if (targetCard && targetCard !== source) {
+            if (targetCard) {
                 // 고정 좌석은 교환 불가
                 if (targetCard.classList.contains('fixed-seat') || source.classList.contains('fixed-seat')) return;
 
@@ -2253,8 +2204,7 @@ export class MainController {
                 );
                 
                 if (cardsOnly.length === 0) {
-                    // 다른 카드가 없으면 그냥 추가
-                    seatsArea.appendChild(source);
+                    // 다른 카드가 없으면 옮길 곳도 없다
                     return;
                 }
                 
@@ -2290,21 +2240,11 @@ export class MainController {
                     }
                 }
                 
-                // 카드 이동
+                // 카드 이동: DOM 요소를 옮기지 않고 '내용'만 회전시킨다.
+                // 요소를 옮기면 data-seat-id가 학생을 따라다녀서,
+                // 화면에 보이는 배치와 저장되는 배치가 어긋난다.
                 if (closestCard) {
-                    if (insertPosition === 'before') {
-                        seatsArea.insertBefore(source, closestCard);
-                    } else {
-                        // 다음 형제가 있으면 그 앞에, 없으면 맨 끝에
-                        const nextSibling = closestCard.nextElementSibling;
-                        if (nextSibling && nextSibling.classList.contains('student-seat-card')) {
-                            seatsArea.insertBefore(source, nextSibling);
-                        } else {
-                            seatsArea.insertBefore(source, closestCard.nextSibling);
-                        }
-                    }
-                } else {
-                    seatsArea.appendChild(source);
+                    this.moveCardContentTo(allCards, source, closestCard, insertPosition === 'before');
                 }
             }
             
@@ -2639,19 +2579,16 @@ export class MainController {
                     seatsArea.style.gridTemplateColumns = previousState.data.gridTemplateColumns;
                 }
                 
-                // 학생 데이터 복원
-                if (previousState.data.students) {
-                    // 학생 데이터 복원은 나중에 구현
-                    
+                // 복원된 화면에서 배치를 다시 읽어 모델을 맞춘다.
+                // 화면만 되돌리고 모델을 그대로 두면, 되돌린 직후 자리를 확정했을 때
+                // 방금 되돌린 배치가 아니라 되돌리기 전 배치가 저장된다.
+                const restoredLayout = this.collectLayoutFromDom();
+                if (restoredLayout.length > 0) {
+                    this.updateSeatsAndStudentsFromLayout(restoredLayout);
                 }
                 
                 // 드래그&드롭 기능 다시 활성화 (복원된 카드에 대해)
                 this.enableSeatSwapDragAndDrop();
-            }
-        } else if (previousState && previousState.type === 'student-input') {
-            // 학생 입력 상태 복원
-            if (previousState.data && previousState.data.students) {
-                this.inputModule.setStudentData(previousState.data.students);
             }
         } else if (previousState && previousState.type === 'options') {
             // 옵션 설정 복원
@@ -2696,19 +2633,14 @@ export class MainController {
                     seatsArea.style.gridTemplateColumns = nextState.data.gridTemplateColumns;
                 }
                 
-                // 학생 데이터 복원
-                if (nextState.data.students) {
-                    // 학생 데이터 복원은 나중에 구현
-                    
+                // 복원된 화면에서 배치를 다시 읽어 모델을 맞춘다 (되돌리기와 동일)
+                const restoredLayout = this.collectLayoutFromDom();
+                if (restoredLayout.length > 0) {
+                    this.updateSeatsAndStudentsFromLayout(restoredLayout);
                 }
                 
                 // 드래그&드롭 기능 다시 활성화 (복원된 카드에 대해)
                 this.enableSeatSwapDragAndDrop();
-            }
-        } else if (nextState && nextState.type === 'student-input') {
-            // 학생 입력 상태 복원
-            if (nextState.data && nextState.data.students) {
-                this.inputModule.setStudentData(nextState.data.students);
             }
         } else if (nextState && nextState.type === 'options') {
             // 옵션 설정 복원
@@ -3013,61 +2945,7 @@ export class MainController {
     }
 
 
-
-    /**
-     * localStorage 사용 가능 여부 확인
-     */
-    private isLocalStorageAvailable(): boolean {
-        try {
-            const test = '__localStorage_test__';
-            localStorage.setItem(test, test);
-            localStorage.removeItem(test);
-            return true;
-        } catch {
-            return false;
-        }
-    }
-    
-    /**
-     * 안전한 localStorage 저장
-     */
-    private safeSetItem(key: string, value: string): boolean {
-        if (!this.isLocalStorageAvailable()) {
-            this.outputModule.showError('브라우저의 저장소 기능이 비활성화되어 있습니다. 설정에서 쿠키 및 사이트 데이터를 허용해주세요.');
-            return false;
-        }
         
-        try {
-            localStorage.setItem(key, value);
-            return true;
-        } catch (error) {
-            if (error instanceof DOMException && error.code === 22) {
-                // 저장소 용량 초과
-                this.outputModule.showError('저장소 용량이 부족합니다. 브라우저 설정에서 저장된 데이터를 삭제해주세요.');
-            } else {
-                this.outputModule.showError('데이터 저장에 실패했습니다. 브라우저 설정을 확인해주세요.');
-            }
-            logger.error('localStorage 저장 실패:', error);
-            return false;
-        }
-    }
-    
-    /**
-     * 안전한 localStorage 읽기
-     */
-    private safeGetItem(key: string): string | null {
-        if (!this.isLocalStorageAvailable()) {
-            return null;
-        }
-        
-        try {
-            return localStorage.getItem(key);
-        } catch (error) {
-            logger.error('localStorage 읽기 실패:', error);
-            return null;
-        }
-    }
-
     /**
      * 좌석 배치 결과를 localStorage에 저장
      */
@@ -3124,9 +3002,6 @@ export class MainController {
                 layoutData.students && Array.isArray(layoutData.students)) {
                 this.seats = layoutData.seats;
                 this.students = layoutData.students;
-                if (this.canvasModule) {
-                    this.canvasModule.setData(this.seats, this.students);
-                }
             } else {
                 // 데이터 구조가 올바르지 않으면 제거
                 try {
@@ -3139,35 +3014,6 @@ export class MainController {
             try {
                 localStorage.removeItem('layoutResult');
             } catch {}
-        }
-    }
-
-    /**
-     * 나머지 랜덤 배치 처리
-     */
-    private handleRandomizeRemaining(): void {
-        if (this.seats.length === 0) {
-            this.outputModule.showError('먼저 자리 배치를 생성해주세요.');
-            return;
-        }
-
-        try {
-            const unassignedStudents = this.students.filter(s => !s.fixedSeatId);
-            
-            if (unassignedStudents.length === 0) {
-                this.outputModule.showInfo('배치할 학생이 없습니다.');
-                return;
-            }
-
-            this.seats = RandomService.assignRandomly(unassignedStudents, this.seats);
-            if (this.canvasModule) {
-                this.canvasModule.setData(this.seats, this.students);
-            }
-
-            this.outputModule.showSuccess(`나머지 ${unassignedStudents.length}명의 학생이 랜덤으로 배치되었습니다.`);
-        } catch (error) {
-            logger.error('랜덤 배치 중 오류:', error);
-            this.outputModule.showError('랜덤 배치 중 오류가 발생했습니다.');
         }
     }
 
@@ -4315,45 +4161,6 @@ export class MainController {
 
 
     /**
-     * 커스텀 모드 1 토글 (4단계 활성화/비활성화)
-     */
-    private toggleCustomMode1(disable: boolean): void {
-        const advancedSection = document.getElementById('advanced-section');
-        if (!advancedSection) return;
-
-        // 라디오 버튼들 가져오기
-        const radioOptions = advancedSection.querySelectorAll('input[name="custom-mode-1"]');
-        const labels = advancedSection.querySelectorAll('label.radio-option');
-        
-        radioOptions.forEach((radio, index) => {
-            const radioElement = radio as HTMLInputElement;
-            const label = labels[index] as HTMLElement;
-            
-            if (disable) {
-                // 비활성화
-                radioElement.disabled = true;
-                if (label) {
-                    label.style.opacity = '0.5';
-                    label.style.pointerEvents = 'none';
-                    label.style.cursor = 'not-allowed';
-                }
-                advancedSection.style.opacity = '0.5';
-                advancedSection.style.pointerEvents = 'none';
-            } else {
-                // 활성화
-                radioElement.disabled = false;
-                if (label) {
-                    label.style.opacity = '1';
-                    label.style.pointerEvents = 'auto';
-                    label.style.cursor = 'pointer';
-                }
-                advancedSection.style.opacity = '1';
-                advancedSection.style.pointerEvents = 'auto';
-            }
-        });
-    }
-
-    /**
      * 1명씩 한 줄로 배치 서브 메뉴 토글
      */
     private toggleSingleSubmenu(show: boolean): void {
@@ -4593,27 +4400,7 @@ export class MainController {
             return false;
         }
     }
-    
-    /**
-     * HTML 이스케이프 (XSS 방지)
-     * 향후 사용자 입력이 포함된 HTML 생성 시 사용
-     */
-    private escapeHtml(_text: string): string {
-        const div = document.createElement('div');
-        div.textContent = _text;
-        return div.innerHTML;
-    }
-    
-    /**
-     * 안전한 innerHTML 설정 (XSS 방지)
-     * 향후 사용자 입력이 포함된 HTML 생성 시 사용
-     */
-    private setSafeInnerHTML(_element: HTMLElement, _html: string): void {
-        // 사용자 입력이 포함된 경우 이스케이프 처리
-        // 단순 템플릿 리터럴은 그대로 사용 (성능 고려)
-        // _element.innerHTML = _html;
-    }
-    
+            
     /**
      * 안전한 이벤트 리스너 추가 (메모리 누수 방지)
      * 향후 사용 예정
@@ -4664,9 +4451,50 @@ export class MainController {
     }
 
     /**
+     * 명단에서 중복된 이름 찾기
+     */
+    private findDuplicateStudentNames(students: Array<{name: string}>): string[] {
+        const seen = new Set<string>();
+        const duplicates = new Set<string>();
+
+        students.forEach(student => {
+            const key = (student.name || '').trim().toLowerCase();
+            if (!key) return;
+            if (seen.has(key)) {
+                duplicates.add(student.name.trim());
+            }
+            seen.add(key);
+        });
+
+        return Array.from(duplicates);
+    }
+
+    /**
+     * 자리 배치 진행 상태 설정
+     * 진행 중에는 버튼을 비활성화해 중복 실행을 막는다.
+     */
+    private setArrangingSeats(arranging: boolean): void {
+        this.arrangingSeats = arranging;
+
+        const arrangeBtn = document.getElementById('arrange-seats') as HTMLButtonElement | null;
+        if (arrangeBtn) {
+            arrangeBtn.disabled = arranging;
+            arrangeBtn.setAttribute('aria-busy', arranging ? 'true' : 'false');
+        }
+    }
+
+    /**
      * 좌석 배치하기 처리
      */
     private handleArrangeSeats(): void {
+            // 배치 연출이 끝나기 전에 다시 실행하면 두 배치가 뒤엉킨다.
+            // 앞선 실행의 커튼 타이머가 뒤이은 실행의 연출을 도중에 뜯어내고,
+            // 되돌리기 이력에도 중복 항목이 쌓인다.
+            if (this.arrangingSeats) {
+                return;
+            }
+            this.setArrangingSeats(true);
+
             // 읽기 전용 모드 해제
             this.disableReadOnlyMode();
             
@@ -4675,7 +4503,20 @@ export class MainController {
             
             if (studentData.length === 0) {
                 this.outputModule.showError('학생 정보를 먼저 입력해주세요.');
+                this.setArrangingSeats(false);
                 return;
+            }
+
+            // 동명이인 확인
+            // '이전 자리 피하기' / '이전 짝꿍 피하기'는 학생을 이름으로 구분하므로
+            // 같은 이름이 둘 있으면 엉뚱한 학생에게 제약이 적용된다.
+            // 배치를 막지는 않되 교사가 알 수 있게 알린다.
+            const duplicateNames = this.findDuplicateStudentNames(studentData);
+            if (duplicateNames.length > 0) {
+                this.outputModule.showWarning(
+                    `같은 이름의 학생이 있습니다: ${duplicateNames.join(', ')}. ` +
+                    '이전 자리·짝꿍 피하기 옵션은 같은 이름끼리 구분하지 못합니다.'
+                );
             }
 
         // 대용량 데이터 처리 시 프로그레스 바 사용 (100명 이상)
@@ -4712,6 +4553,7 @@ export class MainController {
             }
             this.outputModule.showError('좌석 배치 중 오류가 발생했습니다.');
             this.animationManager.stopCurtainAnimation();
+            this.setArrangingSeats(false);
         }
     }
     
@@ -4770,6 +4612,7 @@ export class MainController {
             const seatsArea = document.getElementById('seats-area');
             if (!seatsArea) {
                 this.animationManager.stopCurtainAnimation();
+                this.setArrangingSeats(false);
                 this.outputModule.showError('좌석 배치 영역을 찾을 수 없습니다.');
                 return;
             }
@@ -4794,6 +4637,7 @@ export class MainController {
                 existingCards = seatsArea.querySelectorAll('.student-seat-card');
                 if (existingCards.length === 0) {
                     this.animationManager.stopCurtainAnimation();
+                    this.setArrangingSeats(false);
                     const loadingElement = document.querySelector('.loading');
                     if (loadingElement) {
                         loadingElement.remove();
@@ -5238,6 +5082,8 @@ export class MainController {
             // 자리 배치 완료 후 히스토리 저장
             this.setTimeoutSafe(() => {
                 this.saveLayoutToHistory();
+                // 연출이 모두 끝난 뒤에 다시 배치할 수 있게 한다
+                this.setArrangingSeats(false);
             }, 3100);
             
             // 배치 완료 후 화면을 맨 위로 스크롤 (스크롤 컨테이너와 윈도우 모두 시도)
@@ -5272,6 +5118,7 @@ export class MainController {
             }
             
             this.animationManager.stopCurtainAnimation();
+            this.setArrangingSeats(false);
             
             logger.error('좌석 배치 중 오류:', error);
             this.outputModule.showError('좌석 배치 중 오류가 발생했습니다. 콘솔을 확인해주세요.');
@@ -5338,19 +5185,8 @@ export class MainController {
                 });
             }
             
-            allCards.forEach(card => {
-                const seatIdStr = card.getAttribute('data-seat-id');
-                if (!seatIdStr) return;
-                
-                const seatId = parseInt(seatIdStr, 10);
-                const nameDiv = card.querySelector('.student-name') as HTMLElement;
-                const studentName = nameDiv?.textContent?.trim() || '';
-                
-                if (studentName) {
-                    const gender = card.classList.contains('gender-m') ? 'M' : 'F';
-                    currentLayout.push({ seatId, studentName, gender });
-                }
-            });
+            // 화면의 카드에서 현재 배치를 읽는다 (되돌리기 복원과 같은 경로를 사용한다)
+            currentLayout.push(...this.collectLayoutFromDom());
 
             if (currentLayout.length === 0) {
                 this.outputModule.showError('확정할 자리 배치가 없습니다.');
@@ -5563,6 +5399,34 @@ export class MainController {
     /**
      * 자리 확정 시 수집한 데이터로 현재 seats와 students 업데이트
      */
+    private collectLayoutFromDom(): Array<{seatId: number, studentName: string, gender: 'M' | 'F'}> {
+        const seatsArea = document.getElementById('seats-area');
+        if (!seatsArea) return [];
+
+        const layout: Array<{seatId: number, studentName: string, gender: 'M' | 'F'}> = [];
+        const cards = Array.from(seatsArea.querySelectorAll('.student-seat-card')) as HTMLElement[];
+
+        cards.forEach(card => {
+            const seatIdStr = card.getAttribute('data-seat-id');
+            if (!seatIdStr) return;
+
+            const seatId = parseInt(seatIdStr, 10);
+            if (isNaN(seatId)) return;
+
+            const nameDiv = card.querySelector('.student-name') as HTMLElement | null;
+            const studentName = nameDiv?.textContent?.trim() || '';
+            if (!studentName) return;
+
+            const gender: 'M' | 'F' = card.classList.contains('gender-m') ? 'M' : 'F';
+            layout.push({ seatId, studentName, gender });
+        });
+
+        return layout;
+    }
+
+    /**
+     * 자리 확정 시 수집한 데이터로 현재 seats와 students 업데이트
+     */
     private updateSeatsAndStudentsFromLayout(
         currentLayout: Array<{seatId: number, studentName: string, gender: 'M' | 'F'}>
     ): void {
@@ -5572,16 +5436,14 @@ export class MainController {
                 return;
             }
 
-            // 학생 목록 생성/업데이트
-            const studentMap = new Map<string, Student>();
-            currentLayout.forEach(layoutItem => {
-                if (layoutItem.studentName && !studentMap.has(layoutItem.studentName)) {
-                    const student = StudentModel.create(layoutItem.studentName, layoutItem.gender);
-                    studentMap.set(layoutItem.studentName, student);
-                }
-            });
-            
-            this.students = Array.from(studentMap.values());
+            // 기존 명단을 최대한 그대로 유지한다 (규칙은 SeatOccupancyService에 있고 테스트로 고정되어 있다)
+            const merged = SeatOccupancyService.mergeRosterFromLayout(
+                this.students,
+                currentLayout,
+                (name, gender) => StudentModel.create(name, gender)
+            );
+            const studentBySeatId = merged.studentBySeatId;
+            this.students = merged.students;
             
             // 좌석 목록 업데이트 (기존 seats의 position 정보 유지)
             const seatIds = currentLayout.map(l => l.seatId).filter(id => id > 0);
@@ -5611,7 +5473,7 @@ export class MainController {
                 
                 if (layoutItem && layoutItem.studentName) {
                     // 학생이 배치된 좌석
-                    const student = studentMap.get(layoutItem.studentName);
+                    const student = studentBySeatId.get(layoutItem.seatId);
                     if (student) {
                         const seat: Seat = {
                             id: i,
@@ -7443,6 +7305,8 @@ export class MainController {
             // html2canvas로 이미지 변환 (전체 캡처, 스마트폰 최적화)
             // width와 height를 명시하지 않으면 자동으로 전체 영역을 캡처
             // html2canvas v1.x 옵션 (타입 정의가 v0.5 기준이므로 any 캐스트)
+            // 이미지 저장을 누를 때만 불러온다 (약 200KB, 첫 화면에는 필요 없다)
+            const html2canvas = (await import('html2canvas')).default;
             const canvas = await (html2canvas as any)(classroomLayout, {
                 backgroundColor: '#ffffff',
                 scale: 2, // 고해상도 (스마트폰에서도 선명하게)
@@ -7875,34 +7739,6 @@ export class MainController {
      * QR 코드 생성
      */
     /**
-     * QR 코드 생성
-     * @deprecated 공유 기능이 제거되었습니다. 이 메서드는 더 이상 사용되지 않습니다.
-     */
-    private async generateQRCode(url: string, container: HTMLElement): Promise<void> {
-        // 공유 기능이 제거되었으므로 아무 작업도 하지 않음
-        return;
-        try {
-            container.innerHTML = ''; // 기존 내용 제거
-            
-            const canvas = document.createElement('canvas');
-            await QRCode.toCanvas(canvas, url, {
-                width: 200,
-                margin: 2,
-                color: {
-                    dark: '#000000',
-                    light: '#FFFFFF'
-                }
-            });
-            
-            container.appendChild(canvas);
-            canvas.style.cssText = 'border: 2px solid #ddd; border-radius: 8px; padding: 10px; background: white;';
-        } catch (error) {
-            logger.error('QR 코드 생성 실패:', error);
-            container.innerHTML = '<p style="color: #dc3545;">QR 코드 생성에 실패했습니다.</p>';
-        }
-    }
-
-    /**
      * 사용설명서 모달 표시
      */
     private showUserManual(): void {
@@ -8309,54 +8145,44 @@ export class MainController {
         // 키보드 드래그&드롭 매니저 초기화
         this.keyboardDragDropManager = new KeyboardDragDropManager(
             'seats-area',
-            (sourceCard: HTMLElement, direction: 'up' | 'down' | 'left' | 'right') => {
-                this.handleKeyboardSeatMove(sourceCard, direction);
-            },
+            (sourceCard: HTMLElement, direction: 'up' | 'down' | 'left' | 'right') =>
+                this.handleKeyboardSeatMove(sourceCard, direction),
             (seatId: number) => this.fixedSeatIds.has(seatId)
         );
 
-        // 좌석 카드가 생성될 때마다 활성화
-        const observer = new MutationObserver(() => {
-            const cards = seatsArea.querySelectorAll('.student-seat-card');
-            if (cards.length > 0) {
-                this.keyboardDragDropManager.enable();
-            }
-        });
-
-        observer.observe(seatsArea, {
-            childList: true,
-            subtree: true
-        });
-
-        // 초기 활성화
-        if (seatsArea.querySelectorAll('.student-seat-card').length > 0) {
-            this.keyboardDragDropManager.enable();
-        }
+        // 활성화는 한 번이면 된다.
+        // KeyboardDragDropManager가 자체 MutationObserver로 카드 목록 변화를 따라가므로
+        // 여기서 DOM 변경마다 enable()을 다시 부를 필요가 없다.
+        // (그렇게 하면 리스너가 겹쳐 쌓여 키 입력이 두 번 처리된다)
+        this.keyboardDragDropManager.enable();
     }
 
     /**
      * 키보드로 좌석 이동 처리
      */
-    private handleKeyboardSeatMove(sourceCard: HTMLElement, direction: 'up' | 'down' | 'left' | 'right'): void {
+    private handleKeyboardSeatMove(
+        sourceCard: HTMLElement,
+        direction: 'up' | 'down' | 'left' | 'right'
+    ): HTMLElement | null {
         const sourceSeatIdStr = sourceCard.getAttribute('data-seat-id');
-        if (!sourceSeatIdStr) return;
+        if (!sourceSeatIdStr) return null;
 
         const sourceSeatId = parseInt(sourceSeatIdStr, 10);
-        if (isNaN(sourceSeatId)) return;
+        if (isNaN(sourceSeatId)) return null;
 
         // 방향에 따라 인접한 좌석 찾기
         const targetCard = this.findAdjacentSeat(sourceCard, direction);
-        if (!targetCard) return;
+        if (!targetCard) return null;
 
         const targetSeatIdStr = targetCard.getAttribute('data-seat-id');
-        if (!targetSeatIdStr) return;
+        if (!targetSeatIdStr) return null;
 
         const targetSeatId = parseInt(targetSeatIdStr, 10);
-        if (isNaN(targetSeatId)) return;
+        if (isNaN(targetSeatId)) return null;
 
         // 고정 좌석은 이동 불가
         if (this.fixedSeatIds.has(targetSeatId)) {
-            return;
+            return null;
         }
 
         // 좌석 교환
@@ -8366,6 +8192,9 @@ export class MainController {
         this.setTimeoutSafe(() => {
             this.saveLayoutToHistory();
         }, 50);
+
+        // 학생이 옮겨간 자리를 알려 포커스가 따라가도록 한다
+        return targetCard;
     }
 
     /**
@@ -8385,6 +8214,9 @@ export class MainController {
         let bestMatch: HTMLElement | null = null;
         let minDistance = Infinity;
 
+        // 진행 방향과 수직인 어긋남에 곱할 가중치
+        const PERPENDICULAR_WEIGHT = 3;
+
         allCards.forEach((otherCard) => {
             if (otherCard === card || otherCard.classList.contains('fixed-seat')) return;
 
@@ -8396,21 +8228,24 @@ export class MainController {
             let distance = 0;
 
             switch (direction) {
+                // 진행 방향과 수직인 어긋남에 가중치를 준다.
+                // 같은 가중치로 더하면 위쪽 바로 옆 칸보다 두 칸 옆의 카드가
+                // 선택되는 일이 생겨, 화살표 방향과 다른 자리로 이동한다.
                 case 'up':
                     isInDirection = otherCenterY < cardCenterY;
-                    distance = Math.abs(otherCenterX - cardCenterX) + (cardCenterY - otherCenterY);
+                    distance = Math.abs(otherCenterX - cardCenterX) * PERPENDICULAR_WEIGHT + (cardCenterY - otherCenterY);
                     break;
                 case 'down':
                     isInDirection = otherCenterY > cardCenterY;
-                    distance = Math.abs(otherCenterX - cardCenterX) + (otherCenterY - cardCenterY);
+                    distance = Math.abs(otherCenterX - cardCenterX) * PERPENDICULAR_WEIGHT + (otherCenterY - cardCenterY);
                     break;
                 case 'left':
                     isInDirection = otherCenterX < cardCenterX;
-                    distance = Math.abs(otherCenterY - cardCenterY) + (cardCenterX - otherCenterX);
+                    distance = Math.abs(otherCenterY - cardCenterY) * PERPENDICULAR_WEIGHT + (cardCenterX - otherCenterX);
                     break;
                 case 'right':
                     isInDirection = otherCenterX > cardCenterX;
-                    distance = Math.abs(otherCenterY - cardCenterY) + (otherCenterX - cardCenterX);
+                    distance = Math.abs(otherCenterY - cardCenterY) * PERPENDICULAR_WEIGHT + (otherCenterX - cardCenterX);
                     break;
             }
 
@@ -8425,6 +8260,72 @@ export class MainController {
 
     /**
      * 좌석 교환
+     */
+    private moveCardContentTo(
+        allCards: HTMLElement[],
+        source: HTMLElement,
+        closestCard: HTMLElement,
+        insertBefore: boolean
+    ): void {
+        // 고정 좌석이 섞여 있으면 회전으로 내용이 밀려 고정이 깨진다
+        if (source.classList.contains('fixed-seat')) return;
+
+        const sourceIndex = allCards.indexOf(source);
+        const closestIndex = allCards.indexOf(closestCard);
+        if (sourceIndex === -1 || closestIndex === -1) return;
+
+        const targetIndex = SeatReorderService.resolveTargetIndex(closestIndex, insertBefore, sourceIndex);
+        if (targetIndex === sourceIndex) return;
+
+        // 이동 구간에 고정 좌석이 있으면 옮기지 않는다
+        const [rangeStart, rangeEnd] = sourceIndex < targetIndex
+            ? [sourceIndex, targetIndex]
+            : [targetIndex, sourceIndex];
+        for (let i = rangeStart; i <= rangeEnd; i++) {
+            if (allCards[i].classList.contains('fixed-seat')) return;
+        }
+
+        const contents = allCards.map(card => this.readCardContent(card));
+        const rotated = SeatReorderService.rotate(contents, sourceIndex, targetIndex);
+        rotated.forEach((content, index) => this.writeCardContent(allCards[index], content));
+    }
+
+    /**
+     * 카드에 표시된 내용(이름/성별) 읽기
+     */
+    private readCardContent(card: HTMLElement): { name: string; isMale: boolean; isFemale: boolean } {
+        const nameEl = card.querySelector('.student-name') as HTMLElement | null;
+        return {
+            name: nameEl?.textContent || '',
+            isMale: card.classList.contains('gender-m'),
+            isFemale: card.classList.contains('gender-f')
+        };
+    }
+
+    /**
+     * 카드에 내용 쓰기 (자리 번호는 그대로 둔다)
+     */
+    private writeCardContent(
+        card: HTMLElement,
+        content: { name: string; isMale: boolean; isFemale: boolean }
+    ): void {
+        const nameEl = card.querySelector('.student-name') as HTMLElement | null;
+        if (nameEl) nameEl.textContent = content.name;
+
+        card.classList.toggle('gender-m', content.isMale);
+        card.classList.toggle('gender-f', content.isFemale);
+
+        const seatId = card.getAttribute('data-seat-id');
+        if (seatId) {
+            const genderLabel = content.isMale ? '남학생 ♂' : (content.isFemale ? '여학생 ♀' : '');
+            const genderInfo = genderLabel ? ` (${genderLabel})` : '';
+            const displayName = content.name || '빈 좌석';
+            card.setAttribute('aria-label', `좌석 ${seatId}: ${displayName}${genderInfo}. 화살표 키로 이동, Enter로 선택`);
+        }
+    }
+
+    /**
+     * 두 좌석의 학생을 맞바꿈 (자리 번호는 자리에 남는다)
      */
     private swapSeats(sourceCard: HTMLElement, targetCard: HTMLElement): void {
         const srcNameEl = sourceCard.querySelector('.student-name') as HTMLElement | null;
@@ -8582,6 +8483,39 @@ export class MainController {
      * 반 선택 변경 처리
      */
     private handleClassSelectChange(classId: string): void {
+        const previousClassId = this.classManager.getCurrentClassId();
+
+        // 반이 선택되지 않은 상태에서 입력하거나 엑셀로 불러온 명단은
+        // 아직 어느 반에도 속해 있지 않다. 명단은 반마다 따로 관리되므로
+        // 반을 선택하는 순간 화면의 명단은 지워진다.
+        // 그대로 두면 방금 불러온 명단이 아무 안내 없이 사라지므로 먼저 확인한다.
+        // (반이 이미 선택된 상태였다면 그 명단은 해당 반에 저장되므로 묻지 않는다)
+        if (!previousClassId) {
+            const unsavedCount = this.countEnteredStudents();
+            if (unsavedCount > 0) {
+                const proceed = confirm(
+                    `현재 입력된 학생 ${unsavedCount}명의 명단이 지워집니다.\n` +
+                    '학생 명단은 반마다 따로 관리되기 때문입니다.\n\n' +
+                    '계속하시려면 확인을 누르세요.\n' +
+                    '명단을 지키려면 취소를 누른 뒤, 반을 먼저 선택하고 명단을 다시 불러오세요.'
+                );
+
+                if (!proceed) {
+                    // 선택을 원래대로 되돌린다
+                    const classSelect = document.getElementById('class-select') as HTMLSelectElement | null;
+                    if (classSelect) {
+                        classSelect.value = '';
+                    }
+                    return;
+                }
+            }
+        }
+
+        // 반이 바뀌면 되돌리기 이력은 더 이상 유효하지 않다.
+        // 비우지 않으면 다른 반에서 Ctrl+Z를 눌렀을 때
+        // 이전 반의 자리 배치가 현재 반 화면에 복원된다.
+        this.resetHistory();
+
         if (!classId || classId === '') {
             // 선택 해제
             this.classManager.selectClass(null);
@@ -8676,6 +8610,26 @@ export class MainController {
     }
 
     /**
+     * 화면의 명렬표에 실제로 입력된 학생 수
+     */
+    private countEnteredStudents(): number {
+        const outputSection = document.getElementById('output-section');
+        if (!outputSection) return 0;
+
+        const rows = outputSection.querySelectorAll('.student-input-table tbody tr');
+        let count = 0;
+
+        rows.forEach(row => {
+            const nameInput = row.querySelector('.student-name-input') as HTMLInputElement | null;
+            if (nameInput && nameInput.value.trim()) {
+                count++;
+            }
+        });
+
+        return count;
+    }
+
+    /**
      * 현재 화면의 자리 배치도 지우기
      */
     private clearCurrentLayout(): void {
@@ -8765,10 +8719,16 @@ export class MainController {
                 cardContainer.style.display = 'block';
             }
 
-            // 기본 카드 렌더링 (학생 수가 0이므로 빈 카드만 표시)
-            // 남학생 12명 + 여학생 12명 = 24명의 빈 카드 표시
+            // 인원수 입력값에 맞춰 미리보기를 생성한다.
+            //
+            // renderExampleCards()는 this.students를 그리기만 할 뿐 만들지 않는다.
+            // 바로 앞에서 clearCurrentLayout()이 this.students를 비웠으므로,
+            // 이것만 호출하면 분단 레이블만 있고 자리는 하나도 없는 화면이 된다.
+            // 인원수로부터 미리보기 학생과 좌석을 만드는 것은
+            // updatePreviewForGenderCounts()이며, 좌석 배치 형태 라디오를 누르면
+            // 실행되는 것도 이 함수다. (그래서 라디오를 누르면 화면이 정상으로 돌아왔다)
             this.nextSeatId = 1;
-            this.renderExampleCards();
+            this.updatePreviewForGenderCounts();
 
             logger.info('초기 화면의 자리 배치도 표시 완료');
         } catch (error) {

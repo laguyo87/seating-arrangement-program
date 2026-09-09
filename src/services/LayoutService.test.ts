@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { LayoutService } from './LayoutService';
 import { LayoutType } from '../models/Seat';
+import type { Seat } from '../models/Seat';
 
 describe('LayoutService', () => {
     describe('createSingleUniformLayout', () => {
@@ -187,10 +188,12 @@ describe('LayoutService', () => {
             expect(result.seats).toHaveLength(15);
         });
 
-        it('CUSTOM 타입은 빈 배열을 반환한다', () => {
+        it('CUSTOM 타입은 미지원을 실패로 알린다', () => {
+            // 좌석 0개를 success: true로 돌려주면 호출부가 정상 배치로 취급한다
             const result = LayoutService.createLayout(LayoutType.CUSTOM, 20);
-            expect(result.success).toBe(true);
+            expect(result.success).toBe(false);
             expect(result.seats).toHaveLength(0);
+            expect(result.errorMessage).toBeTruthy();
         });
 
         it('알 수 없는 타입은 실패를 반환한다', () => {
@@ -198,5 +201,77 @@ describe('LayoutService', () => {
             expect(result.success).toBe(false);
             expect(result.errorMessage).toBeDefined();
         });
+    });
+});
+
+describe('LayoutService - 모둠 배치 좌석 겹침', () => {
+    const SEAT_SIZE = 60;
+
+    /** 두 좌석이 물리적으로 겹치는지 (좌석은 60x60 사각형) */
+    function overlaps(a: Seat, b: Seat): boolean {
+        return (
+            Math.abs(a.position.x - b.position.x) < SEAT_SIZE &&
+            Math.abs(a.position.y - b.position.y) < SEAT_SIZE
+        );
+    }
+
+    function countOverlaps(seats: Seat[]): number {
+        let count = 0;
+        for (let i = 0; i < seats.length; i++) {
+            for (let j = i + 1; j < seats.length; j++) {
+                if (overlaps(seats[i], seats[j])) count++;
+            }
+        }
+        return count;
+    }
+
+    [3, 4, 5, 6].forEach(groupSize => {
+        it(`모둠 ${groupSize}명 배치에서 좌석이 겹치지 않는다`, () => {
+            // 모둠 간격이 고정값(180px)이던 시절, 모둠 폭이 220px가 되는
+            // 5명은 3쌍, 6명은 4쌍의 좌석이 물리적으로 겹쳤다
+            const seats = LayoutService.createGroupLayout(24, groupSize);
+
+            expect(seats).toHaveLength(24);
+            expect(countOverlaps(seats)).toBe(0);
+        });
+    });
+
+    it('학생 수가 달라져도 겹치지 않는다', () => {
+        [6, 12, 18, 20, 24, 30, 36].forEach(totalSeats => {
+            [3, 4, 5, 6].forEach(groupSize => {
+                const seats = LayoutService.createGroupLayout(totalSeats, groupSize);
+
+                expect(seats).toHaveLength(totalSeats);
+                expect(countOverlaps(seats)).toBe(0);
+            });
+        });
+    });
+
+    it('createLayout을 통해 만든 모둠 배치도 겹치지 않는다', () => {
+        [LayoutType.GROUP_3, LayoutType.GROUP_4, LayoutType.GROUP_5, LayoutType.GROUP_6].forEach(type => {
+            const result = LayoutService.createLayout(type, 24);
+
+            expect(result.success).toBe(true);
+            expect(result.seats).toHaveLength(24);
+            expect(countOverlaps(result.seats)).toBe(0);
+        });
+    });
+});
+
+describe('LayoutService.createLayout - 좌석을 만들지 못하면 실패로 알린다', () => {
+    it('좌석 수가 0 이하이면 실패를 반환한다', () => {
+        // 좌석 0개를 success: true로 돌려주면 호출부가 정상 배치로 취급한다
+        expect(LayoutService.createLayout(LayoutType.SINGLE_UNIFORM, 0).success).toBe(false);
+        expect(LayoutService.createLayout(LayoutType.SINGLE_UNIFORM, -5).success).toBe(false);
+    });
+
+    it('좌석이 하나도 만들어지지 않으면 실패를 반환한다', () => {
+        const result = LayoutService.createLayout(LayoutType.SINGLE_UNIFORM, 24, 800, 600, 0);
+
+        if (result.seats.length === 0) {
+            expect(result.success).toBe(false);
+        } else {
+            expect(result.success).toBe(true);
+        }
     });
 });
