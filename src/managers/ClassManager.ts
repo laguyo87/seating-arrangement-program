@@ -20,6 +20,16 @@ export interface ClassLayoutData {
 }
 
 /**
+ * 저장 결과 타입
+ * local: localStorage 저장 성공 여부
+ * cloud: 'ok' 성공 / 'failed' 실패 / 'skipped' 미로그인으로 시도하지 않음
+ */
+export interface SaveResult {
+    local: boolean;
+    cloud: 'ok' | 'failed' | 'skipped';
+}
+
+/**
  * 반 정보 타입
  */
 export interface ClassInfo {
@@ -60,24 +70,40 @@ export class ClassManager {
      * 반 목록 가져오기
      */
     public getClassList(): ClassInfo[] {
+        return this.readClassList() ?? [];
+    }
+
+    /**
+     * 반 목록 읽기 (엄격)
+     * 읽기/파싱에 실패하면 null을 반환한다.
+     * 빈 배열(반이 하나도 없음)과 읽기 실패를 반드시 구분해야 하는 곳에서 사용한다.
+     * 이 둘을 혼동하면 읽기 실패 시 빈 목록을 클라우드에 덮어써서 전체 반 목록이 사라진다.
+     */
+    private readClassList(): ClassInfo[] | null {
         try {
-            const classListStr = this.deps.storageManager.safeGetItem(this.STORAGE_KEY_CLASSES);
-            if (!classListStr) {
+            const read = this.deps.storageManager.readItem(this.STORAGE_KEY_CLASSES);
+            if (!read.ok) {
+                // 저장소 접근 자체가 실패한 경우 (없는 것과 구분해야 함)
+                logger.error('반 목록 읽기 실패: 저장소에 접근할 수 없습니다.');
+                return null;
+            }
+            if (!read.value) {
+                // 아직 반이 하나도 없는 정상 상태
                 return [];
             }
 
-            const classList = JSON.parse(classListStr) as ClassInfo[];
-            return Array.isArray(classList) ? classList : [];
+            const classList = JSON.parse(read.value) as ClassInfo[];
+            return Array.isArray(classList) ? classList : null;
         } catch (error) {
             logger.error('반 목록 불러오기 중 오류:', error);
-            return [];
+            return null;
         }
     }
 
     /**
      * 반 목록 저장하기
      */
-    private async saveClassList(classList: ClassInfo[]): Promise<boolean> {
+    private async saveClassList(classList: ClassInfo[]): Promise<SaveResult> {
         try {
             // localStorage에 저장
             const localSuccess = this.deps.storageManager.safeSetItem(
@@ -86,18 +112,22 @@ export class ClassManager {
             );
 
             // Firebase에 저장 (로그인된 경우)
+            let cloud: SaveResult['cloud'] = 'skipped';
             if (this.deps.firebaseStorageManager?.getIsAuthenticated()) {
                 const firebaseSuccess = await this.deps.firebaseStorageManager.saveClassList(classList);
+                cloud = firebaseSuccess ? 'ok' : 'failed';
                 if (firebaseSuccess) {
                     logger.info('Firebase에 반 목록 저장 완료');
+                } else {
+                    logger.error('Firebase에 반 목록 저장 실패');
                 }
             }
 
-            return localSuccess;
+            return { local: localSuccess, cloud };
         } catch (error) {
             logger.error('반 목록 저장 중 오류:', error);
             this.deps.outputModule.showError('반 목록 저장 중 오류가 발생했습니다.');
-            return false;
+            return { local: false, cloud: 'failed' };
         }
     }
 
@@ -110,8 +140,14 @@ export class ClassManager {
             return null;
         }
 
-        const classList = this.getClassList();
-        
+        // 읽기에 실패했다면 절대 새 목록을 만들어 저장하면 안 된다.
+        // 빈 목록으로 시작해 저장하면 클라우드의 기존 반 목록 전체를 덮어쓴다.
+        const classList = this.readClassList();
+        if (classList === null) {
+            this.deps.outputModule.showError('반 목록을 읽을 수 없어 반을 추가할 수 없습니다. 브라우저 저장소 설정을 확인해주세요.');
+            return null;
+        }
+
         // 중복 확인
         const existingClass = classList.find(c => c.name === className.trim());
         if (existingClass) {
@@ -129,8 +165,12 @@ export class ClassManager {
         classList.push(newClass);
         
         const saved = await this.saveClassList(classList);
-        if (saved) {
-            this.deps.outputModule.showInfo(`"${className}" 반이 추가되었습니다.`);
+        if (saved.local) {
+            if (saved.cloud === 'failed') {
+                this.deps.outputModule.showWarning(`"${className}" 반이 이 기기에 추가되었지만 클라우드 저장에 실패했습니다. 다른 기기에서는 보이지 않습니다.`);
+            } else {
+                this.deps.outputModule.showInfo(`"${className}" 반이 추가되었습니다.`);
+            }
             return newClass.id;
         }
 
@@ -150,33 +190,41 @@ export class ClassManager {
         }
 
         const className = classList[classIndex].name;
-        
-        // 반 데이터 삭제
+
+        // 목록에서 제거
+        classList.splice(classIndex, 1);
+
+        // 목록 저장을 먼저 수행한다.
+        // 실제 배치도 데이터를 먼저 지우면, 목록 저장이 실패했을 때
+        // 반은 목록에 남아 있는데 배치도만 사라진 상태가 된다.
+        const saved = await this.saveClassList(classList);
+        if (!saved.local) {
+            return false;
+        }
+
+        // 목록이 저장된 뒤에 실제 데이터를 삭제한다.
         try {
             localStorage.removeItem(`${this.STORAGE_KEY_PREFIX}${classId}`);
         } catch (error) {
             logger.error('반 데이터 삭제 중 오류:', error);
         }
 
-        // 목록에서 제거
-        classList.splice(classIndex, 1);
-        
         // Firebase에서도 삭제
         if (this.deps.firebaseStorageManager?.getIsAuthenticated()) {
             await this.deps.firebaseStorageManager.deleteClass(classId);
         }
-        
-        const saved = await this.saveClassList(classList);
-        if (saved) {
-            // 현재 선택된 반이 삭제된 경우 선택 해제
-            if (this.currentClassId === classId) {
-                this.currentClassId = null;
-            }
-            this.deps.outputModule.showInfo(`"${className}" 반이 삭제되었습니다.`);
-            return true;
+
+        // 현재 선택된 반이 삭제된 경우 선택 해제
+        if (this.currentClassId === classId) {
+            this.currentClassId = null;
         }
 
-        return false;
+        if (saved.cloud === 'failed') {
+            this.deps.outputModule.showWarning(`"${className}" 반을 이 기기에서 삭제했지만 클라우드 반영에 실패했습니다.`);
+        } else {
+            this.deps.outputModule.showInfo(`"${className}" 반이 삭제되었습니다.`);
+        }
+        return true;
     }
 
     /**
@@ -197,9 +245,23 @@ export class ClassManager {
      * 현재 반의 자리 배치도 저장
      */
     public async saveCurrentLayout(): Promise<boolean> {
+        const result = await this.saveCurrentLayoutDetailed();
+        return result.local;
+    }
+
+    /**
+     * 현재 반의 자리 배치도 저장 (로컬/클라우드 결과를 각각 반환)
+     *
+     * silent를 주면 자체 안내 메시지를 띄우지 않는다.
+     * 자리 확정처럼 호출부가 최종 결과를 직접 안내하는 경우에 사용한다.
+     * (안내 메시지끼리 서로를 지워서 실패 경고가 성공 메시지에 덮이는 것을 막는다.)
+     */
+    public async saveCurrentLayoutDetailed(options?: { silent?: boolean }): Promise<SaveResult> {
+        const silent = options?.silent === true;
+
         if (!this.currentClassId) {
             this.deps.outputModule.showError('반을 선택해주세요.');
-            return false;
+            return { local: false, cloud: 'skipped' };
         }
 
         try {
@@ -208,12 +270,15 @@ export class ClassManager {
 
             if (!seats || seats.length === 0 || !students || students.length === 0) {
                 this.deps.outputModule.showError('저장할 자리 배치도가 없습니다.');
-                return false;
+                return { local: false, cloud: 'skipped' };
             }
 
+            // 저장할 시점의 상태를 복사해 둔다.
+            // 클라우드 저장을 기다리는 동안 사용자가 자리를 드래그하면
+            // 라이브 참조를 그대로 직렬화할 경우 저장 전/후가 섞인 데이터가 기록된다.
             const layoutData: ClassLayoutData = {
-                seats: seats,
-                students: students,
+                seats: JSON.parse(JSON.stringify(seats)) as Seat[],
+                students: JSON.parse(JSON.stringify(students)) as Student[],
                 timestamp: new Date().toISOString(),
                 className: this.getClassList().find(c => c.id === this.currentClassId)?.name || ''
             };
@@ -226,28 +291,37 @@ export class ClassManager {
             );
 
             // Firebase에 저장 (로그인된 경우)
+            let cloud: SaveResult['cloud'] = 'skipped';
             if (this.deps.firebaseStorageManager?.getIsAuthenticated()) {
                 const firebaseSuccess = await this.deps.firebaseStorageManager.saveClassLayout(
                     this.currentClassId,
                     layoutData
                 );
+                cloud = firebaseSuccess ? 'ok' : 'failed';
                 if (firebaseSuccess) {
                     logger.info('Firebase에 자리 배치도 저장 완료');
+                } else {
+                    logger.error('Firebase에 자리 배치도 저장 실패');
                 }
             }
 
             if (localSuccess) {
                 // 마지막 수정 시간 업데이트
                 this.updateLastModified(this.currentClassId!);
-                this.deps.outputModule.showInfo('자리 배치도가 저장되었습니다.');
-                return true;
+                if (!silent) {
+                    if (cloud === 'failed') {
+                        this.deps.outputModule.showWarning('자리 배치도를 이 기기에 저장했지만 클라우드 저장에 실패했습니다.');
+                    } else {
+                        this.deps.outputModule.showInfo('자리 배치도가 저장되었습니다.');
+                    }
+                }
             }
 
-            return false;
+            return { local: localSuccess, cloud };
         } catch (error) {
             logger.error('자리 배치도 저장 중 오류:', error);
             this.deps.outputModule.showError('자리 배치도 저장 중 오류가 발생했습니다.');
-            return false;
+            return { local: false, cloud: 'failed' };
         }
     }
 
@@ -326,7 +400,9 @@ export class ClassManager {
         
         if (classInfo) {
             classInfo.lastModified = new Date().toISOString();
-            this.saveClassList(classList);
+            this.saveClassList(classList).catch((error) => {
+                logger.error('마지막 수정 시간 저장 실패:', error);
+            });
         }
     }
 

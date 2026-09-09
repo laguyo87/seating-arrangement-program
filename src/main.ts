@@ -58,12 +58,53 @@ function startApplication(): void {
 // 프로그램 시작
 init();
 
+/**
+ * 전역 오류를 사용자에게 알리는 배너
+ *
+ * 전역 핸들러가 콘솔에만 기록하면, 배포 빌드에서는 앱이 반쯤 망가진 상태가 되어도
+ * 화면에는 아무 표시가 없다. 교사는 무엇이 잘못됐는지 알 방법이 없다.
+ */
+function showGlobalErrorBanner(message: string): void {
+    try {
+        const existing = document.getElementById('global-error-banner');
+        if (existing) existing.remove();
+
+        const banner = document.createElement('div');
+        banner.id = 'global-error-banner';
+        banner.setAttribute('role', 'alert');
+        banner.style.cssText = [
+            'position:fixed', 'top:0', 'left:0', 'right:0', 'z-index:99999',
+            'padding:12px 16px', 'background:#f8d7da', 'color:#721c24',
+            'border-bottom:1px solid #f5c6cb', 'font-size:14px', 'line-height:1.5',
+            'display:flex', 'align-items:center', 'gap:12px'
+        ].join(';');
+
+        const text = document.createElement('span');
+        text.style.flex = '1';
+        text.textContent = message;
+        banner.appendChild(text);
+
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.textContent = '닫기';
+        closeBtn.setAttribute('aria-label', '오류 알림 닫기');
+        closeBtn.style.cssText = 'padding:4px 12px;cursor:pointer;border:1px solid #721c24;background:transparent;color:#721c24;border-radius:4px;';
+        closeBtn.addEventListener('click', () => banner.remove());
+        banner.appendChild(closeBtn);
+
+        document.body.appendChild(banner);
+    } catch {
+        // 배너조차 표시할 수 없는 상태라면 더 할 수 있는 일이 없다
+    }
+}
+
 // 콘솔 경고 필터링 (Firebase 인증 관련 경고 무시)
 const originalWarn = console.warn;
 console.warn = function(...args: any[]) {
     const message = args.join(' ');
     // Firebase 인증 관련 Cross-Origin-Opener-Policy 경고는 무시 (기능에 영향 없음)
-    if (message.includes('Cross-Origin-Opener-Policy') || message.includes('window.close')) {
+    // 'window.close'만으로 거르면 무관한 경고까지 함께 사라지므로 COOP 경고에 한정한다
+    if (message.includes('Cross-Origin-Opener-Policy')) {
         return;
     }
     originalWarn.apply(console, args);
@@ -97,6 +138,7 @@ window.addEventListener('error', (event) => {
     }
     
     logger.error('전역 오류 발생:', event.error);
+    showGlobalErrorBanner('오류가 발생하여 일부 기능이 정상 동작하지 않을 수 있습니다. 저장되지 않은 작업이 있다면 페이지를 새로고침하기 전에 확인해주세요.');
 });
 
 window.addEventListener('unhandledrejection', (event) => {
@@ -113,6 +155,7 @@ window.addEventListener('unhandledrejection', (event) => {
         return;
     }
     logger.error('처리되지 않은 Promise 거부:', event.reason);
+    showGlobalErrorBanner('작업 처리 중 오류가 발생했습니다. 최근 작업이 저장되지 않았을 수 있으니 확인해주세요.');
     event.preventDefault(); // 에러가 콘솔에 표시되지 않도록
 });
 

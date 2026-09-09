@@ -956,7 +956,10 @@ export class MainController {
             const confirmBtn = target.id === 'confirm-seats' ? target : target.closest('#confirm-seats');
             if (confirmBtn) {
                 e.preventDefault();
-                this.handleConfirmSeats();
+                this.handleConfirmSeats().catch((error) => {
+                    logger.error('자리 확정 처리 실패:', error);
+                    this.outputModule.showError('자리 확정 중 오류가 발생했습니다.');
+                });
                 return;
             }
             
@@ -3334,9 +3337,15 @@ export class MainController {
         });
 
         // localStorage에 학생 데이터 저장
+        // safeSetItem은 예외를 던지지 않고 false를 반환하므로 반환값을 반드시 확인해야 한다.
+        // 확인하지 않으면 저장 실패 시에도 아래에서 '등록되었습니다' 메시지가 표시된다.
         try {
-            this.storageManager.safeSetItem('classStudentData', JSON.stringify(studentData));
-            
+            const studentDataSaved = this.storageManager.safeSetItem('classStudentData', JSON.stringify(studentData));
+            if (!studentDataSaved) {
+                logger.error('학생 데이터 저장 실패', { count: studentData.length });
+                this.outputModule.showError('학생 명단을 저장하지 못했습니다. 브라우저 저장소 설정을 확인해주세요.');
+                return;
+            }
         } catch (error) {
             logger.error('학생 데이터 저장 중 오류:', error);
             this.outputModule.showError('학생 데이터 저장 중 오류가 발생했습니다.');
@@ -5296,7 +5305,7 @@ export class MainController {
     /**
      * 자리 확정 처리
      */
-    private handleConfirmSeats(): void {
+    private async handleConfirmSeats(): Promise<void> {
         try {
             // 현재 좌석 배치 데이터 수집
             const seatsArea = document.getElementById('seats-area');
@@ -5412,7 +5421,13 @@ export class MainController {
             // 반별 이력 키: seatHistory_${classId} (각 반마다 독립적으로 저장)
             const historyKey = `seatHistory_${currentClassId}`;
             logger.info(`반별 이력 저장 시작: 반ID=${currentClassId}, 키=${historyKey}`);
-            const existingHistory = this.getSeatHistory(currentClassId);
+            const existingHistory = this.readSeatHistory(currentClassId);
+            if (existingHistory === null) {
+                // 기존 이력을 읽지 못한 상태에서 저장하면 이력 전체가 새 항목 하나로 교체된다.
+                this.outputModule.showError('기존 이력을 읽을 수 없어 자리를 확정하지 않았습니다. 브라우저 저장소 설정을 확인한 뒤 다시 시도해주세요.');
+                logger.error('자리 확정 중단: 기존 이력 읽기 실패', { currentClassId });
+                return;
+            }
             existingHistory.unshift(historyItem); // 최신 항목을 맨 앞에 추가
             // 최대 50개까지만 저장
             if (existingHistory.length > 50) {
@@ -5427,27 +5442,17 @@ export class MainController {
                 return;
             }
             
-            // Firebase에 이력 저장 (로그인된 경우)
-            if (this.firebaseStorageManager?.getIsAuthenticated()) {
-                this.firebaseStorageManager.saveSeatHistory(currentClassId, existingHistory).then((firebaseSaved) => {
-                    if (firebaseSaved) {
-                        logger.info('✅ Firebase에 확정된 자리 이력 저장 완료');
-                    } else {
-                        logger.warn('⚠️ Firebase에 확정된 자리 이력 저장 실패 (localStorage에는 저장됨)');
-                    }
-                }).catch((error) => {
-                    logger.error('❌ Firebase에 확정된 자리 이력 저장 실패:', error);
-                });
-            }
+            // 클라우드 저장은 아래에서 한 번만, 결과를 기다려 수행한다.
+            // (같은 문서에 두 번 쓰면 나중 쓰기가 오래된 데이터로 앞선 쓰기를 덮을 수 있다.)
             
             // 저장 확인: 저장 직후 읽어서 검증
-            const verifyHistory = this.getSeatHistory(currentClassId);
-            if (verifyHistory.length === 0 || verifyHistory[0].id !== historyItem.id) {
+            const verifyHistory = this.readSeatHistory(currentClassId);
+            if (!verifyHistory || verifyHistory.length === 0 || verifyHistory[0].id !== historyItem.id) {
                 logger.error('이력 저장 검증 실패:', { 
                     saved: saved, 
-                    verifyLength: verifyHistory.length,
+                    verifyLength: verifyHistory?.length ?? null,
                     expectedId: historyItem.id,
-                    actualId: verifyHistory[0]?.id 
+                    actualId: verifyHistory?.[0]?.id 
                 });
                 this.outputModule.showError('이력 저장 후 검증에 실패했습니다. 다시 시도해주세요.');
                 return;
@@ -5463,36 +5468,50 @@ export class MainController {
             // 드롭다운 메뉴 업데이트
             this.updateHistoryDropdown();
 
-            // 반이 선택된 경우 Firebase에 자리 배치도 저장 (자리 확정과 동시에 저장)
-            if (this.classManager && this.classManager.getCurrentClassId()) {
-                // 현재 seats와 students를 화면 데이터로 업데이트한 후 저장
-                this.updateSeatsAndStudentsFromLayout(currentLayout);
-                this.classManager.saveCurrentLayout().then((saved) => {
-                    if (saved) {
-                        logger.info('✅ 자리 확정 및 저장 완료');
-                        
-                        // 확정된 자리 이력도 Firebase에 저장
-                        const currentClassId = this.classManager?.getCurrentClassId();
-                        if (currentClassId && this.firebaseStorageManager?.getIsAuthenticated()) {
-                            const history = this.getSeatHistory(currentClassId);
-                            if (history.length > 0) {
-                                this.firebaseStorageManager.saveSeatHistory(currentClassId, history).then((firebaseSaved) => {
-                                    if (firebaseSaved) {
-                                        logger.info('✅ Firebase에 확정된 자리 이력 저장 완료');
-                                    } else {
-                                        logger.warn('⚠️ Firebase에 확정된 자리 이력 저장 실패');
-                                    }
-                                }).catch((error) => {
-                                    logger.error('❌ Firebase에 확정된 자리 이력 저장 실패:', error);
-                                });
-                            }
-                        }
-                    } else {
-                        logger.warn('⚠️ 자리 확정 시 저장 실패');
-                    }
-                }).catch((error) => {
-                    logger.error('❌ 자리 확정 시 저장 실패:', error);
-                });
+            // 화면 데이터를 모델에 반영한 뒤 저장한다.
+            this.updateSeatsAndStudentsFromLayout(currentLayout);
+
+            // 저장 결과를 기다린 뒤에 안내한다.
+            // 기다리지 않고 성공 메시지를 띄우면, 저장이 실패해도 교사는 저장된 것으로 믿는다.
+            let cloudStatus: 'ok' | 'failed' | 'skipped' = 'skipped';
+            let localLayoutSaved = true;
+
+            if (this.classManager) {
+                const layoutResult = await this.classManager.saveCurrentLayoutDetailed({ silent: true });
+                localLayoutSaved = layoutResult.local;
+                cloudStatus = layoutResult.cloud;
+                if (!localLayoutSaved) {
+                    logger.error('자리 확정 시 자리 배치도 로컬 저장 실패');
+                }
+            }
+
+            // 확정된 자리 이력을 클라우드에 저장 (이 경로에서 단 한 번만 수행)
+            if (this.firebaseStorageManager?.getIsAuthenticated()) {
+                const historySaved = await this.firebaseStorageManager
+                    .saveSeatHistory(currentClassId, existingHistory)
+                    .catch((error) => {
+                        logger.error('❌ Firebase에 확정된 자리 이력 저장 실패:', error);
+                        return false;
+                    });
+
+                if (!historySaved) {
+                    cloudStatus = 'failed';
+                } else if (cloudStatus === 'skipped') {
+                    cloudStatus = 'ok';
+                }
+            }
+
+            // 실제 저장 결과에 따른 안내 문구
+            const saveOk = cloudStatus !== 'failed' && localLayoutSaved;
+            let saveLine: string;
+            if (!localLayoutSaved) {
+                saveLine = '⚠️ 자리 배치도 저장에 실패했습니다. 브라우저 저장소를 확인해주세요.';
+            } else if (cloudStatus === 'failed') {
+                saveLine = '⚠️ 이 기기에는 저장했지만 클라우드 저장에 실패했습니다. 다른 기기에서는 보이지 않습니다.';
+            } else if (cloudStatus === 'skipped') {
+                saveLine = '💾 이 기기에 저장되었습니다. (로그인하면 클라우드에도 저장됩니다)';
+            } else {
+                saveLine = '💾 저장도 완료되었습니다.';
             }
 
             // XSS 방지: DOM API를 사용하여 메시지 생성
@@ -5506,13 +5525,13 @@ export class MainController {
 
                 // 새 메시지 생성 (textContent 사용으로 XSS 방지)
                 const messageElement = document.createElement('div');
-                messageElement.className = 'output-message success';
+                messageElement.className = saveOk ? 'output-message success' : 'output-message warning';
                 const lines = [
                     '✅ 자리가 확정되었습니다.',
                     '',
                     '📋 확정된 자리 이력에 기록하였습니다.',
                     '',
-                    '💾 저장도 완료되었습니다.',
+                    saveLine,
                     '',
                     `📅 날짜: ${dateString}`
                 ];
@@ -5530,9 +5549,9 @@ export class MainController {
                     margin: 20px 0;
                     border-radius: 8px;
                     font-weight: 500;
-                    background: #d4edda;
-                    color: #155724;
-                    border: 1px solid #c3e6cb;
+                    background: ${saveOk ? '#d4edda' : '#fff3cd'};
+                    color: ${saveOk ? '#155724' : '#856404'};
+                    border: 1px solid ${saveOk ? '#c3e6cb' : '#ffeeba'};
                     line-height: 1.8;
                     font-size: 1.05em;
                     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -5540,7 +5559,7 @@ export class MainController {
                 messageElement.setAttribute('role', 'status');
                 messageElement.setAttribute('aria-live', 'polite');
                 messageElement.setAttribute('aria-atomic', 'true');
-                messageElement.setAttribute('aria-label', '자리가 확정되었습니다. 확정된 자리 이력에 기록되었습니다');
+                messageElement.setAttribute('aria-label', `자리가 확정되었습니다. 확정된 자리 이력에 기록되었습니다. ${saveLine}`);
                 
                 container.appendChild(messageElement);
                 
@@ -5552,7 +5571,12 @@ export class MainController {
                 }, 7000);
             } else {
                 // 폴백: 기본 showSuccess 사용
-                this.outputModule.showSuccess(`✅ 자리가 확정되었습니다. 📋 확정된 자리 이력에 기록하였습니다. 💾 저장도 완료되었습니다. 📅 날짜: ${dateString}`);
+                const fallbackMessage = `✅ 자리가 확정되었습니다. 📋 확정된 자리 이력에 기록하였습니다. ${saveLine} 📅 날짜: ${dateString}`;
+                if (saveOk) {
+                    this.outputModule.showSuccess(fallbackMessage);
+                } else {
+                    this.outputModule.showWarning(fallbackMessage);
+                }
             }
         } catch (error) {
             logger.error('자리 확정 중 오류:', error);
@@ -5652,6 +5676,23 @@ export class MainController {
      * @param classId 반 ID (없으면 현재 선택된 반의 ID 사용)
      */
     private getSeatHistory(classId?: string): SeatHistoryItem[] {
+        return this.readSeatHistory(classId) ?? [];
+    }
+
+    /**
+     * 좌석 이력 읽기 (엄격)
+     *
+     * 읽기/파싱에 실패하면 null을 반환한다.
+     * '이력이 없음'과 '읽지 못함'을 구분하지 않으면,
+     * 읽기가 한 번 실패했을 때 빈 배열에 새 항목 하나만 붙여 되쓰는 결과가 되어
+     * 저장돼 있던 이력 전체가 로컬과 클라우드 양쪽에서 사라진다.
+     *
+     * 이력을 덮어쓰는 경로에서는 반드시 이 메서드를 사용하고,
+     * null이면 쓰기를 중단해야 한다.
+     *
+     * 이 메서드는 저장소에 쓰지 않는다. 조회가 데이터를 바꾸면 안 된다.
+     */
+    private readSeatHistory(classId?: string): SeatHistoryItem[] | null {
         try {
             // 반 ID가 없으면 현재 선택된 반 ID 사용
             const targetClassId = classId || this.classManager?.getCurrentClassId();
@@ -5663,22 +5704,25 @@ export class MainController {
             
             // 반별 이력 키: seatHistory_${classId}
             const historyKey = `seatHistory_${targetClassId}`;
-            const historyStr = this.storageManager.safeGetItem(historyKey);
-            if (!historyStr) return [];
+            const read = this.storageManager.readItem(historyKey);
+            if (!read.ok) {
+                // 저장소 접근 실패 — '이력 없음'과 구분해야 한다
+                logger.error('좌석 이력 읽기 실패: 저장소에 접근할 수 없습니다.', { historyKey });
+                return null;
+            }
+            if (!read.value) return [];
             
             // JSON 파싱 시도 (데이터 손상 처리)
             let history: SeatHistoryItem[];
             try {
-                history = JSON.parse(historyStr) as SeatHistoryItem[];
+                history = JSON.parse(read.value) as SeatHistoryItem[];
                 if (!Array.isArray(history)) {
-                    return [];
+                    return null;
                 }
             } catch (parseError) {
-                // 데이터 손상 시 저장소에서 제거하고 빈 배열 반환
-                try {
-                    localStorage.removeItem(historyKey);
-                } catch {}
-                return [];
+                // 데이터 손상 — 손상된 값을 덮어쓰지 않도록 실패로 알린다
+                logger.error('좌석 이력 파싱 실패:', { historyKey, parseError });
+                return null;
             }
             
             // 반 ID로 필터링 (classId가 저장된 경우 검증)
@@ -5691,24 +5735,23 @@ export class MainController {
                 return item.classId === targetClassId;
             });
             
-            // 필터링된 결과가 원본과 다르면 저장 (데이터 정리)
+            // 다른 반의 항목이 섞여 있으면 기록만 남긴다.
+            // 조회 함수가 저장소를 정리(삭제)하면 읽기만 했는데 데이터가 사라진다.
             if (filteredHistory.length !== history.length) {
-                logger.warn('잘못된 반 ID를 가진 이력 항목 제거:', {
+                logger.error('잘못된 반 ID를 가진 이력 항목이 섞여 있습니다(표시에서만 제외):', {
                     targetClassId,
                     originalCount: history.length,
                     filteredCount: filteredHistory.length
                 });
-                // 정리된 이력 다시 저장
-                const cleanedHistoryKey = `seatHistory_${targetClassId}`;
-                this.storageManager.safeSetItem(cleanedHistoryKey, JSON.stringify(filteredHistory));
             }
             
             // 최신 항목이 앞에 오도록 timestamp 기준 내림차순 정렬
             return filteredHistory.sort((a, b) => {
                 return (b.timestamp || 0) - (a.timestamp || 0);
             });
-        } catch {
-            return [];
+        } catch (error) {
+            logger.error('좌석 이력 읽기 중 오류:', error);
+            return null;
         }
     }
 

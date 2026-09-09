@@ -550,8 +550,9 @@ export class FirebaseStorageManager {
     classId?: string;
   }>): Promise<boolean> {
     if (!this.isAuthenticated) {
-      // 로그인되지 않은 경우에도 성공으로 처리 (localStorage에만 저장)
-      return true;
+      // 로그인되어 있지 않으면 클라우드 저장을 수행하지 않았음을 그대로 알린다.
+      // 호출부는 로그인 여부를 먼저 확인하고 이 메서드를 호출한다.
+      return false;
     }
 
     try {
@@ -620,8 +621,9 @@ export class FirebaseStorageManager {
       return true;
     } catch (error) {
       logger.error('❌ 확정된 자리 이력 저장 실패:', error);
-      // 에러가 발생해도 localStorage에는 저장되었으므로 true 반환
-      return true;
+      // 실패를 성공으로 보고하면 호출부가 사용자에게 저장 완료를 알리게 되고,
+      // 교사는 클라우드에 남지 않은 이력을 저장된 것으로 믿게 된다.
+      return false;
     }
   }
 
