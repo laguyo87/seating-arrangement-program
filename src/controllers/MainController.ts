@@ -4672,6 +4672,25 @@ export class MainController {
     }
 
     /**
+     * 명단에서 중복된 이름 찾기
+     */
+    private findDuplicateStudentNames(students: Array<{name: string}>): string[] {
+        const seen = new Set<string>();
+        const duplicates = new Set<string>();
+
+        students.forEach(student => {
+            const key = (student.name || '').trim().toLowerCase();
+            if (!key) return;
+            if (seen.has(key)) {
+                duplicates.add(student.name.trim());
+            }
+            seen.add(key);
+        });
+
+        return Array.from(duplicates);
+    }
+
+    /**
      * 자리 배치 진행 상태 설정
      * 진행 중에는 버튼을 비활성화해 중복 실행을 막는다.
      */
@@ -4707,6 +4726,18 @@ export class MainController {
                 this.outputModule.showError('학생 정보를 먼저 입력해주세요.');
                 this.setArrangingSeats(false);
                 return;
+            }
+
+            // 동명이인 확인
+            // '이전 자리 피하기' / '이전 짝꿍 피하기'는 학생을 이름으로 구분하므로
+            // 같은 이름이 둘 있으면 엉뚱한 학생에게 제약이 적용된다.
+            // 배치를 막지는 않되 교사가 알 수 있게 알린다.
+            const duplicateNames = this.findDuplicateStudentNames(studentData);
+            if (duplicateNames.length > 0) {
+                this.outputModule.showWarning(
+                    `같은 이름의 학생이 있습니다: ${duplicateNames.join(', ')}. ` +
+                    '이전 자리·짝꿍 피하기 옵션은 같은 이름끼리 구분하지 못합니다.'
+                );
             }
 
         // 대용량 데이터 처리 시 프로그레스 바 사용 (100명 이상)

@@ -353,13 +353,8 @@ export class CSVFileHandler {
                 return null;
             }
             
-            // 중복 이름 체크
-            const names = students.map(s => s.name.toLowerCase());
-            const uniqueNames = new Set(names);
-            if (names.length !== uniqueNames.size) {
-                this.deps.outputModule.showError('엑셀 파일에 중복된 이름이 있습니다. 모든 이름은 고유해야 합니다.');
-                return null;
-            }
+            // 중복 이름 확인 (거부하지 않고 알리기만 한다 — CSV 경로와 동일)
+            this.warnAboutDuplicateNames(students, '엑셀');
             
             return students;
         } catch (error) {
@@ -726,6 +721,33 @@ export class CSVFileHandler {
     /**
      * CSV 파일 파싱 및 학생 배열 반환
      */
+    private warnAboutDuplicateNames(
+        students: Array<{name: string, gender: 'M' | 'F'}>,
+        source: string
+    ): void {
+        const seen = new Set<string>();
+        const duplicates = new Set<string>();
+
+        students.forEach(student => {
+            const key = student.name.toLowerCase();
+            if (seen.has(key)) {
+                duplicates.add(student.name);
+            }
+            seen.add(key);
+        });
+
+        if (duplicates.size === 0) return;
+
+        const names = Array.from(duplicates).join(', ');
+        this.deps.outputModule.showWarning(
+            `${source} 파일에 같은 이름이 있습니다: ${names}. ` +
+            '그대로 불러왔지만, 이전 자리 피하기 같은 옵션은 같은 이름끼리 구분하지 못합니다.'
+        );
+    }
+
+    /**
+     * CSV 텍스트 파싱
+     */
     private parseCsvFile(csvText: string): Array<{name: string, gender: 'M' | 'F'}> | null {
         try {
             // 파일 크기 검증 (최대 5MB)
@@ -814,13 +836,10 @@ export class CSVFileHandler {
                 return null;
             }
             
-            // 중복 이름 체크
-            const names = students.map(s => s.name.toLowerCase());
-            const uniqueNames = new Set(names);
-            if (names.length !== uniqueNames.size) {
-                this.deps.outputModule.showError('CSV 파일에 중복된 이름이 있습니다. 모든 이름은 고유해야 합니다.');
-                return null;
-            }
+            // 중복 이름 확인
+            // 동명이인은 실제로 있을 수 있으므로 명단 전체를 버리지 않고 알리기만 한다.
+            // (거부하면 교사가 30명을 손으로 다시 입력해야 한다)
+            this.warnAboutDuplicateNames(students, 'CSV');
             
             return students;
         } catch (error) {
