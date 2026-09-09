@@ -79,37 +79,41 @@ export class PrintExportManager {
 
         const extraStyle = `
                         /* 사용자 구성 배치: 좌표로 놓인 책상을 그대로 인쇄한다.
-                           좌석 영역이 고정 폭이 되므로 부모를 flex로 만들어 확실히 가운데 둔다.
-                           (margin: auto 만으로는 회전된 인쇄 레이아웃에서 한쪽으로 쏠렸다) */
-                        .classroom-layout {
-                            display: flex !important;
-                            flex-direction: column !important;
-                            align-items: center !important;
-                        }
-                        /* 칠판은 left:50% + translateX(-50%)로 스스로 가운데 정렬한다.
-                           부모를 flex로 바꾸면 이중으로 밀리므로 그 보정을 걷어낸다.
-                           (칠판 글자를 되돌리는 span의 회전은 건드리지 않는다) */
-                        .blackboard-area {
-                            left: auto !important;
-                            transform: none !important;
-                        }
+                           좌석 영역 자체를 flex로 두고 그 안에 고정 크기 캔버스를 넣어 가운데 정렬한다.
+                           부모(.classroom-layout)를 건드리면 스스로 가운데 정렬하는 칠판이 함께 밀린다. */
                         .seats-area {
-                            display: block !important;
+                            display: flex !important;
+                            justify-content: center !important;
+                            align-items: flex-start !important;
+                            grid-template-columns: none !important;
+                            margin-top: 10px !important;
+                        }
+                        .custom-layout-canvas {
                             position: relative !important;
                             width: ${width}px !important;
                             height: ${height}px !important;
-                            margin: 10px auto !important;
-                            grid-template-columns: none !important;
+                            flex: none !important;
                         }
-                        .seats-area .student-seat-card {
+                        .custom-layout-canvas .student-seat-card {
                             position: absolute !important;
                             width: ${PrintExportManager.PRINT_CARD_SIZE}px !important;
                             min-width: ${PrintExportManager.PRINT_CARD_SIZE}px !important;
                             height: ${PrintExportManager.PRINT_CARD_SIZE}px !important;
                             margin: 0 !important;
+                        }
+                        @media print {
+                            /* 인쇄 전용 규칙이 좌석 영역을 다시 그리드로 되돌리지 못하게 한다 */
+                            .seats-area {
+                                display: flex !important;
+                                justify-content: center !important;
+                                grid-template-columns: none !important;
+                            }
                         }`;
 
-        return { html: clone.innerHTML, extraStyle };
+        // 카드를 고정 크기 캔버스로 감싸면, 좌석 영역이 그 캔버스를 가운데 놓기만 하면 된다
+        const html = `<div class="custom-layout-canvas">${clone.innerHTML}</div>`;
+
+        return { html, extraStyle };
     }
 
     public printLayout(): void {
