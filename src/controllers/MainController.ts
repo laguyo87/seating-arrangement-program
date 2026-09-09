@@ -342,8 +342,11 @@ export class MainController {
             // 반 관리 초기화
             this.initializeClassManagement();
             
-            // 사용자 구성 배치 안내 표시 여부 반영
+            // 사용자 구성 배치 안내 및 분단 개수 사용 가능 여부 반영
             this.updateCustomLayoutHint();
+            this.togglePartitionSection(
+                (document.querySelector('input[name="layout-type"]:checked') as HTMLInputElement | null)?.value !== 'custom'
+            );
             
             // 저장 방식 변경 안내 (처음 한 번만)
             this.cloudMigrationModule.showNoticeIfNeeded();
@@ -613,6 +616,9 @@ export class MainController {
                         this.resetPartitionLimit();
                     }
                 }
+                
+                // 사용자 구성 배치는 책상을 직접 놓으므로 분단 개수가 의미가 없다
+                this.togglePartitionSection(layoutType !== 'custom');
                 
                 // 배치 형태 변경 시 미리보기 업데이트
                 this.updateCustomLayoutHint();
@@ -4316,6 +4322,27 @@ export class MainController {
         }
     }
 
+    private togglePartitionSection(enable: boolean): void {
+        const section = document.getElementById('partition-section');
+        const input = document.getElementById('number-of-partitions') as HTMLInputElement | null;
+
+        if (input) {
+            input.disabled = !enable;
+        }
+
+        if (section) {
+            section.classList.toggle('option-disabled', !enable);
+            // 읽기 전용 안내를 스크린리더에도 전달한다
+            section.setAttribute('aria-disabled', enable ? 'false' : 'true');
+        }
+
+        // 사용자 구성 배치에서는 분단이라는 개념이 없다는 것을 알려준다
+        const note = document.getElementById('partition-disabled-note');
+        if (note) {
+            note.style.display = enable ? 'none' : 'block';
+        }
+    }
+
     private toggleGroupSubmenu(show: boolean): void {
         const groupSubmenu = document.getElementById('group-submenu');
         if (!groupSubmenu) return;
@@ -6091,6 +6118,11 @@ export class MainController {
                 if (layoutTypeRadio) {
                     layoutTypeRadio.checked = true;
                 }
+                
+                // 라디오를 코드로 바꾸면 change 이벤트가 발생하지 않으므로
+                // 배치 형태에 따라 달라지는 옵션들을 여기서 직접 맞춰준다
+                this.updateCustomLayoutHint();
+                this.togglePartitionSection(historyItem.layoutType !== 'custom');
                 
                 // layout-type에 따른 서브 옵션 설정
                 if (historyItem.layoutType === 'single-uniform') {
