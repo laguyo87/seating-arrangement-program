@@ -139,6 +139,14 @@ export class MainController {
      * renderExampleCards가 한 번 사용하고 비운다.
      */
     private pendingCustomPositions: SeatPosition[] | null = null;
+    /**
+     * 지금 화면에 놓인 책상 위치.
+     *
+     * 명렬표를 저장하거나 인원수를 바꾸면 미리보기가 통째로 다시 그려진다.
+     * 저장소에만 의존하면 반을 선택하지 않은 상태에서는 저장되지 않으므로,
+     * 재렌더 때마다 교사가 만든 배치가 기본 격자로 돌아가 버린다.
+     */
+    private customPositions: SeatPosition[] | null = null;
 
     private inputModule!: InputModule;
     private layoutSelectorModule!: LayoutSelectorModule;
@@ -312,7 +320,11 @@ export class MainController {
 
             // 사용자 구성 배치 (교사가 책상을 직접 옮기는 배치)
             this.customLayoutManager = new CustomLayoutManager({
-                onPositionsChanged: (positions) => this.saveCustomPositions(positions)
+                onPositionsChanged: (positions) => {
+                    // 반이 선택되지 않았더라도 이번 세션 동안은 배치를 유지해야 한다
+                    this.customPositions = positions;
+                    this.saveCustomPositions(positions);
+                }
             });
             
             // 저장 방식 변경 안내 및 예전 클라우드 자료 가져오기
@@ -1303,6 +1315,7 @@ export class MainController {
         }
 
         this.pendingCustomPositions = null;
+        this.customPositions = null;
         this.updatePreviewForGenderCounts();
         this.outputModule.showInfo('책상 위치를 기본 배치로 되돌렸습니다.');
     }
@@ -1316,13 +1329,16 @@ export class MainController {
     private renderCustomLayoutCards(seatsArea: HTMLElement): void {
         const areaWidth = Math.max(seatsArea.clientWidth, MainController.CARD_AREA_MIN_WIDTH_FALLBACK);
 
-        // 이력에서 복원 중이면 그 위치를, 아니면 저장해 둔 위치를, 없으면 기본 격자를 쓴다
-        const stored = this.pendingCustomPositions ?? this.loadCustomPositions();
+        // 이력 복원 → 화면에 있던 배치 → 저장해 둔 배치 → 기본 격자 순으로 사용한다
+        const stored = this.pendingCustomPositions ?? this.customPositions ?? this.loadCustomPositions();
         this.pendingCustomPositions = null;
 
         const positions = stored
             ? CustomLayoutService.fitToCount(stored, this.students.length, areaWidth)
             : CustomLayoutService.defaultPositions(this.students.length, areaWidth);
+
+        // 다음 재렌더에서도 같은 배치를 유지한다
+        this.customPositions = positions;
 
         this.students.forEach((student, index) => {
             const card = this.createStudentCard(student, index);
@@ -8917,6 +8933,9 @@ export class MainController {
             this.students = [];
             this.seats = [];
             this.nextSeatId = 1;
+            // 반마다 교실 모양이 다르므로 이전 반의 배치를 물려받지 않는다
+            this.customPositions = null;
+            this.pendingCustomPositions = null;
             this.fixedSeatIds.clear();
 
             // 학생 테이블 제거 (존재한다면)
