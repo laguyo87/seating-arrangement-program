@@ -309,6 +309,11 @@ export class MainController {
                 renderLayout: () => this.renderFinalLayout()
             };
             this.classManager = new ClassManager(classManagerDeps);
+
+            // 사용자 구성 배치 (교사가 책상을 직접 옮기는 배치)
+            this.customLayoutManager = new CustomLayoutManager({
+                onPositionsChanged: (positions) => this.saveCustomPositions(positions)
+            });
             
             // 저장 방식 변경 안내 및 예전 클라우드 자료 가져오기
             // (Firebase는 사용자가 '가져오기'를 눌렀을 때만 동적으로 불러온다)

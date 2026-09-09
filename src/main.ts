@@ -64,7 +64,7 @@ init();
  * 전역 핸들러가 콘솔에만 기록하면, 배포 빌드에서는 앱이 반쯤 망가진 상태가 되어도
  * 화면에는 아무 표시가 없다. 교사는 무엇이 잘못됐는지 알 방법이 없다.
  */
-function showGlobalErrorBanner(message: string): void {
+function showGlobalErrorBanner(message: string, detail?: string): void {
     try {
         const existing = document.getElementById('global-error-banner');
         if (existing) existing.remove();
@@ -74,21 +74,39 @@ function showGlobalErrorBanner(message: string): void {
         banner.setAttribute('role', 'alert');
         banner.style.cssText = [
             'position:fixed', 'top:0', 'left:0', 'right:0', 'z-index:99999',
+            'box-sizing:border-box',
             'padding:12px 16px', 'background:#f8d7da', 'color:#721c24',
             'border-bottom:1px solid #f5c6cb', 'font-size:14px', 'line-height:1.5',
-            'display:flex', 'align-items:center', 'gap:12px'
+            'display:flex', 'align-items:flex-start', 'gap:12px'
         ].join(';');
 
-        const text = document.createElement('span');
-        text.style.flex = '1';
+        const body = document.createElement('div');
+        // 전역 button 규칙(width:100%) 때문에 닫기 버튼이 폭을 모두 차지하지 않도록
+        // 본문에 flex:1과 min-width:0을 주어 글자가 세로로 쪼개지지 않게 한다
+        body.style.cssText = 'flex:1;min-width:0;';
+
+        const text = document.createElement('div');
         text.textContent = message;
-        banner.appendChild(text);
+        body.appendChild(text);
+
+        // 원인을 알 수 있도록 오류 내용을 함께 보여준다.
+        // 이것이 없으면 사용자는 '무언가 잘못됐다'는 사실만 알게 된다.
+        if (detail) {
+            const detailLine = document.createElement('div');
+            detailLine.textContent = detail.length > 300 ? `${detail.slice(0, 300)}…` : detail;
+            detailLine.style.cssText = 'margin-top:6px;font-size:12px;opacity:0.85;word-break:break-word;';
+            body.appendChild(detailLine);
+        }
+
+        banner.appendChild(body);
 
         const closeBtn = document.createElement('button');
         closeBtn.type = 'button';
         closeBtn.textContent = '닫기';
         closeBtn.setAttribute('aria-label', '오류 알림 닫기');
-        closeBtn.style.cssText = 'padding:4px 12px;cursor:pointer;border:1px solid #721c24;background:transparent;color:#721c24;border-radius:4px;';
+        closeBtn.style.cssText =
+            'flex:none;width:auto;margin:0;padding:4px 12px;cursor:pointer;' +
+            'border:1px solid #721c24;background:transparent;color:#721c24;border-radius:4px;font-size:13px;';
         closeBtn.addEventListener('click', () => banner.remove());
         banner.appendChild(closeBtn);
 
@@ -138,7 +156,10 @@ window.addEventListener('error', (event) => {
     }
     
     logger.error('전역 오류 발생:', event.error);
-    showGlobalErrorBanner('오류가 발생하여 일부 기능이 정상 동작하지 않을 수 있습니다. 저장되지 않은 작업이 있다면 페이지를 새로고침하기 전에 확인해주세요.');
+    showGlobalErrorBanner(
+        '오류가 발생하여 일부 기능이 정상 동작하지 않을 수 있습니다.',
+        event.error?.message || event.message || undefined
+    );
 });
 
 window.addEventListener('unhandledrejection', (event) => {
@@ -155,7 +176,10 @@ window.addEventListener('unhandledrejection', (event) => {
         return;
     }
     logger.error('처리되지 않은 Promise 거부:', event.reason);
-    showGlobalErrorBanner('작업 처리 중 오류가 발생했습니다. 최근 작업이 저장되지 않았을 수 있으니 확인해주세요.');
+    showGlobalErrorBanner(
+        '작업 처리 중 오류가 발생했습니다.',
+        event.reason?.message || String(event.reason ?? '') || undefined
+    );
     event.preventDefault(); // 에러가 콘솔에 표시되지 않도록
 });
 
