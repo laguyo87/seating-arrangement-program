@@ -20,16 +20,6 @@ export interface ClassLayoutData {
 }
 
 /**
- * 저장 결과 타입
- * local: localStorage 저장 성공 여부
- * cloud: 'ok' 성공 / 'failed' 실패 / 'skipped' 미로그인으로 시도하지 않음
- */
-export interface SaveResult {
-    local: boolean;
-    cloud: 'ok' | 'failed' | 'skipped';
-}
-
-/**
  * 반 정보 타입
  */
 export interface ClassInfo {
@@ -50,7 +40,6 @@ export interface ClassManagerDependencies {
     setSeats: (seats: Seat[]) => void;
     setStudents: (students: Student[]) => void;
     renderLayout: () => void;
-    firebaseStorageManager?: import('./FirebaseStorageManager.js').FirebaseStorageManager;
 }
 
 /**
@@ -103,31 +92,16 @@ export class ClassManager {
     /**
      * 반 목록 저장하기
      */
-    private async saveClassList(classList: ClassInfo[]): Promise<SaveResult> {
+    private async saveClassList(classList: ClassInfo[]): Promise<boolean> {
         try {
-            // localStorage에 저장
-            const localSuccess = this.deps.storageManager.safeSetItem(
+            return this.deps.storageManager.safeSetItem(
                 this.STORAGE_KEY_CLASSES,
                 JSON.stringify(classList)
             );
-
-            // Firebase에 저장 (로그인된 경우)
-            let cloud: SaveResult['cloud'] = 'skipped';
-            if (this.deps.firebaseStorageManager?.getIsAuthenticated()) {
-                const firebaseSuccess = await this.deps.firebaseStorageManager.saveClassList(classList);
-                cloud = firebaseSuccess ? 'ok' : 'failed';
-                if (firebaseSuccess) {
-                    logger.info('Firebase에 반 목록 저장 완료');
-                } else {
-                    logger.error('Firebase에 반 목록 저장 실패');
-                }
-            }
-
-            return { local: localSuccess, cloud };
         } catch (error) {
             logger.error('반 목록 저장 중 오류:', error);
             this.deps.outputModule.showError('반 목록 저장 중 오류가 발생했습니다.');
-            return { local: false, cloud: 'failed' };
+            return false;
         }
     }
 
@@ -165,12 +139,8 @@ export class ClassManager {
         classList.push(newClass);
         
         const saved = await this.saveClassList(classList);
-        if (saved.local) {
-            if (saved.cloud === 'failed') {
-                this.deps.outputModule.showWarning(`"${className}" 반이 이 기기에 추가되었지만 클라우드 저장에 실패했습니다. 다른 기기에서는 보이지 않습니다.`);
-            } else {
-                this.deps.outputModule.showInfo(`"${className}" 반이 추가되었습니다.`);
-            }
+        if (saved) {
+            this.deps.outputModule.showInfo(`"${className}" 반이 추가되었습니다.`);
             return newClass.id;
         }
 
@@ -198,7 +168,7 @@ export class ClassManager {
         // 실제 배치도 데이터를 먼저 지우면, 목록 저장이 실패했을 때
         // 반은 목록에 남아 있는데 배치도만 사라진 상태가 된다.
         const saved = await this.saveClassList(classList);
-        if (!saved.local) {
+        if (!saved) {
             return false;
         }
 
@@ -209,21 +179,12 @@ export class ClassManager {
             logger.error('반 데이터 삭제 중 오류:', error);
         }
 
-        // Firebase에서도 삭제
-        if (this.deps.firebaseStorageManager?.getIsAuthenticated()) {
-            await this.deps.firebaseStorageManager.deleteClass(classId);
-        }
-
         // 현재 선택된 반이 삭제된 경우 선택 해제
         if (this.currentClassId === classId) {
             this.currentClassId = null;
         }
 
-        if (saved.cloud === 'failed') {
-            this.deps.outputModule.showWarning(`"${className}" 반을 이 기기에서 삭제했지만 클라우드 반영에 실패했습니다.`);
-        } else {
-            this.deps.outputModule.showInfo(`"${className}" 반이 삭제되었습니다.`);
-        }
+        this.deps.outputModule.showInfo(`"${className}" 반이 삭제되었습니다.`);
         return true;
     }
 
@@ -244,24 +205,12 @@ export class ClassManager {
     /**
      * 현재 반의 자리 배치도 저장
      */
-    public async saveCurrentLayout(): Promise<boolean> {
-        const result = await this.saveCurrentLayoutDetailed();
-        return result.local;
-    }
-
-    /**
-     * 현재 반의 자리 배치도 저장 (로컬/클라우드 결과를 각각 반환)
-     *
-     * silent를 주면 자체 안내 메시지를 띄우지 않는다.
-     * 자리 확정처럼 호출부가 최종 결과를 직접 안내하는 경우에 사용한다.
-     * (안내 메시지끼리 서로를 지워서 실패 경고가 성공 메시지에 덮이는 것을 막는다.)
-     */
-    public async saveCurrentLayoutDetailed(options?: { silent?: boolean }): Promise<SaveResult> {
+    public async saveCurrentLayout(options?: { silent?: boolean }): Promise<boolean> {
         const silent = options?.silent === true;
 
         if (!this.currentClassId) {
             this.deps.outputModule.showError('반을 선택해주세요.');
-            return { local: false, cloud: 'skipped' };
+            return false;
         }
 
         try {
@@ -270,12 +219,11 @@ export class ClassManager {
 
             if (!seats || seats.length === 0 || !students || students.length === 0) {
                 this.deps.outputModule.showError('저장할 자리 배치도가 없습니다.');
-                return { local: false, cloud: 'skipped' };
+                return false;
             }
 
             // 저장할 시점의 상태를 복사해 둔다.
-            // 클라우드 저장을 기다리는 동안 사용자가 자리를 드래그하면
-            // 라이브 참조를 그대로 직렬화할 경우 저장 전/후가 섞인 데이터가 기록된다.
+            // 라이브 참조를 그대로 직렬화하면 저장 도중의 변경이 섞여 들어간다.
             const layoutData: ClassLayoutData = {
                 seats: JSON.parse(JSON.stringify(seats)) as Seat[],
                 students: JSON.parse(JSON.stringify(students)) as Student[],
@@ -290,38 +238,19 @@ export class ClassManager {
                 JSON.stringify(layoutData)
             );
 
-            // Firebase에 저장 (로그인된 경우)
-            let cloud: SaveResult['cloud'] = 'skipped';
-            if (this.deps.firebaseStorageManager?.getIsAuthenticated()) {
-                const firebaseSuccess = await this.deps.firebaseStorageManager.saveClassLayout(
-                    this.currentClassId,
-                    layoutData
-                );
-                cloud = firebaseSuccess ? 'ok' : 'failed';
-                if (firebaseSuccess) {
-                    logger.info('Firebase에 자리 배치도 저장 완료');
-                } else {
-                    logger.error('Firebase에 자리 배치도 저장 실패');
-                }
-            }
-
             if (localSuccess) {
                 // 마지막 수정 시간 업데이트
                 this.updateLastModified(this.currentClassId!);
                 if (!silent) {
-                    if (cloud === 'failed') {
-                        this.deps.outputModule.showWarning('자리 배치도를 이 기기에 저장했지만 클라우드 저장에 실패했습니다.');
-                    } else {
-                        this.deps.outputModule.showInfo('자리 배치도가 저장되었습니다.');
-                    }
+                    this.deps.outputModule.showInfo('자리 배치도가 저장되었습니다.');
                 }
             }
 
-            return { local: localSuccess, cloud };
+            return localSuccess;
         } catch (error) {
             logger.error('자리 배치도 저장 중 오류:', error);
             this.deps.outputModule.showError('자리 배치도 저장 중 오류가 발생했습니다.');
-            return { local: false, cloud: 'failed' };
+            return false;
         }
     }
 
@@ -336,32 +265,21 @@ export class ClassManager {
         try {
             let layoutData: ClassLayoutData | null = null;
 
-            // Firebase에서 불러오기 시도 (로그인된 경우)
-            if (this.deps.firebaseStorageManager?.getIsAuthenticated()) {
-                layoutData = await this.deps.firebaseStorageManager.loadClassLayout(classId);
-                if (layoutData) {
-                    logger.info('Firebase에서 자리 배치도 불러오기 완료');
-                }
+            const storageKey = `${this.STORAGE_KEY_PREFIX}${classId}`;
+            const layoutDataStr = this.deps.storageManager.safeGetItem(storageKey);
+
+            if (!layoutDataStr) {
+                this.deps.outputModule.showInfo('저장된 자리 배치도가 없습니다.');
+                return false;
             }
 
-            // Firebase에서 불러오지 못했으면 localStorage에서 불러오기
-            if (!layoutData) {
-                const storageKey = `${this.STORAGE_KEY_PREFIX}${classId}`;
-                const layoutDataStr = this.deps.storageManager.safeGetItem(storageKey);
-                
-                if (!layoutDataStr) {
-                    this.deps.outputModule.showInfo('저장된 자리 배치도가 없습니다.');
-                    return false;
-                }
-
-                // JSON 파싱 시도 (데이터 손상 처리)
-                try {
-                    layoutData = JSON.parse(layoutDataStr) as ClassLayoutData;
-                } catch (parseError) {
-                    this.deps.outputModule.showError('저장된 데이터가 손상되어 불러올 수 없습니다.');
-                    logger.error('자리 배치도 파싱 오류:', parseError);
-                    return false;
-                }
+            // JSON 파싱 시도 (데이터 손상 처리)
+            try {
+                layoutData = JSON.parse(layoutDataStr) as ClassLayoutData;
+            } catch (parseError) {
+                this.deps.outputModule.showError('저장된 데이터가 손상되어 불러올 수 없습니다.');
+                logger.error('자리 배치도 파싱 오류:', parseError);
+                return false;
             }
 
             // 데이터 구조 검증
@@ -413,37 +331,6 @@ export class ClassManager {
         const classList = this.getClassList();
         const classInfo = classList.find(c => c.id === classId);
         return classInfo ? classInfo.name : null;
-    }
-
-    /**
-     * Firebase에서 반 목록을 불러와서 localStorage에 저장
-     */
-    public async syncClassListFromFirebase(): Promise<boolean> {
-        if (!this.deps.firebaseStorageManager?.getIsAuthenticated()) {
-            return false;
-        }
-
-        try {
-            const firebaseClassList = await this.deps.firebaseStorageManager.loadClassList();
-            
-            if (firebaseClassList && firebaseClassList.length > 0) {
-                // Firebase에서 불러온 반 목록을 localStorage에 저장
-                const localSuccess = this.deps.storageManager.safeSetItem(
-                    this.STORAGE_KEY_CLASSES,
-                    JSON.stringify(firebaseClassList)
-                );
-                
-                if (localSuccess) {
-                    logger.info(`Firebase에서 반 목록 ${firebaseClassList.length}개 동기화 완료`);
-                    return true;
-                }
-            }
-            
-            return false;
-        } catch (error) {
-            logger.error('Firebase에서 반 목록 동기화 실패:', error);
-            return false;
-        }
     }
 }
 

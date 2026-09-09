@@ -11,6 +11,7 @@ import { RandomService } from '../services/RandomService.js';
 import { PairingService } from '../services/PairingService.js';
 import { SeatOccupancyService } from '../services/SeatOccupancyService.js';
 import { SeatReorderService } from '../services/SeatReorderService.js';
+import { BackupService } from '../services/BackupService.js';
 // import { SeatType } from '../models/Seat.js'; // 향후 사용 예정
 import { Student } from '../models/Student.js';
 import { Seat } from '../models/Seat.js';
@@ -28,10 +29,8 @@ import { InputValidator, ValidationRules } from '../utils/inputValidator.js';
 import { KeyboardNavigation } from '../utils/keyboardNavigation.js';
 import { KeyboardDragDropManager } from '../managers/KeyboardDragDropManager.js';
 import { ClassManager, ClassManagerDependencies } from '../managers/ClassManager.js';
-import { FirebaseStorageManager, FirebaseStorageManagerDependencies } from '../managers/FirebaseStorageManager.js';
-import { LoginPageModule, LoginPageModuleDependencies } from '../modules/LoginPageModule.js';
-import { SignUpPageModule, SignUpPageModuleDependencies } from '../modules/SignUpPageModule.js';
-import { VisitorCounterModule, VisitorCounterModuleDependencies } from '../modules/VisitorCounterModule.js';
+import { CloudMigrationModule } from '../modules/CloudMigrationModule.js';
+import { VisitorCounterModule } from '../modules/VisitorCounterModule.js';
 
 /**
  * 히스토리 데이터 타입
@@ -136,9 +135,7 @@ export class MainController {
     private inputValidator!: InputValidator;
     private keyboardDragDropManager!: KeyboardDragDropManager;
     private classManager!: ClassManager;
-    private firebaseStorageManager!: FirebaseStorageManager;
-    private loginPageModule!: LoginPageModule;
-    private signUpPageModule!: SignUpPageModule;
+    private cloudMigrationModule!: CloudMigrationModule;
     private visitorCounterModule!: VisitorCounterModule;
     
     private students: Student[] = [];
@@ -283,13 +280,6 @@ export class MainController {
             // InputValidator 초기화
             this.inputValidator = new InputValidator();
             
-            // FirebaseStorageManager 초기화
-            const firebaseStorageManagerDeps: FirebaseStorageManagerDependencies = {
-                outputModule: this.outputModule,
-                isDevelopmentMode: () => this.isDevelopmentMode()
-            };
-            this.firebaseStorageManager = new FirebaseStorageManager(firebaseStorageManagerDeps);
-            
             // ClassManager 초기화
             const classManagerDeps: ClassManagerDependencies = {
                 storageManager: this.storageManager,
@@ -298,48 +288,23 @@ export class MainController {
                 getCurrentStudents: () => this.students,
                 setSeats: (seats) => { this.seats = seats; },
                 setStudents: (students) => { this.students = students; },
-                renderLayout: () => this.renderFinalLayout(),
-                firebaseStorageManager: this.firebaseStorageManager
+                renderLayout: () => this.renderFinalLayout()
             };
             this.classManager = new ClassManager(classManagerDeps);
             
-            // SignUpPageModule 초기화 (먼저 초기화하여 LoginPageModule에서 참조 가능하도록)
-            const signUpPageModuleDeps: SignUpPageModuleDependencies = {
-                firebaseStorageManager: this.firebaseStorageManager,
+            // 저장 방식 변경 안내 및 예전 클라우드 자료 가져오기
+            // (Firebase는 사용자가 '가져오기'를 눌렀을 때만 동적으로 불러온다)
+            this.cloudMigrationModule = new CloudMigrationModule({
                 outputModule: this.outputModule,
-                onSignUpSuccess: () => {
-                    this.updateFirebaseStatus();
-                },
-                onClose: () => {
-                    // 회원가입 페이지 닫힘 처리
-                },
-                onBackToLogin: () => {
-                    this.loginPageModule.show();
+                storageManager: this.storageManager,
+                onDataImported: () => {
+                    this.updateClassSelect();
+                    this.updateHistoryDropdown();
                 }
-            };
-            this.signUpPageModule = new SignUpPageModule(signUpPageModuleDeps);
+            });
             
-            // LoginPageModule 초기화
-            const loginPageModuleDeps: LoginPageModuleDependencies = {
-                firebaseStorageManager: this.firebaseStorageManager,
-                outputModule: this.outputModule,
-                onLoginSuccess: () => {
-                    this.updateFirebaseStatus();
-                },
-                onClose: () => {
-                    // 로그인 페이지 닫힘 처리
-                },
-                onShowSignUp: () => {
-                    this.signUpPageModule.show();
-                }
-            };
-            this.loginPageModule = new LoginPageModule(loginPageModuleDeps);
-            
-            // VisitorCounterModule 초기화
-            const visitorCounterModuleDeps: VisitorCounterModuleDependencies = {
-                firebaseStorageManager: this.firebaseStorageManager
-            };
-            this.visitorCounterModule = new VisitorCounterModule(visitorCounterModuleDeps);
+            // 방문자 수 표시 (Firebase는 이 경로에서만 동적으로 불러온다)
+            this.visitorCounterModule = new VisitorCounterModule();
             this.visitorCounterModule.init();
             
             // 입력 필드 검증 설정
@@ -354,20 +319,8 @@ export class MainController {
             // 반 관리 초기화
             this.initializeClassManagement();
             
-            // Firebase 리다이렉트 로그인 결과 확인
-            this.firebaseStorageManager.checkRedirectResult().then((success) => {
-                if (success) {
-                    this.updateFirebaseStatus();
-                }
-            });
-            
-            // Firebase 인증 상태가 확정되면 화면과 데이터를 갱신한다.
-            // 고정 시간(1초) 타이머로 기다리면 인증 복원이 그보다 늦은 기기에서
-            // 로그인 상태를 놓쳐 클라우드 데이터를 불러오지 못한다.
-            // 그 상태로 반을 만들면 클라우드의 기존 반 목록이 통째로 교체된다.
-            this.firebaseStorageManager.onAuthStateResolved(() => {
-                this.updateFirebaseStatus();
-            });
+            // 저장 방식 변경 안내 (처음 한 번만)
+            this.cloudMigrationModule.showNoticeIfNeeded();
             
             // 모바일 반응형 초기화
             this.initializeMobileResponsive();
@@ -874,6 +827,20 @@ export class MainController {
                     fileInput.click();
                 }
             });
+        }
+
+        // 명단·배치 내보내기 버튼
+        const exportBackupBtn = document.getElementById('backup-export-btn');
+        if (exportBackupBtn) {
+            this.addEventListenerSafe(exportBackupBtn, 'click', () => this.handleExportBackup());
+        }
+
+        // 명단·배치 불러오기 버튼 (숨겨진 파일 입력을 대신 연다)
+        const importBackupBtn = document.getElementById('backup-import-btn');
+        const importBackupInput = document.getElementById('backup-import-input') as HTMLInputElement | null;
+        if (importBackupBtn && importBackupInput) {
+            this.addEventListenerSafe(importBackupBtn, 'click', () => importBackupInput.click());
+            this.addEventListenerSafe(importBackupInput, 'change', (e) => this.handleImportBackup(e));
         }
 
         // 엑셀 파일 업로드 입력 필드
@@ -4451,6 +4418,134 @@ export class MainController {
     }
 
     /**
+     * 모든 반과 명단을 파일 하나로 내보낸다.
+     *
+     * localStorage는 영구 저장소가 아니다. 브라우저 데이터 삭제, 학교 PC 초기화,
+     * Safari의 자동 정리로 언제든 사라질 수 있다. 이 파일이 유일한 백업 수단이므로
+     * 실패했을 때 조용히 넘어가서는 안 된다.
+     */
+    private handleExportBackup(): void {
+        try {
+            const backup = BackupService.buildBackup(
+                {
+                    read: (key) => this.storageManager.safeGetItem(key),
+                    write: (key, value) => this.storageManager.safeSetItem(key, value)
+                },
+                new Date().toISOString()
+            );
+
+            if (backup.classes.length === 0 && !backup.studentRoster) {
+                this.outputModule.showWarning('내보낼 자료가 없습니다. 반을 만들고 학생 명단을 입력한 뒤 다시 시도해주세요.');
+                return;
+            }
+
+            const fileName = BackupService.buildFileName(backup.exportedAt);
+            const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            // 브라우저가 내려받기를 시작할 시간을 준 뒤 해제한다
+            this.setTimeoutSafe(() => URL.revokeObjectURL(url), 1000);
+
+            const classCount = backup.classes.length;
+            this.outputModule.showSuccess(
+                `${classCount}개 반의 자료를 "${fileName}" 파일로 내보냈습니다. ` +
+                'USB나 학교 드라이브에 보관해두시면 다른 기기에서도 불러올 수 있습니다.'
+            );
+            logger.info('백업 내보내기 완료:', { fileName, classCount });
+        } catch (error) {
+            logger.error('백업 내보내기 실패:', error);
+            this.outputModule.showError('내보내기에 실패했습니다. 다시 시도해주세요.');
+        }
+    }
+
+    /**
+     * 백업 파일에서 반과 명단을 복원한다.
+     *
+     * 같은 반은 덮어쓰고, 백업에 없는 기존 반은 그대로 둔다.
+     * 실수로 예전 백업을 불러왔을 때 최근 작업이 사라지지 않도록 하기 위해서다.
+     */
+    private handleImportBackup(event: Event): void {
+        const input = event.target as HTMLInputElement | null;
+        const file = input?.files?.[0];
+        if (!file) return;
+
+        // 같은 파일을 다시 선택해도 change 이벤트가 발생하도록 값을 비운다
+        if (input) input.value = '';
+
+        if (file.size > 20 * 1024 * 1024) {
+            this.outputModule.showError('파일이 너무 큽니다. 20MB 이하의 백업 파일만 불러올 수 있습니다.');
+            return;
+        }
+
+        const reader = new FileReader();
+
+        reader.onerror = () => {
+            this.outputModule.showError('파일을 읽는 중 오류가 발생했습니다.');
+        };
+
+        reader.onload = () => {
+            try {
+                const parsed = BackupService.parseBackup(String(reader.result ?? ''));
+                if (!parsed.ok) {
+                    this.outputModule.showError(parsed.errorMessage);
+                    return;
+                }
+
+                const classCount = parsed.backup.classes.length;
+                const exportedAt = parsed.backup.exportedAt
+                    ? parsed.backup.exportedAt.slice(0, 10)
+                    : '알 수 없음';
+
+                const proceed = confirm(
+                    `백업 파일에 ${classCount}개 반이 들어 있습니다. (내보낸 날짜: ${exportedAt})\n\n` +
+                    '같은 이름의 반은 파일 내용으로 바뀌고, 파일에 없는 반은 그대로 남습니다.\n\n' +
+                    '불러올까요?'
+                );
+                if (!proceed) return;
+
+                const result = BackupService.applyBackup(
+                    {
+                        read: (key) => this.storageManager.safeGetItem(key),
+                        write: (key, value) => this.storageManager.safeSetItem(key, value)
+                    },
+                    parsed.backup
+                );
+
+                if (!result.ok) {
+                    this.outputModule.showError(result.errorMessage || '불러오기에 실패했습니다.');
+                    return;
+                }
+
+                // 반 목록을 다시 그린다
+                this.updateClassSelect();
+                this.updateHistoryDropdown();
+
+                const parts: string[] = [];
+                if (result.added > 0) parts.push(`${result.added}개 반 추가`);
+                if (result.replaced > 0) parts.push(`${result.replaced}개 반 갱신`);
+                if (result.kept > 0) parts.push(`기존 ${result.kept}개 반 유지`);
+
+                this.outputModule.showSuccess(
+                    `불러오기를 마쳤습니다. (${parts.join(', ')}) 상단에서 반을 선택하면 자리 배치가 나타납니다.`
+                );
+                logger.info('백업 불러오기 완료:', result);
+            } catch (error) {
+                logger.error('백업 불러오기 실패:', error);
+                this.outputModule.showError('불러오기에 실패했습니다. 파일을 확인해주세요.');
+            }
+        };
+
+        reader.readAsText(file, 'UTF-8');
+    }
+
+    /**
      * 명단에서 중복된 이름 찾기
      */
     private findDuplicateStudentNames(students: Array<{name: string}>): string[] {
@@ -5285,46 +5380,19 @@ export class MainController {
 
             // 저장 결과를 기다린 뒤에 안내한다.
             // 기다리지 않고 성공 메시지를 띄우면, 저장이 실패해도 교사는 저장된 것으로 믿는다.
-            let cloudStatus: 'ok' | 'failed' | 'skipped' = 'skipped';
-            let localLayoutSaved = true;
-
+            let layoutSaved = true;
             if (this.classManager) {
-                const layoutResult = await this.classManager.saveCurrentLayoutDetailed({ silent: true });
-                localLayoutSaved = layoutResult.local;
-                cloudStatus = layoutResult.cloud;
-                if (!localLayoutSaved) {
-                    logger.error('자리 확정 시 자리 배치도 로컬 저장 실패');
-                }
-            }
-
-            // 확정된 자리 이력을 클라우드에 저장 (이 경로에서 단 한 번만 수행)
-            if (this.firebaseStorageManager?.getIsAuthenticated()) {
-                const historySaved = await this.firebaseStorageManager
-                    .saveSeatHistory(currentClassId, existingHistory)
-                    .catch((error) => {
-                        logger.error('❌ Firebase에 확정된 자리 이력 저장 실패:', error);
-                        return false;
-                    });
-
-                if (!historySaved) {
-                    cloudStatus = 'failed';
-                } else if (cloudStatus === 'skipped') {
-                    cloudStatus = 'ok';
+                layoutSaved = await this.classManager.saveCurrentLayout({ silent: true });
+                if (!layoutSaved) {
+                    logger.error('자리 확정 시 자리 배치도 저장 실패');
                 }
             }
 
             // 실제 저장 결과에 따른 안내 문구
-            const saveOk = cloudStatus !== 'failed' && localLayoutSaved;
-            let saveLine: string;
-            if (!localLayoutSaved) {
-                saveLine = '⚠️ 자리 배치도 저장에 실패했습니다. 브라우저 저장소를 확인해주세요.';
-            } else if (cloudStatus === 'failed') {
-                saveLine = '⚠️ 이 기기에는 저장했지만 클라우드 저장에 실패했습니다. 다른 기기에서는 보이지 않습니다.';
-            } else if (cloudStatus === 'skipped') {
-                saveLine = '💾 이 기기에 저장되었습니다. (로그인하면 클라우드에도 저장됩니다)';
-            } else {
-                saveLine = '💾 저장도 완료되었습니다.';
-            }
+            const saveOk = layoutSaved;
+            const saveLine = layoutSaved
+                ? '💾 이 기기에 저장되었습니다.'
+                : '⚠️ 자리 배치도 저장에 실패했습니다. 브라우저 저장소를 확인해주세요.';
 
             // XSS 방지: DOM API를 사용하여 메시지 생성
             const container = (this.outputModule as any).container;
@@ -7791,20 +7859,21 @@ export class MainController {
                     <li><strong>✨ 반 만들기</strong>: 프로그램을 처음 사용하시면 상단 바의 "반 만들기" 영역이 하이라이트됩니다</li>
                     <li><strong>➕ 반 추가</strong>: 상단 바의 "반 만들기" 셀렉트 메뉴 옆 ➕ 버튼을 클릭하여 새 반을 추가하세요</li>
                     <li><strong>📚 반 선택</strong>: 셀렉트 메뉴에서 반을 선택하면 해당 반의 저장된 자리 배치도가 자동으로 불러와집니다</li>
-                    <li><strong>💾 Firebase 저장</strong>: 반을 선택한 후 💾 버튼을 클릭하면 현재 자리 배치도가 Firebase 클라우드에 저장됩니다 (로그인 필요)</li>
+                    <li><strong>💾 자동 저장</strong>: 자리를 확정하면 이 컴퓨터에 자동으로 저장됩니다. 따로 저장 버튼을 누르지 않아도 됩니다</li>
                     <li><strong>🗑️ 반 삭제</strong>: 반을 선택한 후 🗑️ 버튼을 클릭하면 해당 반과 저장된 자리 배치도가 삭제됩니다</li>
                     <li>각 반의 자리 배치도는 독립적으로 저장되므로, 여러 반의 자리 배치도를 관리할 수 있습니다</li>
                     <li><strong>⚠️ 중요</strong>: 반을 먼저 만들지 않으면 자리 배치 기능을 사용할 수 없습니다</li>
                 </ul>
 
-                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">2️⃣ 로그인 및 클라우드 저장</h3>
+                <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">2️⃣ 저장과 백업 (꼭 읽어주세요)</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
-                    <li><strong>🔐 로그인</strong>: 상단 바의 "🔐 로그인" 버튼을 클릭하여 로그인하세요</li>
-                    <li><strong>구글 로그인</strong>: Google 계정으로 간편하게 로그인할 수 있습니다</li>
-                    <li><strong>이메일 회원가입</strong>: 로그인 페이지에서 "회원가입" 버튼을 클릭하여 이메일과 비밀번호로 계정을 만들 수 있습니다</li>
-                    <li><strong>로그인 상태 표시</strong>: 로그인 후 상단 바에 "안녕하세요. [이름/이메일]님!"이 노란색으로 표시됩니다</li>
-                    <li><strong>💾 Firebase 저장</strong>: 로그인 후 반을 선택하고 💾 버튼을 클릭하면 자리 배치도가 클라우드에 저장되어 다른 기기에서도 접근할 수 있습니다</li>
-                    <li><strong>🚪 로그아웃</strong>: 상단 바의 "🚪 로그아웃" 버튼을 클릭하여 로그아웃할 수 있습니다</li>
+                    <li><strong>로그인이 필요 없습니다</strong>: 반과 학생 명단은 지금 쓰고 계신 <strong>이 컴퓨터의 브라우저</strong>에 저장됩니다</li>
+                    <li><strong>⚠️ 브라우저 데이터를 지우면 함께 사라집니다</strong>: "인터넷 사용 기록 삭제"에서 쿠키 및 사이트 데이터를 지우면 명단도 없어집니다</li>
+                    <li><strong>⚠️ 다른 컴퓨터에서는 보이지 않습니다</strong>: 학교와 집에서 함께 쓰시려면 아래 내보내기를 이용하세요</li>
+                    <li><strong>💾 내보내기</strong>: 상단 바의 "💾 내보내기"를 누르면 모든 반과 명단이 파일 하나로 저장됩니다. USB나 학교 드라이브에 보관해두세요</li>
+                    <li><strong>📂 불러오기</strong>: 다른 컴퓨터에서 "📂 불러오기"로 그 파일을 열면 반과 자리 배치가 그대로 복원됩니다</li>
+                    <li><strong>같은 반은 덮어쓰고, 파일에 없는 반은 그대로 둡니다</strong>: 실수로 예전 파일을 불러와도 최근에 만든 반이 사라지지 않습니다</li>
+                    <li><strong>학기 초·학기 말처럼 중요한 시점에는 내보내기를 해두시길 권합니다</strong></li>
                 </ul>
 
                 <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">3️⃣ 기본 사용 방법</h3>
@@ -7906,7 +7975,7 @@ export class MainController {
                 <h3 style="color: #667eea; margin-top: 25px; margin-bottom: 10px; font-size: 1.3em;">💡 유용한 팁</h3>
                 <ul style="padding-left: 25px; margin-bottom: 20px;">
                     <li><strong>📚 반 관리 팁</strong>: 여러 반을 관리할 때는 각 반의 자리 배치도를 Firebase에 저장해두면 나중에 쉽게 불러올 수 있습니다</li>
-                    <li><strong>🔐 클라우드 저장</strong>: 로그인 후 💾 버튼을 클릭하면 자리 배치도가 클라우드에 저장되어 다른 기기에서도 접근할 수 있습니다</li>
+                    <li><strong>💾 파일로 백업</strong>: 상단 바의 "💾 내보내기"로 모든 반과 명단을 파일 하나에 저장할 수 있습니다. 다른 컴퓨터에서는 "📂 불러오기"로 그대로 복원됩니다</li>
                     <li><strong>📋 반별 이력 관리</strong>: 각 반의 확정된 자리 이력은 독립적으로 관리되므로, 반을 변경하면 해당 반의 이력이 자동으로 표시됩니다</li>
                     <li>📊 학생 정보 입력 테이블 하단의 통계를 확인하여 남학생/여학생 수와 고정 좌석 수를 확인할 수 있습니다</li>
                     <li>🔒 고정 좌석 모드에서는 미리보기 화면에서 좌석을 클릭하여 고정할 수 있습니다</li>
@@ -8439,7 +8508,6 @@ export class MainController {
     private updateClassSelect(): void {
         const classSelect = document.getElementById('class-select') as HTMLSelectElement;
         const deleteBtn = document.getElementById('delete-class-btn') as HTMLButtonElement;
-        const saveBtn = document.getElementById('save-layout-btn') as HTMLButtonElement;
         
         if (!classSelect) return;
 
@@ -8466,13 +8534,16 @@ export class MainController {
             classSelect.value = '';
         }
 
-        // 버튼 표시/숨김
+        // 반 삭제 버튼은 항상 보이되, 삭제할 반이 없으면 누를 수 없게 한다.
+        // 숨겨 버리면 그런 기능이 있다는 것 자체를 알 수 없다.
         const hasSelection = classSelect.value !== '';
         if (deleteBtn) {
-            deleteBtn.style.display = hasSelection ? 'inline-block' : 'none';
-        }
-        if (saveBtn) {
-            saveBtn.style.display = hasSelection ? 'inline-block' : 'none';
+            deleteBtn.style.display = '';
+            deleteBtn.disabled = !hasSelection;
+            deleteBtn.title = hasSelection
+                ? '선택한 반 삭제'
+                : '삭제할 반을 먼저 선택하세요';
+            deleteBtn.setAttribute('aria-label', deleteBtn.title);
         }
         
         // 반 목록 업데이트 후 하이라이트 상태 확인 (반이 삭제된 경우를 대비)
@@ -8883,139 +8954,4 @@ export class MainController {
     //         saveBtn.style.animation = '';
     //     }
     // }
-
-    /**
-     * Firebase 로그인 처리 (로그인 페이지 표시)
-     */
-    private handleFirebaseLogin(): void {
-        this.loginPageModule.show();
-    }
-
-    /**
-     * Firebase 로그아웃 처리
-     */
-    private async handleFirebaseLogout(): Promise<void> {
-        await this.firebaseStorageManager.signOut();
-        this.updateFirebaseStatus();
-    }
-
-    /**
-     * Firebase 상태 업데이트
-     */
-    private updateFirebaseStatus(): void {
-        const loginBtn = document.getElementById('firebase-login-btn') as HTMLButtonElement;
-        const statusSpan = document.getElementById('firebase-status') as HTMLSpanElement;
-        
-        if (!loginBtn || !statusSpan) return;
-
-        const isAuthenticated = this.firebaseStorageManager.getIsAuthenticated();
-        const currentUser = this.firebaseStorageManager.getCurrentUser();
-
-        if (isAuthenticated && currentUser) {
-            loginBtn.textContent = '🚪 로그아웃';
-            loginBtn.title = 'Firebase 로그아웃';
-            loginBtn.onclick = () => this.handleFirebaseLogout();
-            
-            // 사용자 이름 또는 이메일 표시
-            const displayName = currentUser.displayName || currentUser.email || '사용자';
-            statusSpan.textContent = `안녕하세요. ${displayName}님!`;
-            statusSpan.style.display = 'inline-block';
-            statusSpan.style.color = '#ffeb3b'; // 노란색
-            statusSpan.style.fontWeight = '500';
-            
-            // 로그인 시 Firebase에서 데이터 동기화
-            this.syncDataFromFirebase().catch((error) => {
-                logger.error('Firebase 데이터 동기화 실패:', error);
-            });
-        } else {
-            loginBtn.textContent = '🔐 로그인';
-            loginBtn.title = '로그인 (클라우드 동기화)';
-            loginBtn.onclick = () => this.handleFirebaseLogin();
-            statusSpan.textContent = '로그인 필요';
-            statusSpan.style.display = 'none';
-        }
-    }
-
-    /**
-     * Firebase에서 데이터를 불러와서 localStorage에 동기화
-     */
-    private syncDataFromFirebase(): Promise<void> {
-        // 동기화는 로컬 저장소를 통째로 덮어쓴다.
-        // 여러 번 겹쳐 실행되면 쓰기 순서가 보장되지 않아
-        // 반쯤 갱신된 데이터가 남을 수 있으므로 한 번에 하나만 수행한다.
-        if (this.syncInFlight) {
-            return this.syncInFlight;
-        }
-
-        this.syncInFlight = this.performSyncFromFirebase().finally(() => {
-            this.syncInFlight = null;
-        });
-
-        return this.syncInFlight;
-    }
-
-    /**
-     * Firebase 데이터 동기화 실제 수행 (syncDataFromFirebase를 통해서만 호출)
-     */
-    private async performSyncFromFirebase(): Promise<void> {
-        if (!this.firebaseStorageManager.getIsAuthenticated()) {
-            return;
-        }
-
-        try {
-            logger.info('🔄 Firebase에서 데이터 동기화 시작...');
-            
-            // 1. 반 목록 동기화
-            const synced = await this.classManager.syncClassListFromFirebase();
-            if (synced) {
-                logger.info('✅ 반 목록 동기화 완료');
-                
-                // 반 목록 UI 업데이트
-                this.updateClassSelect();
-                
-                // 2. 각 반의 자리 배치도와 확정된 자리 이력 동기화
-                const classList = this.classManager.getClassList();
-                for (const classInfo of classList) {
-                    await this.syncClassDataFromFirebase(classInfo.id);
-                }
-                
-                logger.info('✅ Firebase 데이터 동기화 완료');
-                this.outputModule.showInfo('Firebase에서 데이터를 불러왔습니다.');
-            } else {
-                logger.info('⚠️ Firebase에 반 목록이 없거나 동기화 실패');
-            }
-        } catch (error) {
-            logger.error('❌ Firebase 데이터 동기화 실패:', error);
-            this.outputModule.showError('Firebase 데이터 동기화에 실패했습니다.');
-        }
-    }
-
-    /**
-     * 특정 반의 자리 배치도와 확정된 자리 이력을 Firebase에서 불러와서 localStorage에 저장
-     */
-    private async syncClassDataFromFirebase(classId: string): Promise<void> {
-        if (!this.firebaseStorageManager.getIsAuthenticated()) {
-            return;
-        }
-
-        try {
-            // 1. 자리 배치도 동기화
-            const layout = await this.firebaseStorageManager.loadClassLayout(classId);
-            if (layout) {
-                const storageKey = `classLayout_${classId}`;
-                this.storageManager.safeSetItem(storageKey, JSON.stringify(layout));
-                logger.info(`✅ 반 ${classId} 자리 배치도 동기화 완료`);
-            }
-
-            // 2. 확정된 자리 이력 동기화
-            const history = await this.firebaseStorageManager.loadSeatHistory(classId);
-            if (history && history.length > 0) {
-                const historyKey = `seatHistory_${classId}`;
-                this.storageManager.safeSetItem(historyKey, JSON.stringify(history));
-                logger.info(`✅ 반 ${classId} 확정된 자리 이력 ${history.length}개 동기화 완료`);
-            }
-        } catch (error) {
-            logger.error(`❌ 반 ${classId} 데이터 동기화 실패:`, error);
-        }
-    }
 }

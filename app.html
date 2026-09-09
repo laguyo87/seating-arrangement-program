@@ -71,12 +71,15 @@
                         <option value="">반 선택</option>
                     </select>
                     <button id="add-class-btn" class="icon-btn" title="새 반 추가" aria-label="새 반 추가">➕</button>
-                    <button id="delete-class-btn" class="icon-btn" title="선택한 반 삭제" aria-label="선택한 반 삭제"
-                        style="display: none;">🗑️</button>
+                    <button id="delete-class-btn" class="icon-btn" title="삭제할 반을 먼저 선택하세요"
+                        aria-label="삭제할 반을 먼저 선택하세요" disabled>🗑️</button>
                 </div>
-                <button id="firebase-login-btn" class="login-btn" title="로그인 (클라우드 동기화)" aria-label="로그인">🔐
-                    로그인</button>
-                <span id="firebase-status" class="firebase-status" style="display: none;" aria-live="polite"></span>
+                <button id="backup-export-btn" class="backup-btn" title="모든 반과 명단을 파일 하나로 저장합니다"
+                    aria-label="명단과 자리 배치를 파일로 내보내기">💾 내보내기</button>
+                <button id="backup-import-btn" class="backup-btn" title="내보낸 파일에서 반과 명단을 복원합니다"
+                    aria-label="파일에서 명단과 자리 배치 불러오기">📂 불러오기</button>
+                <input type="file" id="backup-import-input" accept="application/json,.json"
+                    style="display: none;" aria-hidden="true" tabindex="-1">
                 <button id="undo-layout" class="icon-btn" title="되돌리기 (Ctrl+Z / Cmd+Z)"
                     aria-label="되돌리기 (Ctrl+Z 또는 Cmd+Z)">↶</button>
                 <button id="redo-layout" class="icon-btn" title="다시 실행하기 (Ctrl+Y / Cmd+Y)"
@@ -380,98 +383,16 @@
     <script>
         // 개발 모드에서만 로드
         if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-            // checkFirebaseStorage 함수 정의
-            window.checkFirebaseStorage = async function () {
-                console.log('🔍 Firebase 저장 상태 확인 시작...\n');
-
-                const mainController = window.mainController;
-
-                if (!mainController) {
-                    console.error('❌ MainController를 찾을 수 없습니다.');
-                    console.log('💡 팁: 페이지를 새로고침한 후 다시 시도하세요.');
-                    return;
-                }
-
-                const firebaseStorageManager = mainController.firebaseStorageManager;
-
-                if (!firebaseStorageManager) {
-                    console.error('❌ FirebaseStorageManager를 찾을 수 없습니다.');
-                    return;
-                }
-
-                const isAuthenticated = firebaseStorageManager.getIsAuthenticated();
-                const currentUser = firebaseStorageManager.getCurrentUser();
-
-                console.log('📊 인증 상태:');
-                console.log('  - 로그인 여부:', isAuthenticated ? '✅ 로그인됨' : '❌ 로그인 안 됨');
-                console.log('  - 사용자:', currentUser ? currentUser.email : '없음');
-                console.log('  - 사용자 ID:', currentUser ? currentUser.uid : '없음');
-                console.log('');
-
-                if (!isAuthenticated || !currentUser) {
-                    console.warn('⚠️ 로그인이 필요합니다. Firebase에 저장하려면 먼저 로그인하세요.');
-                    return;
-                }
-
-                const classManager = mainController.classManager;
-
-                if (!classManager) {
-                    console.error('❌ ClassManager를 찾을 수 없습니다.');
-                    return;
-                }
-
-                const classList = classManager.getClassList();
-                const currentClassId = classManager.getCurrentClassId();
-
-                console.log('📚 반 정보:');
-                console.log('  - 반 개수:', classList.length);
-                console.log('  - 현재 선택된 반:', currentClassId || '없음');
-                console.log('  - 반 목록:', classList);
-                console.log('');
-
-                try {
-                    console.log('🔄 Firebase에서 데이터 불러오기 시도...');
-
-                    const firebaseClassList = await firebaseStorageManager.loadClassList();
-                    console.log('  - Firebase 반 목록:', firebaseClassList);
-                    console.log('  - Firebase 반 개수:', firebaseClassList.length);
-                    console.log('');
-
-                    if (firebaseClassList.length === 0 && classList.length > 0) {
-                        console.warn('⚠️ Firebase에 반 목록이 없습니다. 저장이 필요합니다.');
-                    } else if (firebaseClassList.length > 0) {
-                        console.log('✅ Firebase에 반 목록이 저장되어 있습니다!');
-                    }
-
-                    if (currentClassId) {
-                        console.log('🔄 현재 반의 자리 배치도 확인...');
-                        const layout = await firebaseStorageManager.loadClassLayout(currentClassId);
-
-                        if (layout) {
-                            console.log('✅ Firebase에 자리 배치도가 저장되어 있습니다!');
-                            console.log('  - 반 이름:', layout.className);
-                            console.log('  - 좌석 수:', layout.seats.length);
-                            console.log('  - 학생 수:', layout.students.length);
-                            console.log('  - 저장 시간:', layout.timestamp);
-                        } else {
-                            console.warn('⚠️ Firebase에 자리 배치도가 없습니다.');
-                        }
-                    }
-
-                } catch (error) {
-                    console.error('❌ Firebase 데이터 불러오기 실패:', error);
-                }
-
-                console.log('\n📝 저장 테스트 방법:');
-                console.log('1. 반을 선택하세요');
-                console.log('2. 자리 배치하기 버튼을 클릭하세요');
-                console.log('3. ✅ 자리 확정하기(저장) 💾 버튼을 클릭하세요');
-                console.log('4. 콘솔에서 "✅ Firebase에" 로그를 확인하세요');
-                console.log('\n🌐 Firebase Console에서 확인:');
-                console.log(`https://console.firebase.google.com/project/seating-arrangement-back-7ffa1/firestore/data/~2Fusers~2F${currentUser.uid}`);
+            // 로컬 저장 상태 확인 (개발용)
+            window.checkLocalStorage = function () {
+                const keys = Object.keys(localStorage).filter(k =>
+                    k === 'classList' || k.startsWith('classLayout_') || k.startsWith('seatHistory_') || k === 'classStudentData');
+                console.log('📦 저장된 항목:', keys.length + '개');
+                keys.forEach(k => console.log('  -', k, '(' + localStorage.getItem(k).length + '자)'));
+                const list = JSON.parse(localStorage.getItem('classList') || '[]');
+                console.log('📚 반 목록:', list.map(c => c.name));
             };
-
-            console.log('💡 Firebase 저장 상태 확인: 브라우저 콘솔에서 checkFirebaseStorage() 실행');
+console.log('💡 로컬 저장 상태 확인: 브라우저 콘솔에서 checkLocalStorage() 실행');
         }
     </script>
 </body>

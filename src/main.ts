@@ -46,7 +46,7 @@ function startApplication(): void {
         if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
             (window as any).mainController = controller;
             console.log('💡 디버깅: MainController가 window.mainController로 노출되었습니다.');
-            console.log('💡 Firebase 저장 상태 확인: checkFirebaseStorage() 실행');
+            console.log('💡 로컬 저장 상태 확인: checkLocalStorage() 실행');
         }
         
     } catch (error) {
