@@ -5,6 +5,7 @@
 
 import { Student } from '../models/Student.js';
 import { Seat } from '../models/Seat.js';
+import { SeatOccupancyService } from '../services/SeatOccupancyService.js';
 import { OutputModule } from '../modules/OutputModule.js';
 import { logger } from '../utils/logger.js';
 
@@ -97,11 +98,11 @@ export class LayoutRenderer {
             seatsArea.style.gap = '10px';
             seatsArea.style.display = 'grid';
 
-            seats.forEach((seat, index) => {
-                if (index >= students.length) return;
-                
-                const student = students[index];
-                const card = this.createStudentCard(student, index);
+            // 좌석에 기록된 배정 정보를 그대로 사용한다 (명단 순서로 되돌리지 않는다)
+            const occupants = SeatOccupancyService.resolveOccupants(seats, students);
+            occupants.forEach((student) => {
+                if (!student) return;
+                const card = this.createStudentCard(student, students.indexOf(student));
                 seatsArea.appendChild(card);
             });
         }

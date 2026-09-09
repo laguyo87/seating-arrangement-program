@@ -11,6 +11,7 @@ import { StudentModel } from '../models/Student.js';
 import { LayoutService } from '../services/LayoutService.js';
 import { RandomService } from '../services/RandomService.js';
 import { PairingService } from '../services/PairingService.js';
+import { SeatOccupancyService } from '../services/SeatOccupancyService.js';
 // import { SeatType } from '../models/Seat.js'; // 향후 사용 예정
 import { Student } from '../models/Student.js';
 import { Seat } from '../models/Seat.js';
@@ -2993,11 +2994,12 @@ export class MainController {
             seatsArea.style.gap = '10px';
             seatsArea.style.display = 'grid';
 
-            seats.forEach((seat, index) => {
-                if (index >= this.students.length) return;
-                
-                const student = this.students[index];
-                const card = this.createStudentCard(student, index);
+            // 좌석에 기록된 배정 정보를 그대로 사용한다.
+            // 명단 순서로 다시 그리면 저장해 둔 배치가 전혀 다른 배치로 복원된다.
+            const occupants = SeatOccupancyService.resolveOccupants(seats, this.students);
+            occupants.forEach((student, index) => {
+                if (!student) return;
+                const card = this.createStudentCard(student, this.students.indexOf(student));
                 seatsArea.appendChild(card);
             });
 
