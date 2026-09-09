@@ -8483,6 +8483,34 @@ export class MainController {
      * 반 선택 변경 처리
      */
     private handleClassSelectChange(classId: string): void {
+        const previousClassId = this.classManager.getCurrentClassId();
+
+        // 반이 선택되지 않은 상태에서 입력하거나 엑셀로 불러온 명단은
+        // 아직 어느 반에도 속해 있지 않다. 명단은 반마다 따로 관리되므로
+        // 반을 선택하는 순간 화면의 명단은 지워진다.
+        // 그대로 두면 방금 불러온 명단이 아무 안내 없이 사라지므로 먼저 확인한다.
+        // (반이 이미 선택된 상태였다면 그 명단은 해당 반에 저장되므로 묻지 않는다)
+        if (!previousClassId) {
+            const unsavedCount = this.countEnteredStudents();
+            if (unsavedCount > 0) {
+                const proceed = confirm(
+                    `현재 입력된 학생 ${unsavedCount}명의 명단이 지워집니다.\n` +
+                    '학생 명단은 반마다 따로 관리되기 때문입니다.\n\n' +
+                    '계속하시려면 확인을 누르세요.\n' +
+                    '명단을 지키려면 취소를 누른 뒤, 반을 먼저 선택하고 명단을 다시 불러오세요.'
+                );
+
+                if (!proceed) {
+                    // 선택을 원래대로 되돌린다
+                    const classSelect = document.getElementById('class-select') as HTMLSelectElement | null;
+                    if (classSelect) {
+                        classSelect.value = '';
+                    }
+                    return;
+                }
+            }
+        }
+
         // 반이 바뀌면 되돌리기 이력은 더 이상 유효하지 않다.
         // 비우지 않으면 다른 반에서 Ctrl+Z를 눌렀을 때
         // 이전 반의 자리 배치가 현재 반 화면에 복원된다.
@@ -8582,6 +8610,26 @@ export class MainController {
     }
 
     /**
+     * 화면의 명렬표에 실제로 입력된 학생 수
+     */
+    private countEnteredStudents(): number {
+        const outputSection = document.getElementById('output-section');
+        if (!outputSection) return 0;
+
+        const rows = outputSection.querySelectorAll('.student-input-table tbody tr');
+        let count = 0;
+
+        rows.forEach(row => {
+            const nameInput = row.querySelector('.student-name-input') as HTMLInputElement | null;
+            if (nameInput && nameInput.value.trim()) {
+                count++;
+            }
+        });
+
+        return count;
+    }
+
+    /**
      * 현재 화면의 자리 배치도 지우기
      */
     private clearCurrentLayout(): void {
@@ -8671,10 +8719,16 @@ export class MainController {
                 cardContainer.style.display = 'block';
             }
 
-            // 기본 카드 렌더링 (학생 수가 0이므로 빈 카드만 표시)
-            // 남학생 12명 + 여학생 12명 = 24명의 빈 카드 표시
+            // 인원수 입력값에 맞춰 미리보기를 생성한다.
+            //
+            // renderExampleCards()는 this.students를 그리기만 할 뿐 만들지 않는다.
+            // 바로 앞에서 clearCurrentLayout()이 this.students를 비웠으므로,
+            // 이것만 호출하면 분단 레이블만 있고 자리는 하나도 없는 화면이 된다.
+            // 인원수로부터 미리보기 학생과 좌석을 만드는 것은
+            // updatePreviewForGenderCounts()이며, 좌석 배치 형태 라디오를 누르면
+            // 실행되는 것도 이 함수다. (그래서 라디오를 누르면 화면이 정상으로 돌아왔다)
             this.nextSeatId = 1;
-            this.renderExampleCards();
+            this.updatePreviewForGenderCounts();
 
             logger.info('초기 화면의 자리 배치도 표시 완료');
         } catch (error) {
