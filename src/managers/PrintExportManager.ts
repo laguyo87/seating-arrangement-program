@@ -6,6 +6,7 @@
 import { OutputModule } from '../modules/OutputModule.js';
 import { Seat } from '../models/Seat.js';
 import { logger } from '../utils/logger.js';
+import { CustomLayoutService, SeatPosition } from '../services/CustomLayoutService.js';
 
 /**
  * PrintExportManager가 필요로 하는 의존성 인터페이스
@@ -21,6 +22,11 @@ export interface PrintExportManagerDependencies {
  * 인쇄 및 내보내기 관리자 클래스
  */
 export class PrintExportManager {
+    /** 화면에 보이는 좌석 카드 한 변의 크기(px) */
+    private static readonly SCREEN_CARD_SIZE = 120;
+    /** 인쇄물의 좌석 카드 한 변의 크기(px) */
+    private static readonly PRINT_CARD_SIZE = 60;
+
     private deps: PrintExportManagerDependencies;
 
     constructor(dependencies: PrintExportManagerDependencies) {
@@ -30,6 +36,68 @@ export class PrintExportManager {
     /**
      * 자리 배치도 인쇄 처리
      */
+    /**
+     * 인쇄용 좌석 영역 HTML과 덧붙일 스타일을 만든다.
+     *
+     * 사용자 구성 배치는 카드가 좌표(left/top)로 놓이기 때문에
+     * 인쇄 템플릿의 `.seats-area { display: grid }` 로는 배치가 재현되지 않는다.
+     * 교사가 만든 교실 모양 그대로 인쇄되어야 하므로 좌표를 그대로 옮기되,
+     * 인쇄용 카드가 화면의 절반 크기이므로 좌표도 같은 비율로 줄인다.
+     */
+    private buildSeatsAreaMarkup(seatsArea: HTMLElement): { html: string; extraStyle: string } {
+        if (!seatsArea.classList.contains('custom-layout')) {
+            return { html: seatsArea.innerHTML, extraStyle: '' };
+        }
+
+        const scale = PrintExportManager.PRINT_CARD_SIZE / PrintExportManager.SCREEN_CARD_SIZE;
+
+        const originalCards = Array.from(seatsArea.querySelectorAll('.student-seat-card')) as HTMLElement[];
+        const clone = seatsArea.cloneNode(true) as HTMLElement;
+
+        // 드래그 중에만 쓰는 안내선은 인쇄물에 나오면 안 된다
+        clone.querySelectorAll('.desk-guide').forEach(guide => guide.remove());
+
+        const clonedCards = Array.from(clone.querySelectorAll('.student-seat-card')) as HTMLElement[];
+
+        const positions: SeatPosition[] = originalCards.map((card, index) => ({
+            seatId: index + 1,
+            x: parseFloat(card.style.left || '0') || 0,
+            y: parseFloat(card.style.top || '0') || 0
+        }));
+
+        positions.forEach((position, index) => {
+            const target = clonedCards[index];
+            if (target) {
+                target.style.left = `${Math.round(position.x * scale)}px`;
+                target.style.top = `${Math.round(position.y * scale)}px`;
+            }
+        });
+
+        const bounds = CustomLayoutService.boundingSize(positions);
+        const width = Math.max(1, Math.round(bounds.width * scale));
+        const height = Math.max(1, Math.round(bounds.height * scale));
+
+        const extraStyle = `
+                        /* 사용자 구성 배치: 좌표로 놓인 책상을 그대로 인쇄한다 */
+                        .seats-area {
+                            display: block !important;
+                            position: relative !important;
+                            width: ${width}px !important;
+                            height: ${height}px !important;
+                            margin: 10px auto !important;
+                            grid-template-columns: none !important;
+                        }
+                        .seats-area .student-seat-card {
+                            position: absolute !important;
+                            width: ${PrintExportManager.PRINT_CARD_SIZE}px !important;
+                            min-width: ${PrintExportManager.PRINT_CARD_SIZE}px !important;
+                            height: ${PrintExportManager.PRINT_CARD_SIZE}px !important;
+                            margin: 0 !important;
+                        }`;
+
+        return { html: clone.innerHTML, extraStyle };
+    }
+
     public printLayout(): void {
         try {
             // 인쇄용 스타일이 포함된 새 창 열기
@@ -52,7 +120,7 @@ export class PrintExportManager {
             const currentGridTemplateColumns = seatsArea.style.gridTemplateColumns;
             
             // 현재 화면의 실제 HTML 구조를 그대로 사용
-            const seatsAreaHtml = seatsArea.innerHTML;
+            const { html: seatsAreaHtml, extraStyle: customLayoutStyle } = this.buildSeatsAreaMarkup(seatsArea);
 
             // 현재 날짜와 시간
             const now = new Date();
@@ -287,6 +355,7 @@ export class PrintExportManager {
                                 width: 100% !important;
                             }
                         }
+${customLayoutStyle}
                     </style>
                 </head>
                 <body>
@@ -344,7 +413,7 @@ export class PrintExportManager {
             const currentGridTemplateColumns = seatsArea.style.gridTemplateColumns;
             
             // 현재 화면의 실제 HTML 구조를 그대로 사용
-            const seatsAreaHtml = seatsArea.innerHTML;
+            const { html: seatsAreaHtml, extraStyle: customLayoutStyle } = this.buildSeatsAreaMarkup(seatsArea);
 
             // 현재 날짜와 시간
             const now = new Date();
@@ -596,6 +665,7 @@ export class PrintExportManager {
                                 margin-bottom: 2px;
                             }
                         }
+${customLayoutStyle}
                     </style>
                 </head>
                 <body>
@@ -671,7 +741,7 @@ export class PrintExportManager {
             const currentGridTemplateColumns = seatsArea.style.gridTemplateColumns;
             
             // 현재 화면의 실제 HTML 구조를 그대로 사용
-            const seatsAreaHtml = seatsArea.innerHTML;
+            const { html: seatsAreaHtml, extraStyle: customLayoutStyle } = this.buildSeatsAreaMarkup(seatsArea);
 
             // 현재 날짜와 시간
             const now = new Date();
@@ -782,6 +852,7 @@ export class PrintExportManager {
                             font-size: 0.9em;
                             margin-bottom: 5px;
                         }
+${customLayoutStyle}
                     </style>
                 </head>
                 <body>

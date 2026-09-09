@@ -203,6 +203,27 @@ export class CustomLayoutService {
     }
 
     /**
+     * 배치 전체를 감싸는 크기를 구한다.
+     *
+     * 인쇄물처럼 좌석 영역의 크기를 직접 지정해야 하는 곳에서 쓴다.
+     * 가장 오른쪽/아래쪽 책상의 '끝'까지 포함해야 하므로 카드 크기를 더한다.
+     * 이를 빠뜨리면 마지막 줄의 책상이 잘려 인쇄된다.
+     */
+    public static boundingSize(positions: SeatPosition[]): { width: number; height: number } {
+        if (positions.length === 0) return { width: 0, height: 0 };
+
+        let right = 0;
+        let bottom = 0;
+
+        for (const position of positions) {
+            right = Math.max(right, position.x + CARD_SIZE);
+            bottom = Math.max(bottom, position.y + CARD_SIZE);
+        }
+
+        return { width: right, height: bottom };
+    }
+
+    /**
      * 저장된 값이 쓸 수 있는 위치 목록인지 확인한다.
      * 손상된 값을 그대로 적용하면 카드가 화면 밖으로 사라진다.
      */

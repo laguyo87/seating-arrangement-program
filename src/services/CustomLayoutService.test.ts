@@ -301,3 +301,35 @@ describe('CustomLayoutService.magnetize - 자석처럼 달라붙기', () => {
         expect(second.y).toBe(first.y);
     });
 });
+
+describe('CustomLayoutService.boundingSize - 배치 전체 크기', () => {
+    it('책상이 없으면 0이다', () => {
+        expect(CustomLayoutService.boundingSize([])).toEqual({ width: 0, height: 0 });
+    });
+
+    it('책상 하나면 카드 크기만큼이다', () => {
+        expect(CustomLayoutService.boundingSize([{ seatId: 1, x: 0, y: 0 }]))
+            .toEqual({ width: CARD_SIZE, height: CARD_SIZE });
+    });
+
+    it('가장 먼 책상의 끝까지 포함한다', () => {
+        // 카드 크기를 더하지 않으면 마지막 줄 책상이 잘려 인쇄된다
+        const positions = [
+            { seatId: 1, x: 0, y: 0 },
+            { seatId: 2, x: 300, y: 500 },
+        ];
+
+        expect(CustomLayoutService.boundingSize(positions))
+            .toEqual({ width: 300 + CARD_SIZE, height: 500 + CARD_SIZE });
+    });
+
+    it('가로와 세로를 각각 가장 먼 값으로 잡는다', () => {
+        const positions = [
+            { seatId: 1, x: 600, y: 0 },
+            { seatId: 2, x: 0, y: 400 },
+        ];
+
+        expect(CustomLayoutService.boundingSize(positions))
+            .toEqual({ width: 600 + CARD_SIZE, height: 400 + CARD_SIZE });
+    });
+});
