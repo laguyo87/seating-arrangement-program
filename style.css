@@ -2895,3 +2895,60 @@ button:disabled {
         font-size: 0.85em;
     }
 }
+
+/* 사용자 구성 배치 안내 */
+.custom-layout-hint {
+    margin: 8px 0 0 28px;
+    padding: 10px 12px;
+    background: #eef2ff;
+    border-left: 3px solid #667eea;
+    border-radius: 6px;
+    font-size: 0.85em;
+    color: #4a5568;
+    line-height: 1.6;
+}
+
+.custom-layout-reset {
+    display: block;
+    margin-top: 8px;
+    width: auto;
+    flex: none;
+    padding: 4px 10px;
+    font-size: 0.9em;
+    background: white;
+    color: #667eea;
+    border: 1px solid #667eea;
+    border-radius: 4px;
+    font-weight: 500;
+    margin-bottom: 0;
+}
+
+.custom-layout-reset:hover {
+    background: #667eea;
+    color: white;
+}
+
+/* 사용자 구성 배치일 때 좌석 영역은 좌표 기준으로 카드를 놓는다 */
+#seats-area.custom-layout {
+    display: block !important;
+    position: relative;
+    gap: 0 !important;
+}
+
+#seats-area.custom-layout .student-seat-card {
+    position: absolute;
+    margin: 0;
+}
+
+/* 책상을 옮기는 중임을 알린다 */
+#seats-area.custom-layout .student-seat-card.desk-moving {
+    opacity: 0.75;
+    z-index: 100;
+    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.45);
+    cursor: grabbing;
+}
+
+/* 아직 학생이 배정되지 않은 책상은 끌어서 옮길 수 있음을 커서로 알린다 */
+#seats-area.custom-layout.arranging-desks .student-seat-card {
+    cursor: grab;
+}

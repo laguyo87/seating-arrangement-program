@@ -12,6 +12,8 @@ import { PairingService } from '../services/PairingService.js';
 import { SeatOccupancyService } from '../services/SeatOccupancyService.js';
 import { SeatReorderService } from '../services/SeatReorderService.js';
 import { BackupService } from '../services/BackupService.js';
+import { CustomLayoutService, SeatPosition } from '../services/CustomLayoutService.js';
+import { CustomLayoutManager } from '../managers/CustomLayoutManager.js';
 // import { SeatType } from '../models/Seat.js'; // 향후 사용 예정
 import { Student } from '../models/Student.js';
 import { Seat } from '../models/Seat.js';
@@ -75,6 +77,12 @@ interface SeatHistoryItem {
     partitionCount?: number; // 분단 수
     groupSize?: string; // 'group-3' | 'group-4' | 'group-5' | 'group-6'
     classId?: string; // 반 ID (검증을 위해 저장)
+    /**
+     * 사용자 구성 배치의 책상 위치.
+     * 이것을 저장하지 않으면 확정한 이력을 불러왔을 때 교사가 만든 교실 모양이
+     * 기본 격자로 되돌아간다.
+     */
+    customPositions?: SeatPosition[];
 }
 
 /**
@@ -117,10 +125,20 @@ interface OptionsData {
  * 전체 프로그램의 흐름을 제어하고 모듈들을 조율합니다.
  */
 export class MainController {
+    /** 사용자 구성 배치에서 좌석 영역 폭을 알 수 없을 때 쓰는 기본값 */
+    private static readonly CARD_AREA_MIN_WIDTH_FALLBACK = 900;
+
     /** 진행 중인 Firebase 동기화 (중복 실행 방지) */
     private syncInFlight: Promise<void> | null = null;
     /** 자리 배치가 진행 중인지 (연출이 끝나기 전 재실행 방지) */
     private arrangingSeats: boolean = false;
+    /** 사용자 구성 배치의 책상 위치 관리 */
+    private customLayoutManager!: CustomLayoutManager;
+    /**
+     * 이력을 불러올 때 복원할 책상 위치.
+     * renderExampleCards가 한 번 사용하고 비운다.
+     */
+    private pendingCustomPositions: SeatPosition[] | null = null;
 
     private inputModule!: InputModule;
     private layoutSelectorModule!: LayoutSelectorModule;
@@ -318,6 +336,9 @@ export class MainController {
             
             // 반 관리 초기화
             this.initializeClassManagement();
+            
+            // 사용자 구성 배치 안내 표시 여부 반영
+            this.updateCustomLayoutHint();
             
             // 저장 방식 변경 안내 (처음 한 번만)
             this.cloudMigrationModule.showNoticeIfNeeded();
@@ -589,9 +610,16 @@ export class MainController {
                 }
                 
                 // 배치 형태 변경 시 미리보기 업데이트
+                this.updateCustomLayoutHint();
                 this.updatePreviewForGenderCounts();
             });
         });
+
+        // 책상 위치 초기화 버튼 (사용자 구성 배치)
+        const resetCustomBtn = document.getElementById('custom-layout-reset');
+        if (resetCustomBtn) {
+            this.addEventListenerSafe(resetCustomBtn, 'click', () => this.handleResetCustomLayout());
+        }
 
         // 1명씩 한 줄로 배치 모드 라디오 버튼 변경 이벤트
         const singleModeInputs = document.querySelectorAll('input[name="single-mode"]');
@@ -1240,6 +1268,100 @@ export class MainController {
     }
 
     /**
+     * 사용자 구성 배치를 선택했을 때만 안내를 보여준다.
+     */
+    private updateCustomLayoutHint(): void {
+        const hint = document.getElementById('custom-layout-hint');
+        if (!hint) return;
+
+        const layoutType = (document.querySelector('input[name="layout-type"]:checked') as HTMLInputElement | null)?.value;
+        hint.style.display = layoutType === 'custom' ? 'block' : 'none';
+    }
+
+    /**
+     * 책상 위치를 기본 격자로 되돌린다.
+     */
+    private handleResetCustomLayout(): void {
+        const key = this.customPositionsKey();
+        if (key) {
+            try {
+                localStorage.removeItem(key);
+            } catch (error) {
+                logger.error('책상 위치 초기화 실패:', error);
+            }
+        }
+
+        this.pendingCustomPositions = null;
+        this.updatePreviewForGenderCounts();
+        this.outputModule.showInfo('책상 위치를 기본 배치로 되돌렸습니다.');
+    }
+
+    /**
+     * 사용자 구성 배치: 책상을 좌표에 놓고 끌어 옮길 수 있게 한다.
+     *
+     * 다른 배치 형태는 정해진 틀에 카드를 채우지만, 이 배치는 교사가
+     * 책상을 직접 옮겨 ㄷ자·원형 같은 임의의 교실 모양을 만든다.
+     */
+    private renderCustomLayoutCards(seatsArea: HTMLElement): void {
+        const areaWidth = Math.max(seatsArea.clientWidth, MainController.CARD_AREA_MIN_WIDTH_FALLBACK);
+
+        // 이력에서 복원 중이면 그 위치를, 아니면 저장해 둔 위치를, 없으면 기본 격자를 쓴다
+        const stored = this.pendingCustomPositions ?? this.loadCustomPositions();
+        this.pendingCustomPositions = null;
+
+        const positions = stored
+            ? CustomLayoutService.fitToCount(stored, this.students.length, areaWidth)
+            : CustomLayoutService.defaultPositions(this.students.length, areaWidth);
+
+        this.students.forEach((student, index) => {
+            const card = this.createStudentCard(student, index);
+            seatsArea.appendChild(card);
+        });
+
+        this.customLayoutManager.applyLayout(positions);
+
+        // 자리를 배정하기 전에는 카드를 끌면 책상이 움직인다.
+        // 배정한 뒤에는 기존과 같이 학생이 서로 바뀐다.
+        this.customLayoutManager.setDeskEditing(true);
+
+        this.enableSeatSwapDragAndDrop();
+        this.setTimeoutSafe(() => this.saveLayoutToHistory(), 100);
+    }
+
+    /**
+     * 저장해 둔 책상 위치를 읽는다. (반별로 따로 보관한다)
+     */
+    private loadCustomPositions(): SeatPosition[] | null {
+        const key = this.customPositionsKey();
+        if (!key) return null;
+
+        const raw = this.storageManager.safeGetItem(key);
+        if (!raw) return null;
+
+        try {
+            return CustomLayoutService.parsePositions(JSON.parse(raw));
+        } catch (error) {
+            logger.error('책상 위치 불러오기 실패:', error);
+            return null;
+        }
+    }
+
+    /**
+     * 책상 위치를 저장한다. 반이 선택되지 않았으면 저장하지 않는다.
+     */
+    private saveCustomPositions(positions: SeatPosition[]): void {
+        const key = this.customPositionsKey();
+        if (!key) return;
+
+        this.storageManager.safeSetItem(key, JSON.stringify(positions));
+    }
+
+    private customPositionsKey(): string | null {
+        const classId = this.classManager?.getCurrentClassId();
+        return classId ? `customLayout_${classId}` : null;
+    }
+
+    /**
      * 예시 카드 렌더링
      */
     private renderExampleCards(): void {
@@ -1276,6 +1398,15 @@ export class MainController {
         const partitionInput = document.getElementById('number-of-partitions') as HTMLInputElement;
         const partitionCount = partitionInput ? parseInt(partitionInput.value || '1', 10) : 1;
         
+        // 사용자 구성 배치인 경우: 카드를 좌표로 놓고 책상을 끌어 옮길 수 있게 한다
+        if (layoutType === 'custom') {
+            this.renderCustomLayoutCards(seatsArea);
+            return;
+        }
+
+        // 다른 배치 형태로 돌아왔다면 좌표 기반 설정을 걷어낸다
+        this.customLayoutManager?.clearLayout();
+
         // 모둠 배치인 경우
         
         if (layoutType === 'group' && (groupSize === 'group-3' || groupSize === 'group-4' || groupSize === 'group-5' || groupSize === 'group-6')) {
@@ -2155,6 +2286,10 @@ export class MainController {
                 source.classList.toggle('gender-f', tgtIsF);
                 targetCard.classList.toggle('gender-m', srcIsM);
                 targetCard.classList.toggle('gender-f', srcIsF);
+            } else if (seatsArea.classList.contains('custom-layout')) {
+                // 사용자 구성 배치에서는 책상이 좌표에 놓여 있어 DOM 순서가 화면 순서와 다르다.
+                // 빈 공간에 떨어뜨렸을 때 순서를 회전시키면 엉뚱한 자리들이 바뀐다.
+                return;
             } else {
                 // 빈 공간에 드롭: 이동
                 // 드롭 위치 계산 (마우스 좌표 사용)
@@ -5164,6 +5299,10 @@ export class MainController {
                 fixedSeatHelp.style.display = 'none';
             }
             
+            // 자리가 배정되었으므로 이제 카드를 끄는 것은 '학생 교환'이다.
+            // 책상 옮기기는 배정 전에만 하도록 해서 두 동작이 섞이지 않게 한다.
+            this.customLayoutManager?.setDeskEditing(false);
+
             // 1초 후 폭죽 애니메이션 시작
             this.setTimeoutSafe(() => {
                 this.animationManager.startFireworks();
@@ -5323,6 +5462,11 @@ export class MainController {
             // 짝꿍 정보가 있으면 추가
             if (pairInfo.length > 0) {
                 historyItem.pairInfo = pairInfo;
+            }
+
+            // 사용자 구성 배치는 책상 위치까지 함께 남겨야 같은 모양으로 복원된다
+            if (layoutType === 'custom') {
+                historyItem.customPositions = this.customLayoutManager.readPositions();
             }
             
             // 반별 이력 키: seatHistory_${classId} (각 반마다 독립적으로 저장)
@@ -5875,6 +6019,8 @@ export class MainController {
             // 중요: 옵션 복원 전에 읽기 전용 모드 활성화
             // 이렇게 하면 옵션 복원 중 이벤트 핸들러가 실행되어 옵션이 변경되는 것을 방지
             this.isReadOnlyMode = true;
+            // 확정된 이력을 보는 중에는 책상도 옮길 수 없어야 한다
+            this.customLayoutManager?.setDeskEditing(false);
 
             // card-layout-container가 숨겨져 있으면 표시
             const cardContainer = document.getElementById('card-layout-container');
@@ -6204,6 +6350,13 @@ export class MainController {
                         historyLayoutCount: historyItem.layout.length
                     });
                 } else {
+                    // 사용자 구성 배치는 확정 당시의 책상 위치로 복원한다.
+                    // renderExampleCards가 이 값을 한 번 쓰고 비운다.
+                    if (historyItem.layoutType === 'custom' && historyItem.customPositions) {
+                        this.pendingCustomPositions =
+                            CustomLayoutService.parsePositions(historyItem.customPositions);
+                    }
+                    
                     // pair-uniform이 아닌 경우 renderExampleCards 호출
                     // 미리보기 카드 생성 (renderExampleCards 호출 - 복원된 배치 형태로 렌더링됨)
                     // renderExampleCards는 nextSeatId를 1로 초기화하므로, 호출 후에 seatId를 재설정해야 함
@@ -6358,6 +6511,8 @@ export class MainController {
 
             // 읽기 전용 모드 활성화
             this.isReadOnlyMode = true;
+            // 확정된 이력을 보는 중에는 책상도 옮길 수 없어야 한다
+            this.customLayoutManager?.setDeskEditing(false);
             
             // 모든 좌석 카드의 드래그 비활성화
             allCards.forEach(card => {
@@ -7901,6 +8056,15 @@ export class MainController {
                                     <li>5명 모둠 배치: 2x3 그리드 (분단 수: 3~5)</li>
                                     <li>6명 모둠 배치: 2x3 그리드 (분단 수: 2~4)</li>
                                     <li>🔄 남녀 섞기: 모둠 내에서 남녀를 균형있게 섞어 배치</li>
+                                </ul>
+                            </li>
+                            <li><strong>✏️ 사용자 구성 배치</strong>: 책상을 원하는 자리로 직접 끌어다 놓아 교실 모양을 만듭니다
+                                <ul style="padding-left: 15px; margin-top: 5px;">
+                                    <li>ㄷ자, 원형, 섬 모양 등 정해진 틀에 없는 배치를 만들 수 있습니다</li>
+                                    <li>책상을 원하는 모양으로 놓은 뒤 <strong>자리 배치하기</strong>를 누르면 학생이 배정됩니다</li>
+                                    <li>배정 전에는 카드를 끌면 <strong>책상이 이동</strong>하고, 배정 후에는 <strong>학생이 서로 교환</strong>됩니다</li>
+                                    <li>만든 모양은 반별로 저장되어 다음에 열 때 그대로 나타납니다</li>
+                                    <li>처음부터 다시 만들려면 "책상 위치 초기화"를 누르세요</li>
                                 </ul>
                             </li>
                         </ul>

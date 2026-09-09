@@ -216,10 +216,15 @@
                             </div>
 
                             <label class="radio-option">
-                                <input type="radio" name="layout-type" value="ushape" data-seat-type="single"
-                                    aria-label="ㄷ자 2명 짝꿍 배치 (준비중)">
-                                <span>ㄷ자 2명 짝꿍 배치 (준비중)</span>
+                                <input type="radio" name="layout-type" value="custom" data-seat-type="single"
+                                    aria-label="사용자 구성 배치">
+                                <span>사용자 구성 배치</span>
                             </label>
+                            <div id="custom-layout-hint" class="custom-layout-hint" style="display: none;">
+                                책상을 끌어다 원하는 모양으로 놓은 뒤 <strong>자리 배치하기</strong>를 누르세요.
+                                ㄷ자, 원형 등 자유롭게 만들 수 있습니다.
+                                <button type="button" id="custom-layout-reset" class="custom-layout-reset">책상 위치 초기화</button>
+                            </div>
                         </div>
                     </div>
 
