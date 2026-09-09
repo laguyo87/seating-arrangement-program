@@ -78,7 +78,21 @@ export class PrintExportManager {
         const height = Math.max(1, Math.round(bounds.height * scale));
 
         const extraStyle = `
-                        /* 사용자 구성 배치: 좌표로 놓인 책상을 그대로 인쇄한다 */
+                        /* 사용자 구성 배치: 좌표로 놓인 책상을 그대로 인쇄한다.
+                           좌석 영역이 고정 폭이 되므로 부모를 flex로 만들어 확실히 가운데 둔다.
+                           (margin: auto 만으로는 회전된 인쇄 레이아웃에서 한쪽으로 쏠렸다) */
+                        .classroom-layout {
+                            display: flex !important;
+                            flex-direction: column !important;
+                            align-items: center !important;
+                        }
+                        /* 칠판은 left:50% + translateX(-50%)로 스스로 가운데 정렬한다.
+                           부모를 flex로 바꾸면 이중으로 밀리므로 그 보정을 걷어낸다.
+                           (칠판 글자를 되돌리는 span의 회전은 건드리지 않는다) */
+                        .blackboard-area {
+                            left: auto !important;
+                            transform: none !important;
+                        }
                         .seats-area {
                             display: block !important;
                             position: relative !important;
@@ -550,6 +564,10 @@ ${customLayoutStyle}
                             color: #667eea;
                             font-size: 8px;
                             margin-bottom: 3px;
+                            transform: rotate(180deg) !important;
+                        }
+                        /* 좌석 번호도 되돌리지 않으면 뒤집힌 채로 인쇄된다 */
+                        .seat-number-label {
                             transform: rotate(180deg) !important;
                         }
                         .labels-row {
